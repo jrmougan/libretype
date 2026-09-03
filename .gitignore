@@ -1,13 +1,27 @@
-# Binarios compilados del spike
-spike-deadkeys/driver
-spike-deadkeys/wkhost
-spike-deadkeys/probe
-spike-deadkeys/resultado-*.json
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# macOS
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
 .DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# Node (para cuando entre el frontend)
-node_modules/
-dist/
-target/
+# Build
+src-tauri/target/

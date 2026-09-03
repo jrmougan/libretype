@@ -1,62 +1,47 @@
-# LibreType
+# Svelte + TS + Vite
 
-Tutor de mecanografía multiplataforma para escritorio. Muy visual y accesible,
-pensado para todo el mundo: de niños a mayores.
+This template should help get you started developing with Svelte and TypeScript in Vite.
 
-Estado: **eligiendo stack**. Nada implementado todavía.
+## Recommended IDE Setup
 
-## Decisión de stack en curso
+[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
 
-Candidatos: Tauri v2 + web · Electron · Flutter desktop.
+## Need an official Svelte framework?
 
-El criterio que decide no es el peso del binario sino dos ejes:
+Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
 
-1. **Fidelidad de teclado.** Es un tutor de mecanografía en español: las tildes
-   se escriben con *dead keys* (`´` + `a` = `á`) y eso es el núcleo funcional
-   del producto, no un detalle de i18n.
-2. **Accesibilidad real.** Lectores de pantalla, escalado del SO al 200%, alto
-   contraste, movimiento reducido. Además, EN 301 549 (vía RD 1112/2018) aplica
-   a software de escritorio, no solo a web — relevante si algún colegio público
-   lo adopta.
+## Technical considerations
 
-## Hallazgos
+**Why use this over SvelteKit?**
 
-### macOS / WKWebView — resuelto
+- It brings its own routing solution which might not be preferable for some users.
+- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
 
-Se sospechaba que WKWebView (el motor que usaría Tauri en macOS) arrastraba un
-bug de dead keys que duplicaba el acento y se comía la tecla siguiente. Si fuera
-cierto, descartaría Tauri.
+This template contains as little as possible to get started with Vite + TypeScript + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
 
-**No reproduce.** 8/8 casos idénticos a un `NSTextView` nativo de AppKit.
-Ver [`spike-deadkeys/RESULTADOS.md`](spike-deadkeys/RESULTADOS.md).
+Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
 
-Hallazgo secundario que sí condiciona el diseño: en WKWebView **los eventos de
-composición preceden al `keydown`** que los provoca (WebKit #165004). El carácter
-llega confirmado antes de saber qué tecla lo produjo. Por eso el resaltado de
-tecla física y la captura del carácter deben ser canales **independientes**, no
-solo separados.
+**Why `global.d.ts` instead of `compilerOptions.types` inside `jsconfig.json` or `tsconfig.json`?**
 
-### Linux / WebKitGTK — resuelto en lo esencial
+Setting `compilerOptions.types` shuts out all other types not explicitly listed in the configuration. Using triple-slash references keeps the default TypeScript setting of accepting type information from the entire workspace, while also adding `svelte` and `vite/client` type information.
 
-Era el punto de fallo que señalaban todos los análisis. **8/8 casos idénticos a
-un `GtkTextView` nativo** (Ubuntu 24.04, WebKitGTK 2.52.6).
-Ver [`spike-deadkeys/linux/RESULTADOS-LINUX.md`](spike-deadkeys/linux/RESULTADOS-LINUX.md).
+**Why include `.vscode/extensions.json`?**
 
-Queda pendiente en hardware real: la fidelidad de `.code` y el comportamiento
-con IBus, que un contenedor no tiene.
+Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
 
-### Dos cosas que condicionan el diseño
+**Why enable `allowJs` in the TS template?**
 
-**El carácter esperado depende de la plataforma.** `´`+espacio da `´` en macOS y
-`'` en GTK; `´`+`´` da `´´` en macOS y `´` en GTK. No puede haber una tabla única
-de "esta pulsación produce este carácter" o habrá lecciones que den error en
-Linux y no en macOS.
+While `allowJs: false` would indeed prevent the use of `.js` files in the project, it does not prevent the use of JavaScript syntax in `.svelte` files. In addition, it would force `checkJs: false`, bringing the worst of both worlds: not being able to guarantee the entire codebase is TypeScript, and also having worse typechecking for the existing JavaScript. In addition, there are valid use cases in which a mixed codebase may be relevant.
 
-**El orden de eventos difiere entre motores.** En Linux el `keydown` precede a la
-composición; en macOS es al revés. Los dos canales tienen que ser independientes
-del orden.
+**Why is HMR not preserving my local component state?**
 
-## Reproducir el spike de macOS
+HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/rixo/svelte-hmr#svelte-hmr).
 
-    cd spike-deadkeys
-    swiftc -O Driver.swift -o driver && ./driver
+If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
+
+```ts
+// store.ts
+// An extremely simple external store
+import { writable } from 'svelte/store'
+export default writable(0)
+```

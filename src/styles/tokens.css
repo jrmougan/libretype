@@ -1,0 +1,217 @@
+/* Tokens de diseño de LibreType.
+ *
+ * Todo color, tamaño y duración sale de aquí. La razón no es estética: la
+ * accesibilidad exige poder cambiar escala de texto, contraste y movimiento
+ * sin tocar los componentes. Si un componente hardcodea un valor, ese ajuste
+ * deja de funcionar en ese punto y no nos enteramos hasta que lo reporta
+ * alguien que no puede usar la app.
+ */
+
+:root {
+  /* --- Escala tipográfica -------------------------------------------------
+   * --ui-scale lo controla el usuario (100% a 200%). Todo tamaño de texto se
+   * deriva de él, así que subirlo agranda la interfaz entera de forma
+   * coherente en vez de romper el layout.
+   */
+  --ui-scale: 1;
+
+  --text-xs: calc(0.75rem * var(--ui-scale));
+  --text-sm: calc(0.875rem * var(--ui-scale));
+  --text-base: calc(1rem * var(--ui-scale));
+  --text-lg: calc(1.25rem * var(--ui-scale));
+  --text-xl: calc(1.75rem * var(--ui-scale));
+  --text-drill: calc(2rem * var(--ui-scale));
+
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-drill: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Fuente para dislexia: se activa poniendo data-font="dyslexic" en <html>.
+   * Se degrada a una sans normal si la fuente no está instalada. */
+  --font-stack: var(--font-ui);
+
+  /* --- Espaciado y forma --- */
+  --space-1: calc(0.25rem * var(--ui-scale));
+  --space-2: calc(0.5rem * var(--ui-scale));
+  --space-3: calc(0.75rem * var(--ui-scale));
+  --space-4: calc(1rem * var(--ui-scale));
+  --space-6: calc(1.5rem * var(--ui-scale));
+  --space-8: calc(2rem * var(--ui-scale));
+  --radius: 8px;
+  --radius-key: 6px;
+
+  /* Objetivo mínimo de pulsación. 44px es el mínimo de WCAG 2.2 (2.5.8);
+   * usamos 48 porque el público incluye niños y personas mayores. */
+  --target-min: 48px;
+
+  /* --- Color: claro --- */
+  --bg: #faf9f7;
+  --surface: #ffffff;
+  --surface-sunken: #f0eee9;
+  --border: #d9d5cd;
+  --border-strong: #a8a296;
+
+  --fg: #1b1b19;
+  --fg-muted: #5f5c55;
+
+  --accent: #1d4ed8;
+  --accent-fg: #ffffff;
+
+  /* Estos tres nunca se usan solos: siempre acompañados de forma, icono o
+   * subrayado. Un daltónico no debe depender del color para saber si acertó. */
+  --ok: #15803d;
+  --ok-bg: #dcfce7;
+  --error: #b91c1c;
+  --error-bg: #fee2e2;
+  --pending: #92400e;
+  --pending-bg: #fef3c7;
+
+  /* --- Dedos: ocho tonos distinguibles ---
+   * Se refuerzan siempre con el número de dedo en texto, nunca solo color. */
+  --finger-l-pinky: #7c3aed;
+  --finger-l-ring: #2563eb;
+  --finger-l-middle: #0891b2;
+  --finger-l-index: #059669;
+  --finger-r-index: #ca8a04;
+  --finger-r-middle: #ea580c;
+  --finger-r-ring: #dc2626;
+  --finger-r-pinky: #be185d;
+
+  /* --- Movimiento --- */
+  --motion-fast: 90ms;
+  --motion-base: 180ms;
+  --motion-slow: 320ms;
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+/* Oscuro: solo se redefinen tokens, nunca se declara un color por primera vez
+ * dentro de este bloque. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15151a;
+    --surface: #1d1d24;
+    --surface-sunken: #111116;
+    --border: #33333d;
+    --border-strong: #565664;
+
+    --fg: #ecebe7;
+    --fg-muted: #a3a09a;
+
+    --accent: #7ba7f5;
+    --accent-fg: #10131a;
+
+    --ok: #4ade80;
+    --ok-bg: #14361f;
+    --error: #fb7185;
+    --error-bg: #3f1520;
+    --pending: #fbbf24;
+    --pending-bg: #3b2c08;
+
+    --finger-l-pinky: #c4b5fd;
+    --finger-l-ring: #93c5fd;
+    --finger-l-middle: #67e8f9;
+    --finger-l-index: #6ee7b7;
+    --finger-r-index: #fde047;
+    --finger-r-middle: #fdba74;
+    --finger-r-ring: #fca5a5;
+    --finger-r-pinky: #f9a8d4;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #15151a;
+  --surface: #1d1d24;
+  --surface-sunken: #111116;
+  --border: #33333d;
+  --border-strong: #565664;
+  --fg: #ecebe7;
+  --fg-muted: #a3a09a;
+  --accent: #7ba7f5;
+  --accent-fg: #10131a;
+  --ok: #4ade80;
+  --ok-bg: #14361f;
+  --error: #fb7185;
+  --error-bg: #3f1520;
+  --pending: #fbbf24;
+  --pending-bg: #3b2c08;
+  --finger-l-pinky: #c4b5fd;
+  --finger-l-ring: #93c5fd;
+  --finger-l-middle: #67e8f9;
+  --finger-l-index: #6ee7b7;
+  --finger-r-index: #fde047;
+  --finger-r-middle: #fdba74;
+  --finger-r-ring: #fca5a5;
+  --finger-r-pinky: #f9a8d4;
+}
+
+/* Alto contraste del sistema. forced-colors lo aplica Windows por su cuenta;
+ * aquí solo nos aseguramos de que los bordes no desaparezcan. */
+@media (forced-colors: active) {
+  :root {
+    --border: CanvasText;
+    --border-strong: CanvasText;
+  }
+  .key { forced-color-adjust: none; border: 2px solid CanvasText; }
+}
+
+/* Movimiento reducido: se respeta la preferencia del sistema, y además el
+ * usuario puede forzarlo desde los ajustes de la app con data-motion. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+  }
+}
+:root[data-motion="reduced"] {
+  --motion-fast: 0ms;
+  --motion-base: 0ms;
+  --motion-slow: 0ms;
+}
+
+:root[data-font="dyslexic"] {
+  --font-stack: "OpenDyslexic", "Comic Sans MS", var(--font-ui);
+  --font-drill: "OpenDyslexic Mono", "OpenDyslexic", var(--font-ui);
+  letter-spacing: 0.02em;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { color-scheme: light dark; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-stack);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* El foco tiene que verse siempre: es requisito de operabilidad por teclado
+ * (EN 301 549 / WCAG 2.4.7), y aquí más que en ninguna app. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+button {
+  font: inherit;
+  min-height: var(--target-min);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease);
+}
+button:hover { background: var(--surface-sunken); }
+
+/* Solo para lectores de pantalla. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; border: 0;
+}

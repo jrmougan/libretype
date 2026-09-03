@@ -8,16 +8,21 @@
  * Si abrir SQLite falla, se cae a localStorage en vez de romper la app: perder
  * el histórico es malo, no poder practicar es peor.
  */
+import type { EstadoTecla } from '../keyboard/dominio';
 import type { Sesion } from './progreso';
 
 export interface Almacen {
   readonly tipo: 'sqlite' | 'local';
   guardar(s: Sesion): Promise<void>;
   leerTodas(): Promise<Sesion[]>;
+  /** Dominio acumulado por tecla, para saber cuánta ayuda visual retirar. */
+  leerTeclas(): Promise<Map<string, EstadoTecla>>;
+  guardarTeclas(teclas: ReadonlyMap<string, EstadoTecla>): Promise<void>;
   borrarTodo(): Promise<void>;
 }
 
 const CLAVE_LOCAL = 'libretype.sesiones';
+const CLAVE_TECLAS = 'libretype.teclas';
 /** Tope del respaldo en navegador; localStorage no es para histórico infinito. */
 const TOPE_LOCAL = 500;
 
@@ -68,8 +73,33 @@ class AlmacenSqlite implements Almacen {
     }));
   }
 
+  async leerTeclas(): Promise<Map<string, EstadoTecla>> {
+    const filas = await this.#db.select<
+      { code: string; intentos: number; aciertos: number; ms_total: number }[]
+    >('SELECT code, intentos, aciertos, ms_total FROM teclas');
+    return new Map(filas.map((f) => [
+      f.code,
+      { intentos: f.intentos, aciertos: f.aciertos, msTotal: f.ms_total },
+    ]));
+  }
+
+  async guardarTeclas(teclas: ReadonlyMap<string, EstadoTecla>): Promise<void> {
+    for (const [code, e] of teclas) {
+      await this.#db.execute(
+        `INSERT INTO teclas (code, intentos, aciertos, ms_total)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT(code) DO UPDATE SET
+           intentos = excluded.intentos,
+           aciertos = excluded.aciertos,
+           ms_total = excluded.ms_total`,
+        [code, e.intentos, e.aciertos, e.msTotal],
+      );
+    }
+  }
+
   async borrarTodo(): Promise<void> {
     await this.#db.execute('DELETE FROM sesiones');
+    await this.#db.execute('DELETE FROM teclas');
   }
 }
 
@@ -98,8 +128,26 @@ export class AlmacenLocal implements Almacen {
     return this.#leer();
   }
 
+  async leerTeclas(): Promise<Map<string, EstadoTecla>> {
+    try {
+      const crudo = localStorage.getItem(CLAVE_TECLAS);
+      return new Map(crudo ? (JSON.parse(crudo) as [string, EstadoTecla][]) : []);
+    } catch {
+      return new Map();
+    }
+  }
+
+  async guardarTeclas(teclas: ReadonlyMap<string, EstadoTecla>): Promise<void> {
+    try {
+      localStorage.setItem(CLAVE_TECLAS, JSON.stringify([...teclas]));
+    } catch { /* modo privado o cuota llena */ }
+  }
+
   async borrarTodo(): Promise<void> {
-    try { localStorage.removeItem(CLAVE_LOCAL); } catch { /* ignorado */ }
+    try {
+      localStorage.removeItem(CLAVE_LOCAL);
+      localStorage.removeItem(CLAVE_TECLAS);
+    } catch { /* ignorado */ }
   }
 }
 
@@ -107,9 +155,14 @@ export class AlmacenLocal implements Almacen {
 export class AlmacenMemoria implements Almacen {
   readonly tipo = 'local' as const;
   #sesiones: Sesion[] = [];
+  #teclas = new Map<string, EstadoTecla>();
   async guardar(s: Sesion): Promise<void> { this.#sesiones.push(s); }
   async leerTodas(): Promise<Sesion[]> { return [...this.#sesiones]; }
-  async borrarTodo(): Promise<void> { this.#sesiones = []; }
+  async leerTeclas(): Promise<Map<string, EstadoTecla>> { return new Map(this.#teclas); }
+  async guardarTeclas(t: ReadonlyMap<string, EstadoTecla>): Promise<void> {
+    this.#teclas = new Map(t);
+  }
+  async borrarTodo(): Promise<void> { this.#sesiones = []; this.#teclas = new Map(); }
 }
 
 export async function abrirAlmacen(): Promise<Almacen> {

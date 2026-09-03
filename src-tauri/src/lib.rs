@@ -4,7 +4,8 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 /// No hay cuentas ni servidor: con menores de por medio, lo que no se recoge
 /// no hay que protegerlo.
 fn migraciones() -> Vec<Migration> {
-    vec![Migration {
+    vec![
+    Migration {
         version: 1,
         description: "sesiones de practica",
         sql: "
@@ -20,6 +21,19 @@ fn migraciones() -> Vec<Migration> {
             );
             CREATE INDEX IF NOT EXISTS idx_sesiones_leccion
                 ON sesiones (leccion);
+        ",
+        kind: MigrationKind::Up,
+    },
+    Migration {
+        version: 2,
+        description: "dominio por tecla",
+        sql: "
+            CREATE TABLE IF NOT EXISTS teclas (
+                code      TEXT    PRIMARY KEY,
+                intentos  INTEGER NOT NULL,
+                aciertos  INTEGER NOT NULL,
+                ms_total  INTEGER NOT NULL
+            );
         ",
         kind: MigrationKind::Up,
     }]

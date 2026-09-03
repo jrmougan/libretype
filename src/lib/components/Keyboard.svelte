@@ -10,6 +10,7 @@
    * Se guía por `code`, la posición física, nunca por el carácter: es lo único
    * que se mantiene igual entre distribuciones y entre motores.
    */
+  import { opacidadEtiqueta, type MapaDominio } from '../keyboard/dominio';
   import { FINGER_NAMES, type Finger, type KeyDef, type KeyStep, type Layout }
     from '../keyboard/layouts';
 
@@ -29,11 +30,19 @@
     guia?: ReadonlySet<string>;
     /** Etiqueta accesible; si no se pasa, se describe la tecla objetivo. */
     etiqueta?: string;
+    /**
+     * Dominio por tecla, de 0 a 1. Las teclas que el alumno ya domina dejan de
+     * mostrar su letra: mirar la pantalla para buscarla es el hábito que hay
+     * que romper, y retirar el andamiaje poco a poco es parte de enseñar.
+     * Vacío = ayuda completa.
+     */
+    dominios?: MapaDominio;
   }
 
   let {
     layout, held, next = null, lastWrong = false,
     guia = new Set<string>(), etiqueta = undefined,
+    dominios = new Map<string, number>(),
   }: Props = $props();
 
   const U = 62;    // ancho de una tecla en unidades SVG
@@ -99,6 +108,7 @@
     {@const st = state(k)}
     {@const isMod = modifierActive(k)}
     {@const enGuia = guia.has(k.code)}
+    {@const opac = k.label ? 1 : opacidadEtiqueta(dominios.get(k.code) ?? 0)}
     <g class="key {st}" class:mod={isMod} class:wrong={st === 'pressed' && lastWrong}>
       <rect
         x={k.x} y={k.y} width={k.w} height={H} rx="7"
@@ -134,15 +144,22 @@
         </text>
       {:else}
         {#if k.shift}
-          <text x={k.x + 9} y={k.y + 19} class="lbl tiny" fill="var(--fg-muted)">{k.shift}</text>
+          <text x={k.x + 9} y={k.y + 19} class="lbl tiny" opacity={opac}
+                fill="var(--fg-muted)">{k.shift}</text>
         {/if}
         <text
-          x={k.x + 9} y={k.y + H - 17} class="lbl main"
+          x={k.x + 9} y={k.y + H - 17} class="lbl main" opacity={opac}
           fill={st === 'pressed' && !lastWrong ? 'var(--accent-fg)' : 'var(--fg)'}
         >{k.base}</text>
         {#if k.altgr}
-          <text x={k.x + k.w - 9} y={k.y + H - 17} class="lbl tiny alt"
+          <text x={k.x + k.w - 9} y={k.y + H - 17} class="lbl tiny alt" opacity={opac}
                 fill="var(--fg-muted)">{k.altgr}</text>
+        {/if}
+        <!-- La tecla aprendida no se queda vacía, que parecería un fallo de
+             dibujo: lleva una marca que significa «esta ya te la sabes». -->
+        {#if opac === 0}
+          <circle cx={k.x + k.w / 2} cy={k.y + H / 2 - 2} r="3"
+                  fill="var(--fg-muted)" opacity="0.5" />
         {/if}
       {/if}
 

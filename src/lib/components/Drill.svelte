@@ -12,6 +12,7 @@
   import Keyboard from './Keyboard.svelte';
   import { TypingEngine, computeStats, diffAgainstTarget, type CharState, type Stats }
     from '../keyboard/engine';
+  import type { MapaDominio } from '../keyboard/dominio';
   import { buildIndex, FINGER_NAMES, type KeyStep, type Layout }
     from '../keyboard/layouts';
 
@@ -20,9 +21,18 @@
     target: string;
     /** Se llama una sola vez al completar la lección, con las métricas. */
     onDone?: (stats: Stats) => void;
+    /**
+     * Un intento sobre una tecla concreta. Se deduce del carácter **objetivo**,
+     * no del `keydown`: los spikes demostraron que no se puede emparejar un
+     * carácter confirmado con la tecla que lo produjo, porque el orden de los
+     * eventos cambia según el motor.
+     */
+    onTecla?: (code: string, acierto: boolean, ms: number) => void;
+    /** Dominio por tecla, para ir retirando la ayuda visual. */
+    dominios?: MapaDominio;
   }
 
-  let { layout, target, onDone }: Props = $props();
+  let { layout, target, onDone, onTecla, dominios }: Props = $props();
 
   let field = $state<HTMLTextAreaElement | null>(null);
   let engine: TypingEngine | null = null;
@@ -85,14 +95,35 @@
         // medias el campo muestra `´` pero la posición de la lección no debe
         // avanzar, o la pista pediría la letra siguiente en vez de la vocal
         // que completa la tilde.
+        const antes = typed.length;
         typed = s.committed.slice(0, target.length);
         composing = s.composing;
         stamps = [...engine!.stamps];
+        if (typed.length > antes) reportarTeclas(antes, typed.length);
       },
     });
     engine.focus();
     return () => engine?.destroy();
   });
+
+  /**
+   * Apunta cada carácter recién confirmado como un intento sobre las teclas que
+   * había que pulsar. Para una vocal con tilde son dos: el acento y la vocal, y
+   * las dos se llevan el mismo resultado. Es una aproximación —no sabemos cuál
+   * de las dos falló— pero mide lo que interesa: si esa combinación le sale.
+   */
+  function reportarTeclas(desde: number, hasta: number): void {
+    if (!onTecla) return;
+    for (let i = desde; i < hasta; i++) {
+      const esperado = target[i];
+      if (esperado === undefined) continue;
+      const pasos = index.get(esperado);
+      if (!pasos) continue;
+      const ms = i > 0 && stamps[i] && stamps[i - 1] ? stamps[i] - stamps[i - 1] : 0;
+      const acierto = typed[i] === esperado;
+      for (const paso of pasos) onTecla(paso.code, acierto, ms);
+    }
+  }
 
   // Se avisa una sola vez: sin el guardia, cualquier reactividad posterior
   // (un keyup que llega tarde, por ejemplo) guardaría la sesión otra vez.
@@ -147,7 +178,7 @@
     {/if}
   </p>
 
-  <Keyboard {layout} {held} next={nextStep} {lastWrong} />
+  <Keyboard {layout} {held} next={nextStep} {lastWrong} {dominios} />
 
   <dl class="stats">
     <div><dt>Velocidad</dt><dd>{stats.wpm} <small>ppm</small></dd></div>

@@ -6,6 +6,9 @@
   import { LAYOUTS } from './lib/keyboard/layouts';
   import { LESSONS } from './lib/lessons';
   import type { Stats } from './lib/keyboard/engine';
+  import {
+    contarDominadas, mapaDeDominio, registrar, type EstadoTecla,
+  } from './lib/keyboard/dominio';
   import { abrirAlmacen, type Almacen } from './lib/storage/almacen';
   import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
 
@@ -20,6 +23,16 @@
   let verProgreso = $state(false);
   /** 'cero' es la pantalla de colocación de manos; 'leccion', el ejercicio. */
   let vista = $state<'cero' | 'leccion'>('leccion');
+
+  /** Intentos acumulados por tecla, que deciden cuánta ayuda visual retirar. */
+  let teclas = $state<Map<string, EstadoTecla>>(new Map());
+  /** 'auto' retira la ayuda según el dominio; 'siempre' la deja entera. */
+  let ayudaTeclado = $state<'auto' | 'siempre'>('auto');
+
+  const dominios = $derived(
+    ayudaTeclado === 'siempre' ? new Map<string, number>() : mapaDeDominio(teclas),
+  );
+  const aprendidas = $derived(contarDominadas(mapaDeDominio(teclas)));
 
   const porLeccion = $derived(resumirLecciones(sesiones));
 
@@ -39,11 +52,19 @@
     almacen = await abrirAlmacen();
     tipoAlmacen = almacen.tipo;
     sesiones = await almacen.leerTodas();
+    teclas = await almacen.leerTeclas();
 
     // Primera vez: se empieza por dónde van las manos, no por un ejercicio.
     // Quien nunca ha tecleado al tacto se pierde si le sueltas un texto.
     if (sesiones.length === 0) vista = 'cero';
   });
+
+  function anotarTecla(code: string, acierto: boolean, ms: number): void {
+    // Se muta un mapa nuevo para que Svelte lo vea cambiar.
+    const m = new Map(teclas);
+    m.set(code, registrar(m.get(code), acierto, ms));
+    teclas = m;
+  }
 
   async function terminada(stats: Stats): Promise<void> {
     const sesion: Sesion = {
@@ -61,9 +82,13 @@
     result = { stats, record };
 
     // Que falle el guardado no puede tumbar la práctica.
+    // El dominio por tecla se persiste al terminar la lección, no en cada
+    // pulsación: escribir en la base de datos sesenta veces por minuto no
+    // aporta nada y se nota.
     try {
       await almacen?.guardar(sesion);
       sesiones = [...sesiones, sesion];
+      await almacen?.guardarTeclas(teclas);
     } catch (err) {
       console.warn('[libretype] no se pudo guardar la sesión:', err);
     }
@@ -72,6 +97,7 @@
   async function borrarProgreso(): Promise<void> {
     await almacen?.borrarTodo();
     sesiones = [];
+    teclas = new Map();
   }
 
   $effect(() => {
@@ -149,6 +175,23 @@
       </div>
 
       <div class="field">
+        <span id="ayuda-l">Letras del teclado en pantalla</span>
+        <div class="group" role="group" aria-labelledby="ayuda-l">
+          <button aria-pressed={ayudaTeclado === 'auto'} onclick={() => (ayudaTeclado = 'auto')}>
+            Se van quitando
+          </button>
+          <button aria-pressed={ayudaTeclado === 'siempre'} onclick={() => (ayudaTeclado = 'siempre')}>
+            Siempre visibles
+          </button>
+        </div>
+        <p class="note">
+          Las teclas que ya dominas dejan de mostrar su letra, para que dejes de
+          mirar el teclado. {#if aprendidas > 0}Llevas {aprendidas}
+          {aprendidas === 1 ? 'tecla aprendida' : 'teclas aprendidas'}.{/if}
+        </p>
+      </div>
+
+      <div class="field">
         <label for="layout">Distribución del teclado</label>
         <select id="layout" bind:value={layout}>
           {#each LAYOUTS as l (l.id)}<option value={l}>{l.name}</option>{/each}
@@ -203,7 +246,14 @@
       <p class="focus">{lesson.focus}</p>
 
       {#key lesson.id}
-        <Drill bind:this={drill} {layout} target={lesson.text} onDone={terminada} />
+        <Drill
+          bind:this={drill}
+          {layout}
+          target={lesson.text}
+          {dominios}
+          onDone={terminada}
+          onTecla={anotarTecla}
+        />
       {/key}
 
       {#if result}

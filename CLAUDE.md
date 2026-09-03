@@ -91,6 +91,32 @@ Otras piezas:
 - `components/Keyboard.svelte` — SVG, no canvas (escala nítido al 200%, se
   estiliza con tokens, es inspeccionable).
 
+## Retirada de la ayuda visual
+
+`src/lib/keyboard/dominio.ts`. El teclado en pantalla es una muleta: mirarlo
+para encontrar la tecla es el hábito que hay que romper. Las teclas que el
+alumno domina dejan de mostrar su letra y pasan a un punto — no se quedan
+vacías, que parecería un fallo de dibujo.
+
+Reglas que están ahí por algo y no son parámetros que tocar a ojo:
+
+- **No se retira nada por debajo de 8 intentos.** Con tres aciertos no se sabe
+  si domina la tecla o ha tenido suerte.
+- **Ni por debajo del 90% de precisión**, por buena que sea la velocidad.
+  Teclear rápido fallando no es dominar, ni aquí ni en las marcas.
+- **La opacidad no baja gradualmente hasta un gris ilegible**: se mantiene por
+  encima de 0,55 y luego desaparece del todo. Una letra al 20% incumpliría el
+  contraste y parecería un error.
+- Hay ajuste para dejarlas **siempre visibles**. Quien necesite la ayuda no
+  puede perderla porque una heurística crea que ya no le hace falta.
+
+El dominio se persiste al terminar cada lección, no en cada pulsación.
+
+Los intentos se atribuyen a la tecla del carácter **objetivo**, no al `keydown`:
+los spikes demostraron que no se puede emparejar un carácter confirmado con la
+tecla que lo produjo. En una vocal con tilde cuentan las dos teclas —el acento y
+la vocal— con el mismo resultado; es una aproximación deliberada.
+
 ## Lección cero
 
 `src/lib/components/LeccionCero.svelte`, con el contenido en

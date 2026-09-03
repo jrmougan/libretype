@@ -133,6 +133,11 @@ export class TypingEngine {
   // --- Canal B: caracteres --------------------------------------------------
 
   #onCompositionStart = (): void => {
+    // Pone al día `#last` antes de fijar la frontera. La frontera se toma del
+    // campo y lo confirmado se corta sobre `#last`: si los dos se desincronizan
+    // (un cambio de valor que no pasó por un `input`, por ejemplo al restaurar
+    // una lección) lo confirmado saldría mal.
+    this.#sync(performance.now());
     this.#composing = true;
     // `compositionstart` llega antes de que el acento entre en el campo, así
     // que la longitud de ahora es justo lo confirmado. Se verificó en los dos

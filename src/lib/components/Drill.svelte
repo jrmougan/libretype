@@ -71,6 +71,12 @@
 
   onMount(() => {
     if (!field) return;
+
+    // `autocorrect` no está en los tipos HTML de Svelte, pero WebKit sí lo
+    // respeta y aquí hace falta: si macOS "corrige" lo que teclea el alumno,
+    // corrompe el ejercicio.
+    field.setAttribute('autocorrect', 'off');
+
     engine = new TypingEngine(field, {
       physical: () => { held = new Set(engine!.heldCodes); },
       text: (s) => {
@@ -107,7 +113,6 @@
     bind:this={field}
     class="capture"
     autocomplete="off"
-    autocorrect="off"
     autocapitalize="off"
     spellcheck="false"
     aria-label="Escribe aquí el texto de la lección"

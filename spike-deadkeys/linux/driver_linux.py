@@ -162,11 +162,13 @@ class Driver:
                 parts = []
                 for r in o.get("log", []):
                     ty = r.get("type", "?")
+                    v = r.get("v")
+                    tail = f"|{v}" if v is not None else ""
                     if ty.startswith("key"):
-                        parts.append(f"{ty}({r.get('key')})")
+                        parts.append(f"{ty}({r.get('key')}){tail}")
                     else:
                         d = r.get("data")
-                        parts.append(f"{ty}({d!r})")
+                        parts.append(f"{ty}({d!r}){tail}")
                 seq = " ".join(parts)
             except Exception:
                 pass

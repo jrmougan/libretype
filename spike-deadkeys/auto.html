@@ -17,6 +17,7 @@ window.__log = [];
     data: ('data' in e) ? e.data : null,
     inputType: ('inputType' in e) ? e.inputType : null,
     repeat: e.type.startsWith('key') ? e.repeat : null,
+    v: pad.value,
   });
   document.getElementById('l').textContent =
     window.__log.map(r => r.type + (r.key ? '(' + r.key + ')' : '')).join(' ');

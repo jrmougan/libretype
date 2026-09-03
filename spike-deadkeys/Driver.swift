@@ -176,9 +176,10 @@ final class Driver: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 if let log = o["log"] as? [[String: Any]] {
                     seq = log.map { r -> String in
                         let ty = (r["type"] as? String) ?? "?"
-                        if ty.hasPrefix("key") { return "\(ty)(\((r["key"] as? String) ?? "-"))" }
+                        let v = (r["v"] as? String).map { "|\($0)" } ?? ""
+                        if ty.hasPrefix("key") { return "\(ty)(\((r["key"] as? String) ?? "-"))\(v)" }
                         let dt = (r["data"] as? String).map { "'\($0)'" } ?? "null"
-                        return "\(ty)(\(dt))"
+                        return "\(ty)(\(dt))\(v)"
                     }.joined(separator: " ")
                 }
             }

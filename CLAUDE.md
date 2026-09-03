@@ -14,11 +14,13 @@ están en español; mantenlo así.
     pnpm build         # bundle de producción
     pnpm tauri:build   # binario empaquetado
     pnpm check         # svelte-check + tsc; debe dar 0 errores
+    pnpm test          # vitest sobre el motor y la tabla de teclado
+    pnpm test:watch
 
     cd src-tauri && cargo build    # solo el backend Rust
 
-**No hay suite de tests.** La verificación es `pnpm check`, que compile, y —para
-cualquier cosa que toque el teclado— ejecutar la app de verdad. Ver más abajo.
+Un solo test: `pnpm test -- -t "acento cancelado"` (por nombre) o
+`pnpm test src/lib/keyboard/layouts.test.ts` (por fichero).
 
 ## Lo que decidió el stack (no re-litigar)
 
@@ -109,10 +111,31 @@ Reglas que aplican a cualquier UI nueva:
   web. Si esto lo adopta un colegio público, obliga a operabilidad completa por
   teclado y a un árbol de accesibilidad real.
 
+## Tests
+
+`src/lib/keyboard/traces.ts` guarda **secuencias reales de eventos del DOM**, con
+el valor del campo después de cada uno. Las de macOS son capturas literales de
+`spike-deadkeys/Driver.swift`; el campo `origin` distingue lo capturado de lo
+reconstruido y hay que mantenerlo honesto. `engine.test.ts` las reproduce contra
+un `<textarea>` real en jsdom.
+
+Existen porque **el orden de eventos no se puede reproducir tecleando en una
+sola máquina**: un cambio que funcione en tu Mac puede romper Linux sin que nada
+avise. Los dos bugs que ha tenido el motor están fijados como tests con nombre.
+
+`layouts.test.ts` comprueba, entre otras cosas, que **todo carácter de toda
+lección sea escribible** con la distribución. Si añades una lección con un
+carácter que ES-ISO no produce, falla ahí en vez de dejar al alumno atascado sin
+pista.
+
 ## Al tocar el teclado
 
 Los dos bugs encontrados hasta ahora **compilaban limpios y pasaban
 `svelte-check` sin errores**. Eran de orden y de estado de composición, y solo
-aparecieron ejecutando la app. Si cambias `engine.ts` o `Drill.svelte`, ejecuta
-y prueba la lección "Tildes" a mano: el cursor no debe avanzar mientras el
-acento está a medias, y debe saltar al confirmar.
+aparecieron ejecutando la app.
+
+Los tests ya cubren esos dos casos, pero no sustituyen a ejecutar: cubren el
+motor con trazas grabadas, no el método de entrada real del sistema. Si cambias
+`engine.ts` o `Drill.svelte`, ejecuta y prueba la lección "Tildes" a mano con el
+teclado físico: el cursor no debe avanzar mientras el acento está a medias, y
+debe saltar al confirmar.

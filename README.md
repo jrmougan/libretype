@@ -36,10 +36,25 @@ llega confirmado antes de saber qué tecla lo produjo. Por eso el resaltado de
 tecla física y la captura del carácter deben ser canales **independientes**, no
 solo separados.
 
-### Linux / WebKitGTK — pendiente
+### Linux / WebKitGTK — resuelto en lo esencial
 
-El punto de fallo que señalaron todos los análisis. Sin probar.
-Ver [`spike-deadkeys/linux/`](spike-deadkeys/linux/).
+Era el punto de fallo que señalaban todos los análisis. **8/8 casos idénticos a
+un `GtkTextView` nativo** (Ubuntu 24.04, WebKitGTK 2.52.6).
+Ver [`spike-deadkeys/linux/RESULTADOS-LINUX.md`](spike-deadkeys/linux/RESULTADOS-LINUX.md).
+
+Queda pendiente en hardware real: la fidelidad de `.code` y el comportamiento
+con IBus, que un contenedor no tiene.
+
+### Dos cosas que condicionan el diseño
+
+**El carácter esperado depende de la plataforma.** `´`+espacio da `´` en macOS y
+`'` en GTK; `´`+`´` da `´´` en macOS y `´` en GTK. No puede haber una tabla única
+de "esta pulsación produce este carácter" o habrá lecciones que den error en
+Linux y no en macOS.
+
+**El orden de eventos difiere entre motores.** En Linux el `keydown` precede a la
+composición; en macOS es al revés. Los dos canales tienen que ser independientes
+del orden.
 
 ## Reproducir el spike de macOS
 

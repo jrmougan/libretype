@@ -45,10 +45,10 @@ jobs:
               src-tauri/target/release/bundle/nsis/*.exe
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -79,7 +79,7 @@ jobs:
       # Sin firmar: macOS pedirá saltarse Gatekeeper y Windows mostrará el aviso
       # de SmartScreen. Firmar necesita cuenta de Apple y certificado de
       # Windows; cuando los haya, se añaden como secretos en release.yml.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: libretype-${{ matrix.runner }}
           path: ${{ matrix.artefactos }}

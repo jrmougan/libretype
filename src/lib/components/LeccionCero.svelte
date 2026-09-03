@@ -77,6 +77,7 @@
 </script>
 
 <section class="cero" aria-labelledby="cero-tit">
+  <div class="texto">
   <header>
     <p class="etapa">Antes de empezar · paso {i + 1} de {PASOS.length}</p>
     <h2 id="cero-tit">{paso.titulo}</h2>
@@ -120,14 +121,18 @@
     </label>
   {/if}
 
-  <Keyboard
-    {layout}
-    held={pulsadas}
-    guia={new Set(paso.guia)}
-    etiqueta={paso.guia.length
-      ? `Teclado en pantalla con la posición de reposo señalada: ${paso.guia.length} teclas.`
-      : 'Teclado en pantalla.'}
-  />
+  </div>
+
+  <div class="teclado">
+    <Keyboard
+      {layout}
+      held={pulsadas}
+      guia={new Set(paso.guia)}
+      etiqueta={paso.guia.length
+        ? `Teclado en pantalla con la posición de reposo señalada: ${paso.guia.length} teclas.`
+        : 'Teclado en pantalla.'}
+    />
+  </div>
 
   <nav class="pasos" aria-label="Pasos de la lección cero">
     <button onclick={() => ir(i - 1)} disabled={i === 0}>Anterior</button>
@@ -158,7 +163,44 @@
 </section>
 
 <style>
-  .cero { display: grid; gap: var(--space-4); }
+  /* En pantallas anchas, el texto a un lado y el teclado al otro: así cabe
+     todo sin desplazarse, que es el punto. En estrechas se apila y el texto se
+     desplaza dentro de su caja. */
+  .cero {
+    display: grid;
+    gap: var(--space-3) var(--space-6);
+    grid-template-areas: 'texto teclado' 'pasos pasos' 'saltar saltar';
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    min-height: 0;
+  }
+  .texto {
+    grid-area: texto;
+    display: grid;
+    gap: var(--space-3);
+    align-content: start;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  /* La fila 1fr le da altura definida a la columna, que es lo que permite al
+     SVG escalarse para llenarla en vez de quedarse a tamaño intrínseco. */
+  .teclado {
+    grid-area: teclado;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    align-items: center;
+  }
+  .pasos { grid-area: pasos; }
+  .saltar { grid-area: saltar; }
+
+  @media (max-width: 900px) {
+    .cero {
+      grid-template-areas: 'texto' 'teclado' 'pasos' 'saltar';
+      grid-template-columns: 1fr;
+      grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+    }
+  }
 
   .etapa {
     margin: 0 0 var(--space-1);
@@ -170,8 +212,8 @@
 
   /* Texto generoso y ancho de lectura cómodo: esta pantalla se lee, no se
      escanea. */
-  .cuerpo { max-width: 68ch; display: grid; gap: var(--space-3); }
-  .cuerpo p { margin: 0; font-size: var(--text-lg); line-height: 1.6; }
+  .cuerpo { max-width: 68ch; display: grid; gap: var(--space-2); }
+  .cuerpo p { margin: 0; font-size: var(--text-base); line-height: 1.55; }
 
   /* El campo está fuera de pantalla pero es enfocable de verdad: es lo que
      recibe las pulsaciones. */

@@ -91,6 +91,34 @@ Otras piezas:
 - `components/Keyboard.svelte` — SVG, no canvas (escala nítido al 200%, se
   estiliza con tokens, es inspeccionable).
 
+## Todo cabe en la ventana, sin scroll
+
+No es una preferencia estética: el alumno necesita ver **a la vez** el texto, la
+pista y el teclado. Si hay que desplazarse, se rompe justo la relación que
+enseña a no mirarse las manos.
+
+Cómo se sostiene:
+
+- `.app` ocupa `100dvh` con `overflow: hidden`. La barra de arriba lleva el
+  selector de lección, las métricas en vivo y los botones; sustituyó a diez
+  botones que ocupaban dos filas.
+- **El teclado absorbe la diferencia**: es lo último de la rejilla y se lleva el
+  espacio que sobra. El SVG escala solo, así que encoger no lo rompe.
+- **Ajustes y progreso son paneles superpuestos**, no bloques en el flujo:
+  abrirlos no puede mover el teclado de sitio.
+
+Con la letra al 200% no cabe todo a tamaño completo, así que hay un **orden de
+sacrificio explícito** y conviene respetarlo:
+
+1. Se pliega la explicación de la lección (`espacioJusto`).
+2. El texto se desplaza dentro de su caja (`max-height: 30vh`).
+3. El teclado se encoge, **pero nunca por debajo de `min(34vh, 230px)`**: un
+   teclado ilegible es peor que uno al que haya que desplazarse.
+4. Si aún así no cabe, se desplaza `.escena`. Desplazarse es malo; recortar
+   contenido y que nadie lo encuentre es peor.
+
+Al tocar esta zona, comprobar las cuatro vistas al 100% y al 200%.
+
 ## Tono y preferencias
 
 `src/lib/preferencias.ts` y `src/lib/voz.ts`.

@@ -70,6 +70,10 @@
       r.reduce((s, k) => s + (k.width ?? 1) * U + ((k.width ?? 1) - 1) * GAP + GAP, 0))) - GAP,
   );
   const height = $derived(layout.rows.length * (H + GAP) - GAP);
+  /** Hueco para el triángulo que señala la tecla objetivo. Va dentro del
+      viewBox y no como relleno CSS, para que forme parte de lo que se escala
+      cuando el teclado tiene que encogerse. */
+  const MARGEN_ARRIBA = 16;
 
   const fingerVar = (f: Finger) => `var(--finger-${f})`;
 
@@ -99,7 +103,7 @@
 
 <svg
   class="keyboard"
-  viewBox="0 0 {width} {height}"
+  viewBox="0 {-MARGEN_ARRIBA} {width} {height + MARGEN_ARRIBA}"
   role="img"
   aria-label={label}
   preserveAspectRatio="xMidYMid meet"
@@ -176,13 +180,14 @@
 </svg>
 
 <style>
+  /* Ocupa el hueco que le deja el contenedor y se escala para caber entero:
+     es la pieza que absorbe la diferencia cuando la ventana es baja o el texto
+     está al 200%. */
   .keyboard {
     width: 100%;
-    height: auto;
+    height: 100%;
+    min-height: 0;
     display: block;
-    /* Deja sitio arriba para el triángulo indicador. */
-    padding-top: 14px;
-    overflow: visible;
   }
 
   .key rect { transition: fill var(--motion-fast) var(--ease); }

@@ -30,9 +30,24 @@
     onTecla?: (code: string, acierto: boolean, ms: number) => void;
     /** Dominio por tecla, para ir retirando la ayuda visual. */
     dominios?: MapaDominio;
+    /** Métricas en vivo: las pinta la barra superior, no la lección. */
+    onStats?: (s: Stats) => void;
+    titulo?: string;
+    explicacion?: string;
+    cobertura?: string;
+    /**
+     * Con la letra muy grande no cabe todo. El orden de sacrificio es
+     * explícito: primero se pliega la explicación, luego el texto se desplaza
+     * dentro de su caja, y el teclado nunca baja de legible. Esto lo decide
+     * quien conoce la escala elegida, no el componente.
+     */
+    espacioJusto?: boolean;
   }
 
-  let { layout, target, onDone, onTecla, dominios }: Props = $props();
+  let {
+    layout, target, onDone, onTecla, dominios, onStats,
+    titulo = '', explicacion = '', cobertura = '', espacioJusto = false,
+  }: Props = $props();
 
   let field = $state<HTMLTextAreaElement | null>(null);
   let engine: TypingEngine | null = null;
@@ -62,6 +77,22 @@
     if (steps.length === 1) return steps[0];
     return composing ? steps[1] : steps[0];
   });
+
+  // La explicación se lee antes de empezar y se aparta en cuanto se teclea:
+  // ocupa sitio que necesita el teclado, pero no puede desaparecer del todo
+  // porque hay quien vuelve a leerla.
+  /**
+   * `null` = decide la aplicación; un booleano = lo ha decidido la persona y su
+   * decisión manda. Sin esto, o el botón no servía de nada durante el ejercicio
+   * (cada pulsación volvía a cerrarla), o subir la letra al 200% a mitad de
+   * lección dejaba la explicación abierta rompiendo la maquetación.
+   */
+  let decisionManual = $state<boolean | null>(null);
+  const explicacionAbierta = $derived(
+    decisionManual ?? (!espacioJusto && typed.length === 0),
+  );
+
+  $effect(() => { onStats?.(stats); });
 
   const lastWrong = $derived(
     typed.length > 0 && typed[typed.length - 1] !== target[typed.length - 1],
@@ -137,6 +168,7 @@
   });
 
   export function restart(): void {
+    decisionManual = null;
     engine?.reset();
     typed = '';
     stamps = [];
@@ -159,15 +191,35 @@
     onblur={() => engine?.focus()}
   ></textarea>
 
+  <header class="cab">
+    <h2>{titulo}</h2>
+    {#if cobertura}
+      <span class="cobertura"
+            aria-label="Al terminarla podrás escribir el {cobertura}% de las palabras del español">
+        {cobertura}% del español
+      </span>
+    {/if}
+    {#if explicacion}
+      <button class="explica" aria-expanded={explicacionAbierta}
+              onclick={() => (decisionManual = !explicacionAbierta)}>
+        {explicacionAbierta ? 'Ocultar' : '¿Qué se practica?'}
+      </button>
+    {/if}
+  </header>
+
+  {#if explicacionAbierta && explicacion}
+    <p class="focus">{explicacion}</p>
+  {/if}
+
   <p class="text" aria-hidden="true">
     {#each [...target] as ch, i (i)}
-      <span class="ch {states[i]}">{ch === ' ' ? ' ' : ch}</span>
+      <span class="ch {states[i]}">{ch === ' ' ? '\u00a0' : ch}</span>
     {/each}
   </p>
 
   <!-- Para lector de pantalla: el bucle de práctica es visual y motor, pero la
        pista sí tiene que ser audible, y el progreso legible. -->
-  <p class="sr-only" aria-live="polite" aria-atomic="true">{hint}</p>
+  <p class="sr-only" aria-live="polite">{hint}</p>
 
   <p class="hint">
     {#if nextStep}
@@ -178,17 +230,21 @@
     {/if}
   </p>
 
-  <Keyboard {layout} {held} next={nextStep} {lastWrong} {dominios} />
-
-  <dl class="stats">
-    <div><dt>Velocidad</dt><dd>{stats.wpm} <small>ppm</small></dd></div>
-    <div><dt>Precisión</dt><dd>{stats.accuracy}<small>%</small></dd></div>
-    <div><dt>Progreso</dt><dd>{typed.length}<small>/{target.length}</small></dd></div>
-  </dl>
+  <div class="teclado">
+    <Keyboard {layout} {held} next={nextStep} {lastWrong} {dominios} />
+  </div>
 </div>
 
 <style>
-  .drill { display: grid; gap: var(--space-4); }
+  /* El teclado se lleva el espacio que sobre; todo lo demás ocupa lo justo.
+     `min-height: 0` es lo que permite que la rejilla encoja de verdad en vez
+     de desbordar. */
+  .drill {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, auto) auto minmax(0, 1fr);
+    gap: var(--space-2);
+    min-height: 0;
+  }
 
   .capture {
     position: absolute;
@@ -198,16 +254,41 @@
        recibir el foco de verdad para que llegue el texto compuesto. */
   }
 
+  .cab { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+  .cab h2 { margin: 0; font-size: var(--text-lg); }
+
+  .cobertura {
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 1px var(--space-2);
+    white-space: nowrap;
+  }
+  .explica {
+    margin-left: auto;
+    min-height: 0;
+    padding: 2px var(--space-2);
+    font-size: var(--text-sm);
+  }
+
+  .focus { margin: 0; color: var(--fg-muted); max-width: 78ch; font-size: var(--text-sm); }
+
   .text {
     font-family: var(--font-drill);
     font-size: var(--text-drill);
-    line-height: 1.8;
+    line-height: 1.7;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: var(--space-4);
+    padding: var(--space-3) var(--space-4);
     margin: 0;
     word-break: break-word;
+    /* Si el texto es largo o la letra muy grande, se desplaza aquí dentro y no
+       arrastra a la página entera. */
+    overflow-y: auto;
+    max-height: 30vh;
   }
 
   .ch { padding: 1px 0; border-bottom: 3px solid transparent; }
@@ -247,14 +328,12 @@
     flex: none;
   }
 
-  .stats {
-    display: flex; gap: var(--space-6); margin: 0;
-    padding: var(--space-3) var(--space-4);
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius);
+  /* El teclado se adapta a la altura disponible, pero con suelo: por debajo de
+     esto las letras dejan de leerse y un teclado ilegible es peor que uno al
+     que haya que desplazarse. Si ni así cabe, es `.escena` quien se desplaza
+     por dentro; nunca se recorta contenido. */
+  .teclado {
+    min-height: min(34vh, 230px);
+    display: grid;
   }
-  .stats div { display: flex; flex-direction: column; }
-  .stats dt { font-size: var(--text-sm); color: var(--fg-muted); }
-  .stats dd { margin: 0; font-size: var(--text-xl); font-variant-numeric: tabular-nums; }
-  .stats small { font-size: var(--text-sm); color: var(--fg-muted); }
 </style>

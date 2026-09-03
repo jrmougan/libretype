@@ -1,0 +1,87 @@
+name: Compilar
+
+# Los binarios completos se compilan al integrar en master y a mano. No en cada
+# PR: son diez minutos por plataforma y lo que suele romperse (tipos, tests,
+# backend) ya lo caza CI en Linux en una fracción del tiempo.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compilar:
+    name: ${{ matrix.nombre }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Se compila en la Ubuntu vieja a propósito: la versión de glibc que
+          # exige el binario la fija la máquina donde se construye, así que
+          # hacerlo aquí lo hace ejecutable en más distribuciones.
+          - nombre: Linux (deb + AppImage)
+            runner: ubuntu-22.04
+            args: ''
+            artefactos: |
+              src-tauri/target/release/bundle/deb/*.deb
+              src-tauri/target/release/bundle/appimage/*.AppImage
+
+          # Binario universal: un solo runner cubre Apple Silicon e Intel.
+          - nombre: macOS (universal)
+            runner: macos-latest
+            args: '--target universal-apple-darwin'
+            artefactos: |
+              src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+
+          - nombre: Windows (msi + exe)
+            runner: windows-latest
+            args: ''
+            artefactos: |
+              src-tauri/target/release/bundle/msi/*.msi
+              src-tauri/target/release/bundle/nsis/*.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Dependencias del sistema (Linux)
+        if: matrix.runner == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf \
+            libxdo-dev libssl-dev build-essential file
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.runner == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.runner }}
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Compilar la app
+        run: pnpm tauri build ${{ matrix.args }}
+
+      # Sin firmar: macOS pedirá saltarse Gatekeeper y Windows mostrará el aviso
+      # de SmartScreen. Firmar necesita cuenta de Apple y certificado de
+      # Windows; cuando los haya, se añaden como secretos en release.yml.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libretype-${{ matrix.runner }}
+          path: ${{ matrix.artefactos }}
+          if-no-files-found: error
+          retention-days: 14

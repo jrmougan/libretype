@@ -1,5 +1,5 @@
 {
-  "name": "vite-app",
+  "name": "libretype",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -29,5 +29,8 @@
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-sql": "^2.4.1"
-  }
+  },
+  "description": "Tutor de mecanografía multiplataforma, visual y accesible",
+  "license": "MIT",
+  "packageManager": "pnpm@11.11.0"
 }

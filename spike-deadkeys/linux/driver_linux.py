@@ -40,6 +40,9 @@ def keycode_for(keyval):
 
 
 class Driver:
+    # Codigo de salida del proceso: 0 solo si WebKitGTK coincide con el nativo.
+    codigo = 1
+
     def __init__(self):
         self.i = 0
         self.phase = 0                      # 0 = webview, 1 = GtkTextView nativo
@@ -200,19 +203,24 @@ class Driver:
         if not any(self.dom.values()) and not any(self.nat.values()):
             print("INCONCLUYENTE: no llego nada a ninguno de los dos. Problema de")
             print("foco X o de inyeccion, no del motor.")
+            self.codigo = 2
         elif "T2" in diffs:
             print("BUG REPRODUCE en T2: WebKitGTK diverge del texto nativo GTK.")
             print("-> Tauri descartado en Linux.")
+            self.codigo = 1
         elif diffs:
             print(f"T2 pasa, pero divergen {diffs}. Revisar a mano.")
+            self.codigo = 1
         elif rotos:
             print("SIN DIVERGENCIA en 8/8: WebKitGTK se comporta igual que un")
             print("GtkTextView nativo.")
             print(f"\nDiferencias con macOS en {rotos}: ambos motores de Linux")
             print("coinciden entre si, asi que es como compone GTK, no un fallo.")
+            self.codigo = 0
         else:
             print("SIN DIVERGENCIA en 8/8: WebKitGTK se comporta igual que un")
             print("GtkTextView nativo con layout espanol.")
+            self.codigo = 0
         print(line)
         Gtk.main_quit()
 
@@ -228,3 +236,4 @@ def watchdog():
 
 GLib.timeout_add_seconds(100, watchdog)
 Gtk.main()
+sys.exit(d.codigo)

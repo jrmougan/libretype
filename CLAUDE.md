@@ -91,6 +91,24 @@ Otras piezas:
 - `components/Keyboard.svelte` — SVG, no canvas (escala nítido al 200%, se
   estiliza con tokens, es inspeccionable).
 
+## Compilación continua
+
+`.github/workflows/`. Lo barato corre siempre (tipos, tests, backend y el spike
+de dead keys, todo en Linux); los binarios de las tres plataformas se compilan
+al integrar en master o a mano, y las Releases al empujar una etiqueta `v*`.
+
+El job **spike-deadkeys** es el que más aporta: compara WebKitGTK contra un
+`GtkTextView` nativo bajo Xvfb y **rompe el build si divergen**. Es la
+comprobación de Linux que no se puede hacer desde un Mac. Si lo tocas, mantén
+que `driver_linux.py` salga con código distinto de cero al divergir, o el job
+pasará siempre.
+
+Se compila en `ubuntu-22.04` a propósito: la versión de glibc que exige el
+binario la fija la máquina donde se construye.
+
+Los binarios van **sin firmar**. Añadir firma es meter secretos en
+`release.yml`, no reescribirlo.
+
 ## Persistencia
 
 El progreso vive en SQLite local (`tauri-plugin-sql`), en el directorio de datos

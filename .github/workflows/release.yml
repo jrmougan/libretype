@@ -1,0 +1,74 @@
+name: Release
+
+# Se dispara al empujar una etiqueta de versión:
+#     git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publicar:
+    name: ${{ matrix.nombre }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nombre: Linux
+            runner: ubuntu-22.04
+            args: ''
+          - nombre: macOS (universal)
+            runner: macos-latest
+            args: '--target universal-apple-darwin'
+          - nombre: Windows
+            runner: windows-latest
+            args: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Dependencias del sistema (Linux)
+        if: matrix.runner == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf \
+            libxdo-dev libssl-dev build-essential file
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.runner == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: release-${{ matrix.runner }}
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Para firmar en el futuro basta con añadir aquí los secretos:
+          #   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+          #   APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID  (macOS)
+          #   WINDOWS_CERTIFICATE, WINDOWS_CERTIFICATE_PASSWORD  (Windows)
+          # No hace falta tocar el resto del workflow.
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'LibreType ${{ github.ref_name }}'
+          releaseBody: |
+            Binarios sin firmar. En macOS puede hacer falta abrir con clic
+            derecho la primera vez; en Windows, aceptar el aviso de SmartScreen.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

@@ -168,6 +168,58 @@
   --motion-slow: 0ms;
 }
 
+/* --- Tono ----------------------------------------------------------------
+ * Cambia cómo se ve y cómo habla la aplicación, nunca cuánto se ve. El tamaño
+ * lo necesitan por igual el niño y la persona mayor, y vive en --ui-scale.
+ *
+ * Sin data-tono se usa el sobrio, que es el estado por defecto: es más fácil
+ * perdonar que una app te hable seria de más que al revés.
+ */
+:root {
+  /* Color de celebración. En sobrio no se usa; se declara aquí para que exista
+     en los tres estados de tema. */
+  --celebracion: #b45309;
+
+  /* Muestras del selector de tono. Existen aparte porque hay que poder enseñar
+     el aspecto del tono de juego mientras la aplicación va en sobrio, y al
+     revés, sin que ninguna de las dos quede fuera del tema en curso. */
+  --muestra-juego-bg: #f1e9fe;
+  --muestra-juego-chip: #7c3aed;
+  --muestra-juego-texto: #ffffff;
+}
+
+:root[data-tono="juego"] {
+  --accent: #7c3aed;
+  --accent-soft: #f1e9fe;
+  --celebracion: #d97706;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --celebracion: #fbbf24;
+    --muestra-juego-bg: #241a3d;
+    --muestra-juego-chip: #b39cf8;
+    --muestra-juego-texto: #16101f;
+  }
+  :root[data-tono="juego"]:not([data-theme="light"]) {
+    --accent: #b39cf8;
+    --accent-soft: #241a3d;
+    --celebracion: #fbbf24;
+  }
+}
+
+:root[data-theme="dark"] {
+  --celebracion: #fbbf24;
+  --muestra-juego-bg: #241a3d;
+  --muestra-juego-chip: #b39cf8;
+  --muestra-juego-texto: #16101f;
+}
+:root[data-theme="dark"][data-tono="juego"] {
+  --accent: #b39cf8;
+  --accent-soft: #241a3d;
+  --celebracion: #fbbf24;
+}
+
 :root[data-font="dyslexic"] {
   --font-stack: "OpenDyslexic", "Comic Sans MS", var(--font-ui);
   --font-drill: "OpenDyslexic Mono", "OpenDyslexic", var(--font-ui);

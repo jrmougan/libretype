@@ -3,6 +3,7 @@
   import Drill from './lib/components/Drill.svelte';
   import LeccionCero from './lib/components/LeccionCero.svelte';
   import Progreso from './lib/components/Progreso.svelte';
+  import SelectorTono from './lib/components/SelectorTono.svelte';
   import { LAYOUTS } from './lib/keyboard/layouts';
   import { LESSONS } from './lib/lessons';
   import type { Stats } from './lib/keyboard/engine';
@@ -11,6 +12,20 @@
   } from './lib/keyboard/dominio';
   import { abrirAlmacen, type Almacen } from './lib/storage/almacen';
   import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
+  import {
+    aplicar, cargar, guardar as guardarPrefs, POR_DEFECTO,
+    type Preferencias, type Tono,
+  } from './lib/preferencias';
+  import { PRECISION_ALTA, vozDe } from './lib/voz';
+
+  /**
+   * Preferencias de interfaz. Se cargan de disco antes del primer pintado para
+   * que quien necesita el texto al 200% no vea un parpadeo al 100%.
+   */
+  let prefs = $state<Preferencias>(
+    typeof localStorage === 'undefined' ? { ...POR_DEFECTO } : cargar(),
+  );
+  let settingsOpen = $state(false);
 
   let layout = $state(LAYOUTS[0]);
   let lessonIx = $state(0);
@@ -21,28 +36,20 @@
   let sesiones = $state<Sesion[]>([]);
   let tipoAlmacen = $state<'sqlite' | 'local'>('local');
   let verProgreso = $state(false);
-  /** 'cero' es la pantalla de colocación de manos; 'leccion', el ejercicio. */
-  let vista = $state<'cero' | 'leccion'>('leccion');
+  /** 'tono' solo aparece la primera vez; 'cero' es la colocación de manos. */
+  let vista = $state<'tono' | 'cero' | 'leccion'>('leccion');
 
   /** Intentos acumulados por tecla, que deciden cuánta ayuda visual retirar. */
   let teclas = $state<Map<string, EstadoTecla>>(new Map());
-  /** 'auto' retira la ayuda según el dominio; 'siempre' la deja entera. */
-  let ayudaTeclado = $state<'auto' | 'siempre'>('auto');
 
   const dominios = $derived(
-    ayudaTeclado === 'siempre' ? new Map<string, number>() : mapaDeDominio(teclas),
+    prefs.ayudaTeclado === 'siempre' ? new Map<string, number>() : mapaDeDominio(teclas),
   );
   const aprendidas = $derived(contarDominadas(mapaDeDominio(teclas)));
 
   const porLeccion = $derived(resumirLecciones(sesiones));
 
-  // Ajustes de accesibilidad. Se aplican a <html> para que los tokens los vean.
-  let scale = $state(1);
-  let theme = $state<'auto' | 'light' | 'dark'>('auto');
-  let motion = $state<'auto' | 'reduced'>('auto');
-  let font = $state<'default' | 'dyslexic'>('default');
-  let settingsOpen = $state(false);
-
+  const voz = $derived(vozDe(prefs.tono));
   const lesson = $derived(LESSONS[lessonIx]);
 
   /** En español el separador decimal es la coma, no el punto. */
@@ -54,10 +61,16 @@
     sesiones = await almacen.leerTodas();
     teclas = await almacen.leerTeclas();
 
-    // Primera vez: se empieza por dónde van las manos, no por un ejercicio.
-    // Quien nunca ha tecleado al tacto se pierde si le sueltas un texto.
-    if (sesiones.length === 0) vista = 'cero';
+    // Primera vez: primero cómo quiere la aplicación, luego dónde van las
+    // manos. Nunca soltarle un ejercicio a alguien que no ha tecleado nunca.
+    if (prefs.tono === null) vista = 'tono';
+    else if (sesiones.length === 0) vista = 'cero';
   });
+
+  function elegirTono(tono: Tono): void {
+    prefs = { ...prefs, tono };
+    vista = sesiones.length === 0 ? 'cero' : 'leccion';
+  }
 
   function anotarTecla(code: string, acierto: boolean, ms: number): void {
     // Se muta un mapa nuevo para que Svelte lo vea cambiar.
@@ -100,15 +113,11 @@
     teclas = new Map();
   }
 
+  // Aplicar y guardar van juntos: un ajuste que no sobrevive a cerrar la app
+  // deja fuera a quien depende de él.
   $effect(() => {
-    const el = document.documentElement;
-    el.style.setProperty('--ui-scale', String(scale));
-    if (theme === 'auto') el.removeAttribute('data-theme');
-    else el.setAttribute('data-theme', theme);
-    if (motion === 'auto') el.removeAttribute('data-motion');
-    else el.setAttribute('data-motion', 'reduced');
-    if (font === 'default') el.removeAttribute('data-font');
-    else el.setAttribute('data-font', 'dyslexic');
+    aplicar(prefs, document.documentElement);
+    guardarPrefs(prefs);
   });
 
   function pick(i: number): void {
@@ -135,15 +144,18 @@
   {#if settingsOpen}
     <section class="settings" aria-label="Ajustes de accesibilidad">
       <div class="field">
-        <label for="scale">Tamaño del texto: {Math.round(scale * 100)}%</label>
-        <input id="scale" type="range" min="1" max="2" step="0.1" bind:value={scale} />
+        <label for="scale">Tamaño del texto: {Math.round(prefs.escala * 100)}%</label>
+        <input id="scale" type="range" min="1" max="2" step="0.1"
+               value={prefs.escala}
+               oninput={(e) => (prefs = { ...prefs, escala: +e.currentTarget.value })} />
       </div>
 
       <div class="field">
         <span id="theme-l">Tema</span>
         <div class="group" role="group" aria-labelledby="theme-l">
-          {#each [['auto', 'Sistema'], ['light', 'Claro'], ['dark', 'Oscuro']] as [v, l] (v)}
-            <button aria-pressed={theme === v} onclick={() => (theme = v as typeof theme)}>
+          {#each [['auto', 'Sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']] as [v, l] (v)}
+            <button aria-pressed={prefs.tema === v}
+                    onclick={() => (prefs = { ...prefs, tema: v as Preferencias['tema'] })}>
               {l}
             </button>
           {/each}
@@ -151,12 +163,29 @@
       </div>
 
       <div class="field">
+        <span id="tono-l">Cómo te habla</span>
+        <div class="group" role="group" aria-labelledby="tono-l">
+          <button aria-pressed={prefs.tono === 'juego'}
+                  onclick={() => (prefs = { ...prefs, tono: 'juego' })}>
+            Con celebración
+          </button>
+          <button aria-pressed={prefs.tono !== 'juego'}
+                  onclick={() => (prefs = { ...prefs, tono: 'sobrio' })}>
+            Tranquila
+          </button>
+        </div>
+        <p class="note">Cambia los colores y los mensajes. No cambia el tamaño ni las lecciones.</p>
+      </div>
+
+      <div class="field">
         <span id="motion-l">Animaciones</span>
         <div class="group" role="group" aria-labelledby="motion-l">
-          <button aria-pressed={motion === 'auto'} onclick={() => (motion = 'auto')}>
+          <button aria-pressed={prefs.movimiento === 'auto'}
+                  onclick={() => (prefs = { ...prefs, movimiento: 'auto' })}>
             Normales
           </button>
-          <button aria-pressed={motion === 'reduced'} onclick={() => (motion = 'reduced')}>
+          <button aria-pressed={prefs.movimiento === 'reducido'}
+                  onclick={() => (prefs = { ...prefs, movimiento: 'reducido' })}>
             Reducidas
           </button>
         </div>
@@ -165,10 +194,12 @@
       <div class="field">
         <span id="font-l">Tipografía</span>
         <div class="group" role="group" aria-labelledby="font-l">
-          <button aria-pressed={font === 'default'} onclick={() => (font = 'default')}>
+          <button aria-pressed={prefs.fuente === 'normal'}
+                  onclick={() => (prefs = { ...prefs, fuente: 'normal' })}>
             Normal
           </button>
-          <button aria-pressed={font === 'dyslexic'} onclick={() => (font = 'dyslexic')}>
+          <button aria-pressed={prefs.fuente === 'dislexia'}
+                  onclick={() => (prefs = { ...prefs, fuente: 'dislexia' })}>
             Para dislexia
           </button>
         </div>
@@ -177,10 +208,12 @@
       <div class="field">
         <span id="ayuda-l">Letras del teclado en pantalla</span>
         <div class="group" role="group" aria-labelledby="ayuda-l">
-          <button aria-pressed={ayudaTeclado === 'auto'} onclick={() => (ayudaTeclado = 'auto')}>
+          <button aria-pressed={prefs.ayudaTeclado === 'auto'}
+                  onclick={() => (prefs = { ...prefs, ayudaTeclado: 'auto' })}>
             Se van quitando
           </button>
-          <button aria-pressed={ayudaTeclado === 'siempre'} onclick={() => (ayudaTeclado = 'siempre')}>
+          <button aria-pressed={prefs.ayudaTeclado === 'siempre'}
+                  onclick={() => (prefs = { ...prefs, ayudaTeclado: 'siempre' })}>
             Siempre visibles
           </button>
         </div>
@@ -204,6 +237,7 @@
     </section>
   {/if}
 
+  {#if vista !== 'tono'}
   <nav aria-label="Lecciones">
     <button
       class="lesson cero"
@@ -231,9 +265,12 @@
       </button>
     {/each}
   </nav>
+  {/if}
 
   <main>
-    {#if vista === 'cero'}
+    {#if vista === 'tono'}
+      <SelectorTono onElegir={elegirTono} />
+    {:else if vista === 'cero'}
       <LeccionCero {layout} onTerminar={() => pick(0)} />
     {:else}
       <div class="leccion-cab">
@@ -257,20 +294,27 @@
       {/key}
 
       {#if result}
-        <div class="result" class:record={result.record} role="status">
+        <div class="result" class:record={result.record}
+             class:celebra={result.record && prefs.tono === 'juego'} role="status">
           <strong>
-            {#if result.record}★ ¡Tu mejor marca en esta lección!{:else}Lección terminada.{/if}
+            {#if result.record}★ {voz.record}{:else}{voz.terminada}{/if}
           </strong>
-          {result.stats.wpm} palabras por minuto, {result.stats.accuracy}% de precisión.
-          <button onclick={again}>Repetir</button>
+          <span>
+            {result.stats.wpm} palabras por minuto, {result.stats.accuracy}% de precisión.
+          </span>
+          <span class="animo">
+            {result.stats.accuracy >= PRECISION_ALTA ? voz.animoAlto : voz.animoBajo}
+          </span>
+          <button onclick={again}>{voz.repetir}</button>
           {#if lessonIx < LESSONS.length - 1}
-            <button onclick={() => pick(lessonIx + 1)}>Siguiente lección</button>
+            <button onclick={() => pick(lessonIx + 1)}>{voz.siguiente}</button>
           {/if}
         </div>
       {/if}
     {/if}
   </main>
 
+  {#if vista !== 'tono'}
   <button class="ver-progreso" aria-expanded={verProgreso}
           onclick={() => (verProgreso = !verProgreso)}>
     {verProgreso ? 'Ocultar progreso' : 'Ver progreso'}
@@ -278,6 +322,7 @@
 
   {#if verProgreso}
     <Progreso {sesiones} lecciones={LESSONS} {tipoAlmacen} onBorrar={borrarProgreso} />
+  {/if}
   {/if}
 </div>
 
@@ -339,6 +384,22 @@
   }
   /* El récord se distingue por la estrella y el texto, no solo por el borde. */
   .result.record { border-width: 3px; border-style: double; }
+  .result .animo { color: var(--fg-muted); }
+
+  /* La celebración solo existe en el tono de juego, y se apaga sola si el
+     sistema o el usuario piden menos movimiento. */
+  .result.celebra {
+    border-color: var(--celebracion);
+    animation: celebrar var(--motion-slow) var(--ease) 2 alternate;
+  }
+  @keyframes celebrar {
+    from { transform: scale(1); }
+    to { transform: scale(1.015); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .result.celebra { animation: none; }
+  }
+  :global(:root[data-motion='reducido']) .result.celebra { animation: none; }
 
   .marca {
     display: inline-block;

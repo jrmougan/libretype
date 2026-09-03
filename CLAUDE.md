@@ -91,6 +91,34 @@ Otras piezas:
 - `components/Keyboard.svelte` — SVG, no canvas (escala nítido al 200%, se
   estiliza con tokens, es inspeccionable).
 
+## Tono y preferencias
+
+`src/lib/preferencias.ts` y `src/lib/voz.ts`.
+
+**Las preferencias se guardan siempre.** No es un extra: quien necesita el texto
+al 200% o la tipografía para dislexia no puede tener que reconfigurarlo cada vez
+que abre la aplicación. Van en localStorage y no en la base de datos porque son
+de este equipo, no progreso del alumno. `normalizar()` acota y sanea lo que
+venga de disco: un valor corrupto cae al de por defecto en vez de dejar la
+interfaz en un estado imposible.
+
+**El tono** responde a un problema real de este público doble. La investigación
+de usabilidad con personas mayores le llama *design disqualification*: la
+sensación de quedarse fuera al ver una interfaz hecha para gente joven. Un tutor
+lleno de premios le dice a un adulto que la app no es para él; uno gris no
+engancha a un niño.
+
+Reglas del tono, que no son negociables sin rehacer el razonamiento:
+
+- **Cambia cómo se ve y cómo habla, nunca cuánto se ve.** El tamaño lo necesitan
+  los dos y vive en `--ui-scale`, en sus propios ajustes.
+- **Se pregunta por preferencia, jamás por edad.** «¿Eres niño o mayor?» sería
+  cometer justo el error que la pantalla evita. El selector enseña una muestra
+  real de cada opción en vez de describirla.
+- **Por defecto se usa el sobrio** mientras no haya elegido: es más fácil
+  perdonar que una app te hable seria de más que al revés.
+- Ninguna de las dos voces reprende al fallar. Hay test.
+
 ## Retirada de la ayuda visual
 
 `src/lib/keyboard/dominio.ts`. El teclado en pantalla es una muleta: mirarlo

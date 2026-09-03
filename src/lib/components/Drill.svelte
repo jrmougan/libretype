@@ -10,7 +10,7 @@
    */
   import { onMount } from 'svelte';
   import Keyboard from './Keyboard.svelte';
-  import { TypingEngine, computeStats, diffAgainstTarget, type CharState }
+  import { TypingEngine, computeStats, diffAgainstTarget, type CharState, type Stats }
     from '../keyboard/engine';
   import { buildIndex, FINGER_NAMES, type KeyStep, type Layout }
     from '../keyboard/layouts';
@@ -18,7 +18,8 @@
   interface Props {
     layout: Layout;
     target: string;
-    onDone?: (wpm: number, accuracy: number) => void;
+    /** Se llama una sola vez al completar la lección, con las métricas. */
+    onDone?: (stats: Stats) => void;
   }
 
   let { layout, target, onDone }: Props = $props();
@@ -93,14 +94,22 @@
     return () => engine?.destroy();
   });
 
+  // Se avisa una sola vez: sin el guardia, cualquier reactividad posterior
+  // (un keyup que llega tarde, por ejemplo) guardaría la sesión otra vez.
+  let avisado = $state(false);
+
   $effect(() => {
-    if (finished && !composing && onDone) onDone(stats.wpm, stats.accuracy);
+    if (finished && !composing && !avisado) {
+      avisado = true;
+      onDone?.(stats);
+    }
   });
 
   export function restart(): void {
     engine?.reset();
     typed = '';
     stamps = [];
+    avisado = false;
     engine?.focus();
   }
 </script>

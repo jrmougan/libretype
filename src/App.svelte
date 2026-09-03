@@ -1,12 +1,24 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import Drill from './lib/components/Drill.svelte';
+  import Progreso from './lib/components/Progreso.svelte';
   import { LAYOUTS } from './lib/keyboard/layouts';
   import { LESSONS } from './lib/lessons';
+  import type { Stats } from './lib/keyboard/engine';
+  import { abrirAlmacen, type Almacen } from './lib/storage/almacen';
+  import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
 
   let layout = $state(LAYOUTS[0]);
   let lessonIx = $state(0);
   let drill = $state<ReturnType<typeof Drill> | null>(null);
-  let result = $state<{ wpm: number; accuracy: number } | null>(null);
+  let result = $state<{ stats: Stats; record: boolean } | null>(null);
+
+  let almacen: Almacen | null = null;
+  let sesiones = $state<Sesion[]>([]);
+  let tipoAlmacen = $state<'sqlite' | 'local'>('local');
+  let verProgreso = $state(false);
+
+  const porLeccion = $derived(resumirLecciones(sesiones));
 
   // Ajustes de accesibilidad. Se aplican a <html> para que los tokens los vean.
   let scale = $state(1);
@@ -16,6 +28,41 @@
   let settingsOpen = $state(false);
 
   const lesson = $derived(LESSONS[lessonIx]);
+
+  onMount(async () => {
+    almacen = await abrirAlmacen();
+    tipoAlmacen = almacen.tipo;
+    sesiones = await almacen.leerTodas();
+  });
+
+  async function terminada(stats: Stats): Promise<void> {
+    const sesion: Sesion = {
+      leccion: lesson.id,
+      ppm: stats.wpm,
+      pctAcierto: stats.accuracy,
+      aciertos: stats.correct,
+      escritos: stats.typed,
+      ms: Math.round(stats.elapsedMs),
+      terminadaEn: new Date().toISOString(),
+    };
+
+    // Se calcula antes de guardar: después, la propia sesión ya sería la marca.
+    const record = esRecord(porLeccion.get(lesson.id), sesion);
+    result = { stats, record };
+
+    // Que falle el guardado no puede tumbar la práctica.
+    try {
+      await almacen?.guardar(sesion);
+      sesiones = [...sesiones, sesion];
+    } catch (err) {
+      console.warn('[libretype] no se pudo guardar la sesión:', err);
+    }
+  }
+
+  async function borrarProgreso(): Promise<void> {
+    await almacen?.borrarTodo();
+    sesiones = [];
+  }
 
   $effect(() => {
     const el = document.documentElement;
@@ -105,8 +152,21 @@
 
   <nav aria-label="Lecciones">
     {#each LESSONS as l, i (l.id)}
-      <button class="lesson" aria-current={i === lessonIx ? 'true' : undefined}
-              onclick={() => pick(i)}>{l.title}</button>
+      {@const marca = porLeccion.get(l.id)}
+      <button
+        class="lesson"
+        aria-current={i === lessonIx ? 'true' : undefined}
+        onclick={() => pick(i)}
+      >
+        {l.title}
+        {#if marca && marca.mejorPpm > 0}
+          <span class="marca" aria-label="tu marca: {marca.mejorPpm} palabras por minuto">
+            {marca.mejorPpm} ppm
+          </span>
+        {:else if marca}
+          <span class="marca" aria-label="practicada, aún sin marca limpia">·</span>
+        {/if}
+      </button>
     {/each}
   </nav>
 
@@ -115,18 +175,15 @@
     <p class="focus">{lesson.focus}</p>
 
     {#key lesson.id}
-      <Drill
-        bind:this={drill}
-        {layout}
-        target={lesson.text}
-        onDone={(wpm, accuracy) => (result = { wpm, accuracy })}
-      />
+      <Drill bind:this={drill} {layout} target={lesson.text} onDone={terminada} />
     {/key}
 
     {#if result}
-      <div class="result" role="status">
-        <strong>Lección terminada.</strong>
-        {result.wpm} palabras por minuto, {result.accuracy}% de precisión.
+      <div class="result" class:record={result.record} role="status">
+        <strong>
+          {#if result.record}★ ¡Tu mejor marca en esta lección!{:else}Lección terminada.{/if}
+        </strong>
+        {result.stats.wpm} palabras por minuto, {result.stats.accuracy}% de precisión.
         <button onclick={again}>Repetir</button>
         {#if lessonIx < LESSONS.length - 1}
           <button onclick={() => pick(lessonIx + 1)}>Siguiente lección</button>
@@ -134,6 +191,15 @@
       </div>
     {/if}
   </main>
+
+  <button class="ver-progreso" aria-expanded={verProgreso}
+          onclick={() => (verProgreso = !verProgreso)}>
+    {verProgreso ? 'Ocultar progreso' : 'Ver progreso'}
+  </button>
+
+  {#if verProgreso}
+    <Progreso {sesiones} lecciones={LESSONS} {tipoAlmacen} onBorrar={borrarProgreso} />
+  {/if}
 </div>
 
 <style>
@@ -172,4 +238,22 @@
     background: var(--ok-bg); border: 2px solid var(--ok);
     border-radius: var(--radius); padding: var(--space-3) var(--space-4);
   }
+  /* El récord se distingue por la estrella y el texto, no solo por el borde. */
+  .result.record { border-width: 3px; border-style: double; }
+
+  .marca {
+    display: inline-block;
+    margin-left: var(--space-2);
+    padding: 0 var(--space-2);
+    border-radius: 999px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+  .lesson[aria-current='true'] .marca {
+    background: var(--accent-fg); color: var(--accent); border-color: var(--accent-fg);
+  }
+
+  .ver-progreso { justify-self: start; }
 </style>

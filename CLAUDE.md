@@ -91,6 +91,28 @@ Otras piezas:
 - `components/Keyboard.svelte` — SVG, no canvas (escala nítido al 200%, se
   estiliza con tokens, es inspeccionable).
 
+## Persistencia
+
+El progreso vive en SQLite local (`tauri-plugin-sql`), en el directorio de datos
+de la app. No hay cuentas ni servidor: con menores de por medio, lo que no se
+recoge no hay que protegerlo.
+
+`src/lib/storage/almacen.ts` tiene **dos backends** y eso no es sobreingeniería:
+la app corre en `pnpm tauri:dev` (escritorio, SQLite) y en `pnpm dev`
+(navegador, sin Tauri). Sin el respaldo de localStorage, desarrollar el frontend
+en el navegador dejaría de funcionar. Si abrir SQLite falla, se cae al respaldo
+en vez de tumbar la app.
+
+La agregación (`storage/progreso.ts`) se hace en TypeScript, no en SQL, para que
+se pueda probar sin base de datos. Los volúmenes son de una persona practicando.
+
+Regla de producto que vive en el código: **solo cuentan para la marca los
+intentos con 90% de acierto o más** (`PCT_MINIMO_PARA_RECORD`). Sin ese umbral
+la app premiaría teclear rápido y mal, que es lo contrario de lo que enseña.
+
+El esquema está en `src-tauri/src/lib.rs` como migración versionada. Al cambiarlo
+hay que añadir una migración nueva, no editar la que ya se aplicó.
+
 ## Accesibilidad
 
 No es una capa final: es el motivo de que exista `src/styles/tokens.css`. Todo
@@ -122,6 +144,9 @@ un `<textarea>` real en jsdom.
 Existen porque **el orden de eventos no se puede reproducir tecleando en una
 sola máquina**: un cambio que funcione en tu Mac puede romper Linux sin que nada
 avise. Los dos bugs que ha tenido el motor están fijados como tests con nombre.
+
+`progreso.test.ts` cubre la agregación y los dos almacenes; el caso que más
+importa es que un intento rápido y lleno de fallos no fije récord.
 
 `layouts.test.ts` comprueba, entre otras cosas, que **todo carácter de toda
 lección sea escribible** con la distribución. Si añades una lección con un

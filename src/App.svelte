@@ -29,6 +29,9 @@
 
   const lesson = $derived(LESSONS[lessonIx]);
 
+  /** En español el separador decimal es la coma, no el punto. */
+  const pct = (n: number) => n.toLocaleString('es-ES', { maximumFractionDigits: 1 });
+
   onMount(async () => {
     almacen = await abrirAlmacen();
     tipoAlmacen = almacen.tipo;
@@ -171,7 +174,13 @@
   </nav>
 
   <main>
-    <h2>{lesson.title}</h2>
+    <div class="leccion-cab">
+      <h2>{lesson.title}</h2>
+      <span class="cobertura"
+            aria-label="Al terminarla podrás escribir el {pct(lesson.cobertura)}% de las palabras del español">
+        {pct(lesson.cobertura)}% del español
+      </span>
+    </div>
     <p class="focus">{lesson.focus}</p>
 
     {#key lesson.id}
@@ -231,7 +240,25 @@
     background: var(--accent); color: var(--accent-fg); border-color: var(--accent);
   }
 
-  .focus { margin: 0 0 var(--space-4); color: var(--fg-muted); }
+  .leccion-cab {
+    display: flex; align-items: baseline; gap: var(--space-3);
+    flex-wrap: wrap; margin-bottom: var(--space-1);
+  }
+  .leccion-cab h2 { margin: 0; }
+
+  /* Cuánto español desbloquea la lección. Sale de contar frecuencias sobre un
+     corpus real, no es un número decorativo. */
+  .cobertura {
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 1px var(--space-2);
+    white-space: nowrap;
+  }
+
+  .focus { margin: 0 0 var(--space-4); color: var(--fg-muted); max-width: 70ch; }
 
   .result {
     display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;

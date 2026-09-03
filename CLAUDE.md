@@ -91,6 +91,32 @@ Otras piezas:
 - `components/Keyboard.svelte` — SVG, no canvas (escala nítido al 200%, se
   estiliza con tokens, es inspeccionable).
 
+## Las lecciones (no reordenar a ojo)
+
+`src/lib/lessons.ts`. El orden **no** es el tradicional (reposo, fila superior,
+fila inferior). Ese viene de las academias de mecanografía en inglés. Este sale
+de contar frecuencias sobre un corpus real: `investigacion/frecuencias.py`.
+
+Lo que dicen los datos, y que no es intuitivo:
+
+- **El 12,97% de las palabras que se escriben en español llevan tilde, diéresis
+  o eñe**, y la tecla `´` se pulsa más que la `p`. Las tildes van en la lección
+  5 de 9, no al final. No son un tema avanzado del español: son el español.
+- **Con la fila de reposo entera solo se escribe el 5,5% de las palabras.**
+  `asdfjklñ` contiene cuatro de las letras más raras (`f`, `j`, `k`, `ñ`) y
+  ninguna de las cinco que sostienen el idioma. Sigue siendo el ancla anatómica
+  correcta —los relieves de la F y la J son lo que permite volver sin mirar—,
+  pero hay que salir pronto o el alumno teclea sílabas sin sentido.
+- **Comparar por lección engaña**: el temario tradicional parece rápido porque
+  mete diez teclas de golpe. Por tecla aprendida, que es el esfuerzo real, con
+  13 teclas da 17,6% frente al 28,1% de este orden.
+
+Los textos son palabras reales ordenadas por frecuencia, generadas con
+`investigacion/generar_lecciones.py` y revisadas a mano. Si añades o cambias una
+lección, `lessons.test.ts` comprueba lo que importa: que no use teclas sin
+enseñar, que practique las que estrena, que ninguna meta más de cinco de golpe
+y que las tildes lleguen con las cinco vocales ya dadas.
+
 ## Compilación continua
 
 `.github/workflows/`. Lo barato corre siempre (tipos, tests, backend y el spike

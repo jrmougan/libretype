@@ -1,0 +1,13 @@
+# Binarios compilados del spike
+spike-deadkeys/driver
+spike-deadkeys/wkhost
+spike-deadkeys/probe
+spike-deadkeys/resultado-*.json
+
+# macOS
+.DS_Store
+
+# Node (para cuando entre el frontend)
+node_modules/
+dist/
+target/

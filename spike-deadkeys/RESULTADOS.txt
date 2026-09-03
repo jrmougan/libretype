@@ -1,0 +1,35 @@
+Layout activo: Spanish
+Ejecutando 8 casos...
+
+--- pasada nativa (NSTextView) ---
+
+====================================================================================
+CASO  DESCRIPCION                      NATIVO      WKWebView   UCKeyTr   VEREDICTO
+====================================================================================
+T1    ´ + a  -> tilde normal           "á"         "á"         "á "      coinciden
+T2    ´ + t  -> DEAD KEY CANCELADA     "´t"        "´t"        "´t"      coinciden
+T3    ´ + espacio                      "´"         "´"         "´ "      coinciden
+T4    ´ + ´  -> acento doble           "´´"        "´´"        "´´"      coinciden
+T5    ñ directa                        "ñ"         "ñ"         "ñ"       coinciden
+T6    Shift+´ + u -> dieresis          "ü"         "ü"         "ü "      coinciden
+T7    Option+2 (arroba en Mac ES)      "@"         "@"         "@"       coinciden
+T8    Option+e (euro en Mac ES)        "€"         "€"         "€"       coinciden
+====================================================================================
+NATIVO = NSTextView de AppKit (la referencia: como se comporta macOS)
+UCKeyTr = UCKeyTranslate, informativo (su manejo del dead state pendiente
+          no modela el texto sin confirmar, por eso puede anadir espacios)
+
+T1 — ´ + a  -> tilde normal
+  compositionstart('') compositionupdate('´') beforeinput('´') input('´') keydown(´) keyup(´) beforeinput(null) input(null) beforeinput('á') input('á') compositionend('á') keydown(a) keyup(a)
+
+T2 — ´ + t  -> DEAD KEY CANCELADA
+  compositionstart('') compositionupdate('´') beforeinput('´') input('´') keydown(´) keyup(´) beforeinput(null) input(null) beforeinput('´') input('´') compositionend('´') keydown(t) beforeinput('t') input('t') keyup(t)
+
+T6 — Shift+´ + u -> dieresis
+  compositionstart('') compositionupdate('¨') beforeinput('¨') input('¨') keydown(¨) keyup(¨) beforeinput(null) input(null) beforeinput('ü') input('ü') compositionend('ü') keydown(u) keyup(u)
+
+====================================================================================
+SIN DIVERGENCIA en 8/8 casos: WKWebView se comporta EXACTAMENTE
+igual que un campo de texto nativo de macOS con layout espanol.
+-> El argumento que descartaba a Tauri NO se sostiene.
+====================================================================================

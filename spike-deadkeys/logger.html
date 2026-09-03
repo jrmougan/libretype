@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Spike dead keys — LibreType</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --fg: #1a1a19; --muted: #6b6b66; --line: #e0ded8;
+    --ok: #1a7f4b; --bad: #c0392b; --warn: #b8860b; --accent: #2c5fa8;
+    --card: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#16161a; --fg:#e8e6e1; --muted:#9a978f; --line:#2f2f36;
+            --ok:#4ec97f; --bad:#ff7a6b; --warn:#e0b34d; --accent:#79a9f0; --card:#1e1e24; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  .engine { display:inline-block; padding:2px 8px; border-radius:4px;
+            background:var(--accent); color:#fff; font-weight:600; font-size:12px; }
+  .grid { display:grid; grid-template-columns: 340px 1fr; gap:16px; align-items:start; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em;
+       color:var(--muted); margin:0 0 10px; }
+  #pad { width:100%; font: 20px/1.4 ui-monospace, Menlo, monospace; padding:10px;
+         border:2px solid var(--accent); border-radius:6px; background:var(--bg);
+         color:var(--fg); min-height:70px; }
+  ol.tests { margin:0; padding-left:20px; }
+  ol.tests li { margin-bottom:9px; }
+  ol.tests li.done { opacity:.45; text-decoration:line-through; }
+  code { font: 12px ui-monospace, Menlo, monospace; background:var(--bg);
+         border:1px solid var(--line); border-radius:3px; padding:1px 4px; }
+  .expect { color:var(--muted); font-size:12.5px; }
+  table { border-collapse:collapse; width:100%; font:12px ui-monospace, Menlo, monospace; }
+  th { text-align:left; color:var(--muted); font-weight:600; padding:5px 7px;
+       border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--card); }
+  td { padding:3px 7px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  tr.keydown td:first-child { color:var(--accent); font-weight:700; }
+  tr.comp td:first-child { color:var(--warn); font-weight:700; }
+  tr.input td:first-child { color:var(--ok); font-weight:700; }
+  tr.marker td { background:var(--accent); color:#fff; font-weight:700; }
+  .scroll { max-height:440px; overflow:auto; }
+  .bar { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  button { font:13px inherit; padding:6px 12px; border:1px solid var(--line);
+           background:var(--card); color:var(--fg); border-radius:6px; cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .dead { color:var(--bad); font-weight:700; }
+  .empty { color:var(--muted); padding:14px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Spike dead keys — LibreType <span class="engine" id="engine">?</span></h1>
+  <div class="sub">Layout esperado: <strong>Spanish - ISO</strong>. Teclea cada caso en el recuadro y pulsa "Siguiente caso".</div>
+
+  <div class="bar">
+    <button class="primary" id="next">Siguiente caso →</button>
+    <button id="clear">Limpiar todo</button>
+    <button id="dump">Copiar JSON</button>
+    <span id="status" class="sub" style="margin:0; align-self:center;"></span>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="card" style="margin-bottom:14px;">
+        <h2>Escribe aquí</h2>
+        <textarea id="pad" autocomplete="off" autocorrect="off"
+                  autocapitalize="off" spellcheck="false"
+                  aria-label="Campo de prueba"></textarea>
+        <div class="sub" style="margin:8px 0 0;">Contenido literal:
+          <code id="literal">(vacío)</code></div>
+      </div>
+      <div class="card">
+        <h2>Casos de prueba</h2>
+        <ol class="tests" id="tests"></ol>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Secuencia de eventos</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr>
+            <th>evento</th><th>key</th><th>code</th><th>data</th>
+            <th>inputType</th><th>rep</th><th>AltGr</th><th>t (ms)</th>
+          </tr></thead>
+          <tbody id="log"></tbody>
+        </table>
+        <div class="empty" id="empty">Sin eventos todavía.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TESTS = [
+  { id:'T1', label:'Tilde normal',        keys:'´ luego a',        expect:'á' },
+  { id:'T2', label:'Dead key CANCELADA (el caso crítico)', keys:'´ luego t', expect:'´t — dos caracteres, en ese orden' },
+  { id:'T3', label:'Dead key + espacio',  keys:'´ luego espacio',  expect:'´ (un solo acento)' },
+  { id:'T4', label:'Dead key doble',      keys:'´ luego ´',        expect:'´´ (dos acentos)' },
+  { id:'T5', label:'Eñe directa',         keys:'ñ',                expect:'ñ' },
+  { id:'T6', label:'Diéresis',            keys:'Shift+´ luego u',  expect:'ü' },
+  { id:'T7', label:'AltGr arroba',        keys:'AltGr+2',          expect:'@' },
+  { id:'T8', label:'AltGr euro',          keys:'AltGr+e',          expect:'€' },
+  { id:'T9', label:'Repetición',          keys:'mantén "a" pulsada ~1s', expect:'varios eventos con repeat=true' },
+];
+
+const ENGINE = (() => {
+  const ua = navigator.userAgent;
+  if (window.__WKWEBVIEW_HOST__) return 'WKWebView (host nativo)';
+  if (/Chrome\//.test(ua)) return 'Chromium (Chrome)';
+  if (/Safari\//.test(ua)) return 'WebKit (Safari)';
+  return 'desconocido';
+})();
+document.getElementById('engine').textContent = ENGINE;
+
+let events = [], idx = 0, t0 = performance.now();
+const log = document.getElementById('log');
+const pad = document.getElementById('pad');
+const empty = document.getElementById('empty');
+
+function renderTests() {
+  document.getElementById('tests').innerHTML = TESTS.map((t,i) =>
+    `<li class="${i < idx ? 'done' : ''}"><strong>${t.id}. ${t.label}</strong><br>
+     Teclea: <code>${t.keys}</code><br>
+     <span class="expect">Esperado: ${t.expect}</span></li>`).join('');
+  const cur = TESTS[idx];
+  document.getElementById('status').textContent =
+    cur ? `Caso actual: ${cur.id} (${idx+1}/${TESTS.length})` : 'Todos los casos completados.';
+}
+
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))
+                  .replace(/ /g, '␣');
+}
+
+function row(cls, cells) {
+  empty.style.display = 'none';
+  const tr = document.createElement('tr');
+  tr.className = cls;
+  tr.innerHTML = cells.map(c => `<td>${c}</td>`).join('');
+  log.appendChild(tr);
+  tr.scrollIntoView({ block:'nearest' });
+}
+
+function record(e) {
+  const isKey = e.type.startsWith('key');
+  const isDead = isKey && e.key === 'Dead';
+  const rec = {
+    test: TESTS[idx] ? TESTS[idx].id : 'post',
+    engine: ENGINE, type: e.type,
+    key: isKey ? e.key : null, code: isKey ? e.code : null,
+    data: ('data' in e) ? e.data : null,
+    inputType: ('inputType' in e) ? e.inputType : null,
+    repeat: isKey ? e.repeat : null,
+    altGraph: isKey ? e.getModifierState('AltGraph') : null,
+    ctrl: isKey ? e.ctrlKey : null, alt: isKey ? e.altKey : null,
+    t: +(e.timeStamp - t0).toFixed(2),
+  };
+  events.push(rec);
+  const cls = isKey ? 'keydown' : (e.type.startsWith('composition') ? 'comp' : 'input');
+  row(cls, [
+    e.type,
+    isDead ? '<span class="dead">Dead</span>' : esc(rec.key),
+    esc(rec.code), esc(rec.data), esc(rec.inputType),
+    rec.repeat ? '✓' : '', rec.altGraph ? '✓' : '', rec.t,
+  ]);
+  document.getElementById('literal').textContent =
+    pad.value === '' ? '(vacío)' : JSON.stringify(pad.value);
+}
+
+['keydown','keyup','compositionstart','compositionupdate','compositionend',
+ 'beforeinput','input'].forEach(t => pad.addEventListener(t, record));
+
+document.getElementById('next').addEventListener('click', () => {
+  const done = TESTS[idx];
+  if (done) {
+    events.push({ test: done.id, type:'__RESULT__', engine: ENGINE,
+                  expected: done.expect, actual: pad.value });
+    row('marker', [`fin ${done.id}`, '', '', esc(pad.value), 'resultado', '', '',
+                   +(performance.now()-t0).toFixed(2)]);
+    idx++;
+  }
+  pad.value = ''; renderTests(); pad.focus();
+});
+
+document.getElementById('clear').addEventListener('click', () => {
+  events = []; idx = 0; log.innerHTML = ''; pad.value = '';
+  empty.style.display = ''; t0 = performance.now(); renderTests(); pad.focus();
+});
+
+document.getElementById('dump').addEventListener('click', async () => {
+  const json = JSON.stringify({ engine: ENGINE, ua: navigator.userAgent,
+                                platform: navigator.platform, events }, null, 1);
+  try { await navigator.clipboard.writeText(json);
+        document.getElementById('status').textContent = 'JSON copiado al portapapeles.';
+  } catch (err) { console.log('DUMP_JSON ' + json); 
+        document.getElementById('status').textContent = 'JSON volcado a consola.'; }
+  if (window.__WKWEBVIEW_HOST__) window.webkit.messageHandlers.spike.postMessage(json);
+});
+
+renderTests(); pad.focus();
+</script>
+</body>
+</html>

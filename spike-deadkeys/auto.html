@@ -1,0 +1,29 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>auto</title>
+<style>body{font:13px ui-monospace,Menlo,monospace;margin:0;padding:12px;
+background:#16161a;color:#e8e6e1}#pad{width:100%;height:60px;font:20px inherit;
+background:#0e0e11;color:#e8e6e1;border:2px solid #79a9f0;padding:8px}
+#l{margin-top:8px;white-space:pre-wrap;font-size:11px;color:#9a978f}</style></head>
+<body><textarea id="pad" autocomplete="off" autocorrect="off" autocapitalize="off"
+spellcheck="false"></textarea><div id="l"></div>
+<script>
+const pad = document.getElementById('pad');
+window.__log = [];
+['keydown','keyup','compositionstart','compositionupdate','compositionend',
+ 'beforeinput','input'].forEach(t => pad.addEventListener(t, e => {
+  window.__log.push({
+    type: e.type,
+    key: e.type.startsWith('key') ? e.key : null,
+    code: e.type.startsWith('key') ? e.code : null,
+    data: ('data' in e) ? e.data : null,
+    inputType: ('inputType' in e) ? e.inputType : null,
+    repeat: e.type.startsWith('key') ? e.repeat : null,
+  });
+  document.getElementById('l').textContent =
+    window.__log.map(r => r.type + (r.key ? '(' + r.key + ')' : '')).join(' ');
+}));
+window.__reset = () => { window.__log = []; pad.value = '';
+  document.getElementById('l').textContent = ''; pad.focus();
+  pad.setSelectionRange(0, 0); return 'ok'; };
+window.__read = () => JSON.stringify({ value: pad.value, log: window.__log });
+pad.focus();
+</script></body></html>

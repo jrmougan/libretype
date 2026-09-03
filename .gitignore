@@ -25,3 +25,6 @@ dist-ssr
 
 # Build
 src-tauri/target/
+
+# Corpus descargable, no versionado (ver investigacion/README.md)
+investigacion/es_50k.txt

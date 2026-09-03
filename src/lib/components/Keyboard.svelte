@@ -21,9 +21,20 @@
     next?: KeyStep | null;
     /** Marca la última pulsación como errónea. */
     lastWrong?: boolean;
+    /**
+     * Teclas señaladas como grupo, por `code`. La lección cero las usa para
+     * enseñar la posición de reposo: no es «pulsa esta», es «aquí van los
+     * dedos».
+     */
+    guia?: ReadonlySet<string>;
+    /** Etiqueta accesible; si no se pasa, se describe la tecla objetivo. */
+    etiqueta?: string;
   }
 
-  let { layout, held, next = null, lastWrong = false }: Props = $props();
+  let {
+    layout, held, next = null, lastWrong = false,
+    guia = new Set<string>(), etiqueta = undefined,
+  }: Props = $props();
 
   const U = 62;    // ancho de una tecla en unidades SVG
   const GAP = 5;
@@ -68,11 +79,12 @@
   }
 
   const label = $derived(
-    next
-      ? `Teclado en pantalla. Siguiente tecla: ${next.char === ' ' ? 'espacio' : next.char}` +
-        `, con el ${FINGER_NAMES[next.finger]}` +
-        (next.dead ? '. Es un acento: no aparecerá nada hasta la letra siguiente.' : '')
-      : 'Teclado en pantalla.',
+    etiqueta ??
+      (next
+        ? `Teclado en pantalla. Siguiente tecla: ${next.char === ' ' ? 'espacio' : next.char}` +
+          `, con el ${FINGER_NAMES[next.finger]}` +
+          (next.dead ? '. Es un acento: no aparecerá nada hasta la letra siguiente.' : '')
+        : 'Teclado en pantalla.'),
   );
 </script>
 
@@ -86,16 +98,17 @@
   {#each placed as k (k.code)}
     {@const st = state(k)}
     {@const isMod = modifierActive(k)}
+    {@const enGuia = guia.has(k.code)}
     <g class="key {st}" class:mod={isMod} class:wrong={st === 'pressed' && lastWrong}>
       <rect
         x={k.x} y={k.y} width={k.w} height={H} rx="7"
         fill={st === 'pressed'
           ? (lastWrong ? 'var(--error-bg)' : 'var(--accent)')
-          : st === 'next' || isMod ? 'var(--surface)' : 'var(--surface-sunken)'}
-        stroke={st === 'next' || isMod
+          : st === 'next' || isMod || enGuia ? 'var(--surface)' : 'var(--surface-sunken)'}
+        stroke={st === 'next' || isMod || enGuia
           ? 'var(--accent)'
           : st === 'pressed' && lastWrong ? 'var(--error)' : 'var(--border)'}
-        stroke-width={st === 'next' || isMod ? 3.5 : 1.5}
+        stroke-width={st === 'next' || isMod || enGuia ? 3.5 : 1.5}
         stroke-dasharray={isMod && st !== 'pressed' ? '7 4' : undefined}
       />
 

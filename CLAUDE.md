@@ -91,6 +91,26 @@ Otras piezas:
 - `components/Keyboard.svelte` — SVG, no canvas (escala nítido al 200%, se
   estiliza con tokens, es inspeccionable).
 
+## Lección cero
+
+`src/lib/components/LeccionCero.svelte`, con el contenido en
+`src/lib/leccion-cero.ts` para poder probarlo. Es la pantalla de colocación de
+manos: postura, la fila de reposo, los relieves de la F y la J, y el espacio con
+el pulgar. Los pasos 3 y 4 comprueban de verdad la pulsación leyendo `code`.
+
+Tres cosas deliberadas que no hay que "optimizar":
+
+- **No mide nada.** Ni velocidad ni puntuación. Aquí se coloca a la persona, no
+  se la evalúa.
+- **El texto es largo a propósito.** Al contrario que el tópico del onboarding,
+  las personas mayores sí leen las instrucciones, y son buena parte del público.
+- **Se llega sola la primera vez** (cuando no hay ninguna sesión guardada) pero
+  sigue accesible desde la navegación, porque la investigación dice que hay que
+  poder volver a las instrucciones, no solo verlas una vez.
+
+Cada paso interactivo tiene salida (*Saltar esta comprobación*) por si una tecla
+no responde: nunca se puede quedar nadie encallado.
+
 ## Las lecciones (no reordenar a ojo)
 
 `src/lib/lessons.ts`. El orden **no** es el tradicional (reposo, fila superior,

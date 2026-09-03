@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Drill from './lib/components/Drill.svelte';
+  import LeccionCero from './lib/components/LeccionCero.svelte';
   import Progreso from './lib/components/Progreso.svelte';
   import { LAYOUTS } from './lib/keyboard/layouts';
   import { LESSONS } from './lib/lessons';
@@ -17,6 +18,8 @@
   let sesiones = $state<Sesion[]>([]);
   let tipoAlmacen = $state<'sqlite' | 'local'>('local');
   let verProgreso = $state(false);
+  /** 'cero' es la pantalla de colocación de manos; 'leccion', el ejercicio. */
+  let vista = $state<'cero' | 'leccion'>('leccion');
 
   const porLeccion = $derived(resumirLecciones(sesiones));
 
@@ -36,6 +39,10 @@
     almacen = await abrirAlmacen();
     tipoAlmacen = almacen.tipo;
     sesiones = await almacen.leerTodas();
+
+    // Primera vez: se empieza por dónde van las manos, no por un ejercicio.
+    // Quien nunca ha tecleado al tacto se pierde si le sueltas un texto.
+    if (sesiones.length === 0) vista = 'cero';
   });
 
   async function terminada(stats: Stats): Promise<void> {
@@ -81,6 +88,7 @@
   function pick(i: number): void {
     lessonIx = i;
     result = null;
+    vista = 'leccion';
     drill?.restart();
   }
 
@@ -154,11 +162,19 @@
   {/if}
 
   <nav aria-label="Lecciones">
+    <button
+      class="lesson cero"
+      aria-current={vista === 'cero' ? 'true' : undefined}
+      onclick={() => (vista = 'cero')}
+    >
+      Antes de empezar
+    </button>
+
     {#each LESSONS as l, i (l.id)}
       {@const marca = porLeccion.get(l.id)}
       <button
         class="lesson"
-        aria-current={i === lessonIx ? 'true' : undefined}
+        aria-current={vista === 'leccion' && i === lessonIx ? 'true' : undefined}
         onclick={() => pick(i)}
       >
         {l.title}
@@ -174,30 +190,34 @@
   </nav>
 
   <main>
-    <div class="leccion-cab">
-      <h2>{lesson.title}</h2>
-      <span class="cobertura"
-            aria-label="Al terminarla podrás escribir el {pct(lesson.cobertura)}% de las palabras del español">
-        {pct(lesson.cobertura)}% del español
-      </span>
-    </div>
-    <p class="focus">{lesson.focus}</p>
-
-    {#key lesson.id}
-      <Drill bind:this={drill} {layout} target={lesson.text} onDone={terminada} />
-    {/key}
-
-    {#if result}
-      <div class="result" class:record={result.record} role="status">
-        <strong>
-          {#if result.record}★ ¡Tu mejor marca en esta lección!{:else}Lección terminada.{/if}
-        </strong>
-        {result.stats.wpm} palabras por minuto, {result.stats.accuracy}% de precisión.
-        <button onclick={again}>Repetir</button>
-        {#if lessonIx < LESSONS.length - 1}
-          <button onclick={() => pick(lessonIx + 1)}>Siguiente lección</button>
-        {/if}
+    {#if vista === 'cero'}
+      <LeccionCero {layout} onTerminar={() => pick(0)} />
+    {:else}
+      <div class="leccion-cab">
+        <h2>{lesson.title}</h2>
+        <span class="cobertura"
+              aria-label="Al terminarla podrás escribir el {pct(lesson.cobertura)}% de las palabras del español">
+          {pct(lesson.cobertura)}% del español
+        </span>
       </div>
+      <p class="focus">{lesson.focus}</p>
+
+      {#key lesson.id}
+        <Drill bind:this={drill} {layout} target={lesson.text} onDone={terminada} />
+      {/key}
+
+      {#if result}
+        <div class="result" class:record={result.record} role="status">
+          <strong>
+            {#if result.record}★ ¡Tu mejor marca en esta lección!{:else}Lección terminada.{/if}
+          </strong>
+          {result.stats.wpm} palabras por minuto, {result.stats.accuracy}% de precisión.
+          <button onclick={again}>Repetir</button>
+          {#if lessonIx < LESSONS.length - 1}
+            <button onclick={() => pick(lessonIx + 1)}>Siguiente lección</button>
+          {/if}
+        </div>
+      {/if}
     {/if}
   </main>
 
@@ -239,6 +259,8 @@
   .lesson[aria-current='true'] {
     background: var(--accent); color: var(--accent-fg); border-color: var(--accent);
   }
+  /* La lección cero no es un ejercicio más: se separa del resto. */
+  .lesson.cero { border-style: dashed; margin-right: var(--space-2); }
 
   .leccion-cab {
     display: flex; align-items: baseline; gap: var(--space-3);

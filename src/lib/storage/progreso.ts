@@ -4,7 +4,13 @@
  * La agregación se hace aquí y no en SQL a propósito. Los volúmenes son
  * minúsculos (una persona practicando), y a cambio la lógica que decide qué es
  * un récord y qué media se enseña se puede probar sin base de datos.
+ *
+ * Todo lo que agrupa por lección pasa antes por `idCanonico()`: es el único
+ * sitio por el que entra el histórico, así que traducir aquí los identificadores
+ * de versiones anteriores los arregla para los dos backends de golpe, y sin
+ * tocar lo que hay escrito en disco.
  */
+import { idCanonico } from './equivalencias';
 
 export interface Sesion {
   leccion: string;
@@ -46,12 +52,13 @@ export function resumirLecciones(sesiones: readonly Sesion[]): Map<string, Resum
   const porLeccion = new Map<string, ResumenLeccion>();
 
   for (const s of sesiones) {
-    const previo = porLeccion.get(s.leccion);
+    const leccion = idCanonico(s.leccion);
+    const previo = porLeccion.get(leccion);
     const cuenta = s.pctAcierto >= PCT_MINIMO_PARA_RECORD;
 
     if (!previo) {
-      porLeccion.set(s.leccion, {
-        leccion: s.leccion,
+      porLeccion.set(leccion, {
+        leccion,
         intentos: 1,
         mejorPpm: cuenta ? s.ppm : 0,
         mejorPct: s.pctAcierto,
@@ -82,7 +89,7 @@ export function resumirGlobal(sesiones: readonly Sesion[]): ResumenGlobal {
 
   for (const s of sesiones) {
     msTotales += s.ms;
-    lecciones.add(s.leccion);
+    lecciones.add(idCanonico(s.leccion));
     if (s.pctAcierto >= PCT_MINIMO_PARA_RECORD && s.ppm > mejorPpm) mejorPpm = s.ppm;
   }
 

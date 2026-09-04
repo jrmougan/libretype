@@ -2,6 +2,7 @@
   import {
     formatearDuracion, resumirGlobal, resumirLecciones, type Sesion,
   } from '../storage/progreso';
+  import { tituloRetirada } from '../storage/equivalencias';
   import type { Lesson } from '../lessons';
 
   interface Props {
@@ -16,6 +17,23 @@
 
   const porLeccion = $derived(resumirLecciones(sesiones));
   const global = $derived(resumirGlobal(sesiones));
+  const idsActuales = $derived(new Set(lecciones.map((l) => l.id)));
+
+  /**
+   * Lo practicado en versiones anteriores en lecciones que ya no existen. Se
+   * enseña aparte en vez de esconderlo: sale en los totales, así que si no
+   * apareciera en ninguna fila los números no cuadrarían y parecería un fallo.
+   */
+  const retiradas = $derived(
+    [...porLeccion.values()]
+      .filter((r) => !idsActuales.has(r.leccion))
+      .sort((a, b) => (a.ultimaEn < b.ultimaEn ? 1 : -1)),
+  );
+  /** El denominador es el temario de ahora, así que el numerador también. */
+  const tocadasActuales = $derived(
+    [...porLeccion.keys()].filter((id) => idsActuales.has(id)).length,
+  );
+
   let confirmando = $state(false);
 
   const fecha = (iso: string) =>
@@ -32,13 +50,16 @@
     </p>
   {:else}
     <dl class="global">
-      <div><dt>Lecciones practicadas</dt><dd>{global.leccionesTocadas} <small>de {lecciones.length}</small></dd></div>
+      <div><dt>Lecciones practicadas</dt><dd>{tocadasActuales} <small>de {lecciones.length}</small></dd></div>
       <div><dt>Sesiones</dt><dd>{global.sesiones}</dd></div>
       <div><dt>Tiempo total</dt><dd>{formatearDuracion(global.msTotales)}</dd></div>
       <div><dt>Mejor marca</dt><dd>{global.mejorPpm} <small>ppm</small></dd></div>
     </dl>
 
-    <table>
+    <!-- Al 200% las cinco columnas no caben en el panel. Que se desplace la
+         tabla dentro de su caja, no que se recorten la marca y la fecha. -->
+    <div class="tabla">
+      <table>
       <caption class="sr-only">Marca por lección</caption>
       <thead>
         <tr>
@@ -66,8 +87,34 @@
             <td>{r ? fecha(r.ultimaEn) : '—'}</td>
           </tr>
         {/each}
+        {#each retiradas as r (r.leccion)}
+          <tr class="retirada">
+            <th scope="row">
+              {tituloRetirada(r.leccion) ?? r.leccion}
+              <small>lección retirada</small>
+            </th>
+            <td>{r.intentos}</td>
+            <td>
+              {#if r.mejorPpm > 0}
+                <strong>{r.mejorPpm}</strong> ppm · {r.mejorPct}%
+              {:else}
+                <span class="nota">sin marca limpia</span>
+              {/if}
+            </td>
+            <td>{r.ultimaPpm} ppm · {r.ultimaPct}%</td>
+            <td>{fecha(r.ultimaEn)}</td>
+          </tr>
+        {/each}
       </tbody>
-    </table>
+      </table>
+    </div>
+
+    {#if retiradas.length > 0}
+      <p class="nota">
+        Las lecciones retiradas son de una versión anterior de LibreType. El
+        temario cambió, pero lo que practicaste sigue contando aquí.
+      </p>
+    {/if}
 
     <p class="nota">
       Solo cuentan para la marca los intentos con 90% de acierto o más: ir
@@ -113,6 +160,7 @@
   .global dd { margin: 0; font-size: var(--text-xl); font-variant-numeric: tabular-nums; }
   .global small { font-size: var(--text-sm); color: var(--fg-muted); }
 
+  .tabla { overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
   caption { text-align: left; }
   th, td {
@@ -125,6 +173,16 @@
   /* Las lecciones sin hacer se distinguen también por el guion de cada celda,
      no solo por el atenuado. */
   .sin-hacer { color: var(--fg-muted); }
+  /* Y las retiradas por su etiqueta, no por el borde: la línea más gruesa solo
+     separa el bloque del temario de ahora, no una fila de la siguiente. */
+  .retirada { border-top: 2px solid var(--border); }
+  .retirada + .retirada { border-top: 0; }
+  .retirada th small {
+    display: block;
+    font-size: var(--text-sm);
+    font-weight: 400;
+    color: var(--fg-muted);
+  }
 
   .nota { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
   .aviso {

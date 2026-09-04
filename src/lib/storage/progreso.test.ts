@@ -6,7 +6,7 @@ import {
 import { AlmacenLocal, AlmacenMemoria } from './almacen';
 
 const sesion = (p: Partial<Sesion> = {}): Sesion => ({
-  leccion: 'home',
+  leccion: 'reposo',
   ppm: 30,
   pctAcierto: 100,
   aciertos: 40,
@@ -19,7 +19,7 @@ const sesion = (p: Partial<Sesion> = {}): Sesion => ({
 describe('resumen por lección', () => {
   it('cuenta los intentos', () => {
     const r = resumirLecciones([sesion(), sesion(), sesion({ leccion: 'tildes' })]);
-    expect(r.get('home')!.intentos).toBe(2);
+    expect(r.get('reposo')!.intentos).toBe(2);
     expect(r.get('tildes')!.intentos).toBe(1);
   });
 
@@ -28,8 +28,8 @@ describe('resumen por lección', () => {
       sesion({ ppm: 40, terminadaEn: '2026-09-01T10:00:00.000Z' }),
       sesion({ ppm: 25, terminadaEn: '2026-09-02T10:00:00.000Z' }),
     ]);
-    expect(r.get('home')!.mejorPpm).toBe(40);
-    expect(r.get('home')!.ultimaPpm).toBe(25);
+    expect(r.get('reposo')!.mejorPpm).toBe(40);
+    expect(r.get('reposo')!.ultimaPpm).toBe(25);
   });
 
   it('teclear rápido y mal no cuenta como marca', () => {
@@ -39,13 +39,13 @@ describe('resumen por lección', () => {
       sesion({ ppm: 20, pctAcierto: 100 }),
       sesion({ ppm: 90, pctAcierto: 60 }),
     ]);
-    expect(r.get('home')!.mejorPpm).toBe(20);
+    expect(r.get('reposo')!.mejorPpm).toBe(20);
   });
 
   it('sin ningún intento limpio la marca es cero, no un número inflado', () => {
     const r = resumirLecciones([sesion({ ppm: 90, pctAcierto: 50 })]);
-    expect(r.get('home')!.mejorPpm).toBe(0);
-    expect(r.get('home')!.intentos).toBe(1);
+    expect(r.get('reposo')!.mejorPpm).toBe(0);
+    expect(r.get('reposo')!.intentos).toBe(1);
   });
 
   it('lo último es lo más reciente por fecha, no por orden de llegada', () => {
@@ -53,11 +53,55 @@ describe('resumen por lección', () => {
       sesion({ ppm: 10, terminadaEn: '2026-09-05T10:00:00.000Z' }),
       sesion({ ppm: 20, terminadaEn: '2026-09-03T10:00:00.000Z' }),
     ]);
-    expect(r.get('home')!.ultimaPpm).toBe(10);
+    expect(r.get('reposo')!.ultimaPpm).toBe(10);
   });
 
   it('sin sesiones devuelve un mapa vacío', () => {
     expect(resumirLecciones([]).size).toBe(0);
+  });
+});
+
+describe('histórico de versiones anteriores', () => {
+  // La v0.1.0 guardó 'home' y 'home-words'; hoy esa lección se llama 'reposo'.
+  // Sin traducir, esas sesiones cuentan en los totales pero no salen en ninguna
+  // fila: el alumno ve trabajo suyo desaparecido.
+  it('una sesión de la v0.1.0 aparece en su lección de ahora', () => {
+    const r = resumirLecciones([sesion({ leccion: 'home', ppm: 22 })]);
+    expect(r.has('home')).toBe(false);
+    expect(r.get('reposo')!.intentos).toBe(1);
+    expect(r.get('reposo')!.mejorPpm).toBe(22);
+  });
+
+  it('las dos lecciones de la fila de reposo se funden en una', () => {
+    const r = resumirLecciones([
+      sesion({ leccion: 'home', ppm: 18 }),
+      sesion({ leccion: 'home-words', ppm: 26 }),
+      sesion({ leccion: 'reposo', ppm: 24 }),
+    ]);
+    expect(r.size).toBe(1);
+    expect(r.get('reposo')!.intentos).toBe(3);
+    expect(r.get('reposo')!.mejorPpm).toBe(26);
+  });
+
+  // Traducir 'top' a alguna lección de ahora le regalaría al alumno una marca
+  // en teclas que no practicó, y esRecord() la daría por buena.
+  it('una lección retirada conserva su identificador, no se traduce', () => {
+    const r = resumirLecciones([sesion({ leccion: 'top', ppm: 30 })]);
+    expect(r.get('top')!.intentos).toBe(1);
+  });
+
+  it('los totales no cuentan dos veces la lección renombrada', () => {
+    const g = resumirGlobal([
+      sesion({ leccion: 'home', ms: 60000 }),
+      sesion({ leccion: 'reposo', ms: 60000 }),
+    ]);
+    expect(g.leccionesTocadas).toBe(1);
+    expect(g.sesiones).toBe(2);
+  });
+
+  it('un identificador desconocido pasa tal cual, sin inventarse una lección', () => {
+    const r = resumirLecciones([sesion({ leccion: 'lo-que-sea' })]);
+    expect(r.get('lo-que-sea')!.intentos).toBe(1);
   });
 });
 
@@ -71,7 +115,7 @@ describe('récords', () => {
   });
 
   it('hay que superar la marca, no igualarla', () => {
-    const previo = resumirLecciones([sesion({ ppm: 30 })]).get('home')!;
+    const previo = resumirLecciones([sesion({ ppm: 30 })]).get('reposo')!;
     expect(esRecord(previo, sesion({ ppm: 31 }))).toBe(true);
     expect(esRecord(previo, sesion({ ppm: 30 }))).toBe(false);
     expect(esRecord(previo, sesion({ ppm: 29 }))).toBe(false);
@@ -86,8 +130,8 @@ describe('récords', () => {
 describe('resumen global', () => {
   it('suma tiempo y cuenta lecciones distintas', () => {
     const g = resumirGlobal([
-      sesion({ leccion: 'home', ms: 60000, ppm: 20 }),
-      sesion({ leccion: 'home', ms: 30000, ppm: 25 }),
+      sesion({ leccion: 'reposo', ms: 60000, ppm: 20 }),
+      sesion({ leccion: 'reposo', ms: 30000, ppm: 25 }),
       sesion({ leccion: 'tildes', ms: 90000, ppm: 18 }),
     ]);
     expect(g).toMatchObject({ sesiones: 3, leccionesTocadas: 2, msTotales: 180000, mejorPpm: 25 });

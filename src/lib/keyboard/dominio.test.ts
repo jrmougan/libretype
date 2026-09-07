@@ -75,7 +75,7 @@ describe('opacidad de la letra', () => {
     // O se lee, o no está.
     for (let d = 0.5; d < DOMINADA; d += 0.02) {
       const o = opacidadEtiqueta(d);
-      expect(o, `dominio ${d.toFixed(2)}`).toBeGreaterThanOrEqual(0.55);
+      expect(o, `dominio ${d.toFixed(2)}`).toBeGreaterThanOrEqual(0.65);
     }
   });
 

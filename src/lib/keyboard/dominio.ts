@@ -66,8 +66,9 @@ export function dominioDe(e: EstadoTecla | undefined): number {
 export function opacidadEtiqueta(dominio: number): number {
   if (dominio >= DOMINADA) return 0;
   if (dominio <= 0.5) return 1;
-  // Entre 0,5 y 0,85 se atenúa, pero nunca por debajo de un valor legible.
-  return acotar(1 - ((dominio - 0.5) / (DOMINADA - 0.5)) * 0.45, 0.55, 1);
+  // Entre 0,5 y 0,85 se atenúa, pero nunca por debajo de un valor legible
+  // (mínimo 0,65 para mantener contraste >= 4,5:1 sobre la tecla en tema claro).
+  return acotar(1 - ((dominio - 0.5) / (DOMINADA - 0.5)) * 0.35, 0.65, 1);
 }
 
 /** Registra un intento sobre una tecla. */

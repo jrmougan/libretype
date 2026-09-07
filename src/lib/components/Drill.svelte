@@ -270,7 +270,7 @@
        recibir el foco de verdad para que llegue el texto compuesto. */
   }
 
-  .cab { grid-area: cabecera; display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+  .cab { grid-area: cabecera; display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
   .cab h2 { margin: 0; font-size: var(--text-lg); }
 
   .cobertura {
@@ -284,8 +284,12 @@
   }
   .explica {
     margin-left: auto;
-    min-height: 0;
-    padding: 2px var(--space-2);
+    min-height: var(--target-min);
+    min-width: var(--target-min);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2) var(--space-3);
     font-size: var(--text-sm);
   }
 

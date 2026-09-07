@@ -19,6 +19,8 @@
   interface Props {
     layout: Layout;
     target: string;
+    /** Suspende la captura mientras hay un panel o resultado abierto. */
+    activo?: boolean;
     /** Se llama una sola vez al completar la lección, con las métricas. */
     onDone?: (stats: Stats) => void;
     /**
@@ -45,7 +47,7 @@
   }
 
   let {
-    layout, target, onDone, onTecla, dominios, onStats,
+    layout, target, activo = true, onDone, onTecla, dominios, onStats,
     titulo = '', explicacion = '', cobertura = '', espacioJusto = false,
   }: Props = $props();
 
@@ -133,9 +135,18 @@
         if (typed.length > antes) reportarTeclas(antes, typed.length);
       },
     });
-    engine.focus();
     return () => engine?.destroy();
   });
+
+  // Solo al entrar en la lección o volver de un panel. Perder el foco nunca
+  // lo recupera: Tab y Mayús+Tab tienen que poder llegar a los demás controles.
+  $effect(() => {
+    if (activo) field?.focus();
+  });
+
+  export function enfocar(): void {
+    if (activo) field?.focus();
+  }
 
   /**
    * Apunta cada carácter recién confirmado como un intento sobre las teclas que
@@ -173,24 +184,10 @@
     typed = '';
     stamps = [];
     avisado = false;
-    engine?.focus();
   }
 </script>
 
 <div class="drill">
-  <!-- Campo real de captura. Fuera de pantalla pero enfocable: el texto tiene
-       que pasar por el método de entrada del sistema para que las tildes se
-       compongan como en cualquier otra aplicación. -->
-  <textarea
-    bind:this={field}
-    class="capture"
-    autocomplete="off"
-    autocapitalize="off"
-    spellcheck="false"
-    aria-label="Escribe aquí el texto de la lección"
-    onblur={() => engine?.focus()}
-  ></textarea>
-
   <header class="cab">
     <h2>{titulo}</h2>
     {#if cobertura}
@@ -205,17 +202,31 @@
         {explicacionAbierta ? 'Ocultar' : '¿Qué se practica?'}
       </button>
     {/if}
+    <button onclick={enfocar} disabled={!activo}>Seguir escribiendo</button>
   </header>
 
   {#if explicacionAbierta && explicacion}
     <p class="focus">{explicacion}</p>
   {/if}
 
-  <p class="text" aria-hidden="true">
-    {#each [...target] as ch, i (i)}
-      <span class="ch {states[i]}">{ch === ' ' ? '\u00a0' : ch}</span>
-    {/each}
-  </p>
+  <!-- La etiqueta devuelve el foco al pulsar el texto sin interceptar teclas.
+       El campo real conserva la composición del método de entrada del sistema. -->
+  <label class="text">
+    <textarea
+      bind:this={field}
+      class="capture"
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+      disabled={!activo}
+      aria-label="Escribe aquí el texto de la lección"
+    ></textarea>
+    <span aria-hidden="true">
+      {#each [...target] as ch, i (i)}
+        <span class="ch {states[i]}">{ch === ' ' ? '\u00a0' : ch}</span>
+      {/each}
+    </span>
+  </label>
 
   <!-- Para lector de pantalla: el bucle de práctica es visual y motor, pero la
        pista sí tiene que ser audible, y el progreso legible. -->
@@ -241,7 +252,12 @@
      de desbordar. */
   .drill {
     display: grid;
-    grid-template-rows: auto auto minmax(0, auto) auto minmax(0, 1fr);
+    grid-template-areas: 'cabecera' 'explicacion' 'texto' 'pista' 'teclado';
+    /* Los mínimos también van en las filas: si solo los tienen los hijos,
+       la rejilla puede encogerlas hasta que texto y teclado se solapen. */
+    grid-template-rows: auto auto
+      minmax(calc(1.7 * var(--text-drill) + 2 * var(--space-3) + 2px), auto)
+      auto minmax(min(34vh, 230px), 1fr);
     gap: var(--space-2);
     min-height: 0;
   }
@@ -254,7 +270,7 @@
        recibir el foco de verdad para que llegue el texto compuesto. */
   }
 
-  .cab { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+  .cab { grid-area: cabecera; display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
   .cab h2 { margin: 0; font-size: var(--text-lg); }
 
   .cobertura {
@@ -273,9 +289,11 @@
     font-size: var(--text-sm);
   }
 
-  .focus { margin: 0; color: var(--fg-muted); max-width: 78ch; font-size: var(--text-sm); }
+  .focus { grid-area: explicacion; margin: 0; color: var(--fg-muted); max-width: 78ch; font-size: var(--text-sm); }
 
   .text {
+    grid-area: texto;
+    cursor: text;
     font-family: var(--font-drill);
     font-size: var(--text-drill);
     line-height: 1.7;
@@ -289,6 +307,11 @@
        arrastra a la página entera. */
     overflow-y: auto;
     max-height: 30vh;
+  }
+
+  .text:has(.capture:focus-visible) {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .ch { padding: 1px 0; border-bottom: 3px solid transparent; }
@@ -317,6 +340,7 @@
   }
 
   .hint {
+    grid-area: pista;
     display: flex; align-items: center; gap: var(--space-2);
     margin: 0; min-height: 1.6em;
     font-size: var(--text-lg);
@@ -333,6 +357,7 @@
      que haya que desplazarse. Si ni así cabe, es `.escena` quien se desplaza
      por dentro; nunca se recorta contenido. */
   .teclado {
+    grid-area: teclado;
     min-height: min(34vh, 230px);
     display: grid;
   }

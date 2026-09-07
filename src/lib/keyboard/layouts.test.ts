@@ -58,38 +58,13 @@ describe('índice de caracteres', () => {
   });
 });
 
-describe('coherencia de la distribución', () => {
-  it('no hay codes repetidos', () => {
-    const vistos = new Set<string>();
-    for (const fila of ES_ISO.rows) {
-      for (const k of fila) {
-        expect(vistos.has(k.code), `code duplicado: ${k.code}`).toBe(false);
-        vistos.add(k.code);
-      }
-    }
-  });
-
+describe('distribución ES-ISO', () => {
   it('la fila de reposo son las ocho teclas de siempre más la ñ', () => {
     const reposo = ES_ISO.rows.flat().filter((k) => k.home).map((k) => k.code);
     expect(reposo).toEqual([
       'KeyA', 'KeyS', 'KeyD', 'KeyF',
       'KeyJ', 'KeyK', 'KeyL', 'Semicolon',
     ]);
-  });
-
-  it('toda tecla con carácter tiene dedo asignado', () => {
-    for (const k of ES_ISO.rows.flat()) {
-      expect(k.finger, `sin dedo: ${k.code}`).toBeTruthy();
-    }
-  });
-
-  it('todo carácter compuesto se puede formar con teclas que existen', () => {
-    for (const [ch, seq] of Object.entries(ES_ISO.compose)) {
-      for (const parte of [...seq]) {
-        expect(index.has(parte), `${ch} necesita "${parte}", que no está en la tabla`)
-          .toBe(true);
-      }
-    }
   });
 });
 
@@ -113,10 +88,39 @@ describe('las lecciones son escribibles', () => {
 
 describe('todas las distribuciones registradas', () => {
   for (const layout of LAYOUTS) {
-    it(`${layout.id} construye su índice sin romperse`, () => {
-      const ix = buildIndex(layout);
-      expect(ix.size).toBeGreaterThan(30);
-      for (const pasos of ix.values()) expect(pasos.length).toBeGreaterThan(0);
+    describe(layout.id, () => {
+      it('construye su índice sin romperse', () => {
+        const ix = buildIndex(layout);
+        expect(ix.size).toBeGreaterThan(30);
+        for (const pasos of ix.values()) expect(pasos.length).toBeGreaterThan(0);
+      });
+
+      it('no hay codes repetidos', () => {
+        const vistos = new Set<string>();
+        for (const fila of layout.rows) {
+          for (const k of fila) {
+            expect(vistos.has(k.code), `code duplicado: ${k.code}`).toBe(false);
+            vistos.add(k.code);
+          }
+        }
+      });
+
+      it('toda tecla tiene dedo asignado', () => {
+        for (const k of layout.rows.flat()) {
+          expect(k.finger, `sin dedo: ${k.code}`).toBeTruthy();
+        }
+      });
+
+      it('todo carácter compuesto se puede formar con teclas que existen', () => {
+        const ix = buildIndex(layout);
+        for (const [ch, seq] of Object.entries(layout.compose)) {
+          for (const parte of [...seq]) {
+            expect(ix.has(parte), `${ch} necesita "${parte}", que no está en la tabla`)
+              .toBe(true);
+          }
+        }
+      });
     });
   }
 });
+

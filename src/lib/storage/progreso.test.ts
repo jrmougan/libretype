@@ -193,9 +193,17 @@ describe('almacén en memoria', () => {
   it('cumple el mismo contrato', async () => {
     const a = new AlmacenMemoria();
     expect(await a.leerTodas()).toEqual([]);
+    expect(await a.leerTeclas()).toEqual(new Map());
+
     await a.guardar(sesion({ ppm: 7 }));
     expect(await a.leerTodas()).toHaveLength(1);
+
+    const teclas = new Map([['KeyA', { intentos: 10, aciertos: 9, msTotal: 2000 }]]);
+    await a.guardarTeclas(teclas);
+    expect(await a.leerTeclas()).toEqual(teclas);
+
     await a.borrarTodo();
     expect(await a.leerTodas()).toEqual([]);
+    expect(await a.leerTeclas()).toEqual(new Map());
   });
 });

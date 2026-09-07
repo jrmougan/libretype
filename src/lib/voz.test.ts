@@ -6,10 +6,10 @@ const CLAVES: (keyof Voz)[] = [
 ];
 
 describe('voces', () => {
-  it('los dos tonos dicen lo mismo, no uno más cosas que el otro', () => {
+  it('los dos tonos tienen texto para todas las situaciones', () => {
     for (const clave of CLAVES) {
-      expect(VOCES.juego[clave], `falta ${clave} en juego`).toBeTruthy();
-      expect(VOCES.sobrio[clave], `falta ${clave} en sobrio`).toBeTruthy();
+      expect(VOCES.juego[clave].trim().length, `falta o es muy corto ${clave} en juego`).toBeGreaterThanOrEqual(3);
+      expect(VOCES.sobrio[clave].trim().length, `falta o es muy corto ${clave} en sobrio`).toBeGreaterThanOrEqual(3);
     }
   });
 

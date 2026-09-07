@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   contarDominadas, DOMINADA, dominioDe, INTENTOS_MINIMOS, mapaDeDominio,
-  MS_LENTO, MS_RAPIDO, opacidadEtiqueta, PRECISION_MINIMA, registrar,
+  MS_LENTO, MS_RAPIDO, opacidadEtiqueta, registrar,
   type EstadoTecla,
 } from './dominio';
 
@@ -31,7 +31,6 @@ describe('dominio de una tecla', () => {
     expect(dominioDe({ intentos: 50, aciertos: 44, msTotal: 50 * 150 })).toBe(0);
     // Y justo en el umbral sí cuenta.
     expect(dominioDe({ intentos: 50, aciertos: 45, msTotal: 50 * 150 })).toBeGreaterThan(0);
-    expect(PRECISION_MINIMA).toBe(0.9);
   });
 
   it('mucha precisión y buena velocidad es dominio alto', () => {

@@ -56,7 +56,7 @@
       "endpoints": [
         "https://github.com/jrmougan/libretype/releases/latest/download/latest.json"
       ],
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkyQTUxRTYzNUNDRUYwNzUKUldSMThNNWNZeDZsa2x0TW5UVHlwS3lUZDdpRVhWVFVrbWhTY1R0WHJ2L0hXbDBjQlNSUktCRC8K",
       "windows": {
         "installMode": "passive"
       }

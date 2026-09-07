@@ -166,6 +166,8 @@ pnpm tauri signer generate -w ~/.tauri/libretype.key
 - La **pública** que imprime va en `src-tauri/tauri.conf.json`, en `plugins.updater.pubkey`.
 - La **privada** (`~/.tauri/libretype.key`) va en el secreto `TAURI_SIGNING_PRIVATE_KEY`, y su contraseña en `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 
+`release.yml` activa `bundle.createUpdaterArtifacts` al empaquetar para generar los archivos de actualización y sus firmas. Las compilaciones locales y de comprobación no necesitan la clave privada.
+
 > Guarda la privada también fuera de GitHub. Si se pierde, quien ya tenga la aplicación instalada no podrá volver a actualizarla y tendrá que reinstalar a mano.
 
 **2. Firma del repositorio apt.** Una clave GPG que firma el índice; es lo que hace que apt no exija `[trusted=yes]` a cada usuario.

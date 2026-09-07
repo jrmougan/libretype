@@ -47,6 +47,8 @@
 
   /** Intentos acumulados por tecla, que deciden cuánta ayuda visual retirar. */
   let teclas = $state<Map<string, EstadoTecla>>(new Map());
+  /** Copia del estado persistido para preservar el dominio si se abandona la lección. */
+  let teclasBase = new Map<string, EstadoTecla>();
 
   const dominios = $derived(
     prefs.ayudaTeclado === 'siempre' ? new Map<string, number>() : mapaDeDominio(teclas),
@@ -66,6 +68,7 @@
     tipoAlmacen = almacen.tipo;
     sesiones = await almacen.leerTodas();
     teclas = await almacen.leerTeclas();
+    teclasBase = new Map(teclas);
 
     // Primera vez: primero cómo quiere la aplicación, luego dónde van las
     // manos. Nunca soltarle un ejercicio a alguien que no ha tecleado nunca.
@@ -108,6 +111,7 @@
       await almacen?.guardar(sesion);
       sesiones = [...sesiones, sesion];
       await almacen?.guardarTeclas(teclas);
+      teclasBase = new Map(teclas);
     } catch (err) {
       console.warn('[libretype] no se pudo guardar la sesión:', err);
     }
@@ -117,6 +121,7 @@
     await almacen?.borrarTodo();
     sesiones = [];
     teclas = new Map();
+    teclasBase = new Map();
   }
 
   // Aplicar y guardar van juntos: un ajuste que no sobrevive a cerrar la app
@@ -131,6 +136,11 @@
     // diálogo y, si el campo anterior ya no existe, lo manda al documento.
     dialogoResultado?.close();
     dialogoPanel?.close();
+    if (!result) {
+      // Si se abandona la lección antes de terminarla, se preserva el estado
+      // persistido según AGENTS.md (el dominio solo se persiste al terminar).
+      teclas = new Map(teclasBase);
+    }
     lessonIx = i;
     result = null;
     vista = 'leccion';
@@ -144,6 +154,9 @@
 
   async function again(): Promise<void> {
     dialogoResultado?.close();
+    if (!result) {
+      teclas = new Map(teclasBase);
+    }
     result = null;
     drill?.restart();
     await tick();

@@ -10,9 +10,9 @@
    */
   import { onMount } from 'svelte';
   import Keyboard from './Keyboard.svelte';
-  import { TypingEngine, computeStats, diffAgainstTarget, type CharState, type Stats }
+  import { TypingEngine, computeStats, diffAgainstTarget, UMBRAL_PAUSA_MS, type CharState, type Stats }
     from '../keyboard/engine';
-  import type { MapaDominio } from '../keyboard/dominio';
+  import { MS_RAPIDO, type MapaDominio } from '../keyboard/dominio';
   import { buildIndex, FINGER_NAMES, type KeyStep, type Layout }
     from '../keyboard/layouts';
 
@@ -58,10 +58,12 @@
   let composing = $state(false);
   let held = $state<Set<string>>(new Set());
   let stamps = $state<readonly number[]>([]);
+  let errores = $state(0);
+  let pendienteTecla0: { code: string; acierto: boolean }[] | null = null;
 
   const index = $derived(buildIndex(layout));
   const states = $derived<CharState[]>(diffAgainstTarget(typed, target));
-  const stats = $derived(computeStats(typed, target, stamps));
+  const stats = $derived(computeStats(typed, target, stamps, errores));
   const finished = $derived(typed.length >= target.length);
 
   /** Carácter que toca escribir ahora. */
@@ -128,11 +130,22 @@
         // medias el campo muestra `´` pero la posición de la lección no debe
         // avanzar, o la pista pediría la letra siguiente en vez de la vocal
         // que completa la tilde.
-        const antes = typed.length;
-        typed = s.committed.slice(0, target.length);
+        const antes = typed;
+        const nuevoTyped = s.committed.slice(0, target.length);
+        if (nuevoTyped.length < antes.length) {
+          // El alumno ha borrado caracteres: contabilizar errores corregidos
+          for (let i = nuevoTyped.length; i < antes.length; i++) {
+            if (antes[i] !== target[i]) {
+              errores++;
+            }
+          }
+        }
+        typed = nuevoTyped;
         composing = s.composing;
         stamps = [...engine!.stamps];
-        if (typed.length > antes) reportarTeclas(antes, typed.length);
+        if (nuevoTyped.length > antes.length) {
+          reportarTeclas(antes.length, nuevoTyped.length);
+        }
       },
     });
     return () => engine?.destroy();
@@ -156,13 +169,35 @@
    */
   function reportarTeclas(desde: number, hasta: number): void {
     if (!onTecla) return;
+
+    // Si teníamos la primera tecla pendiente y ahora tenemos al menos 2 sellos
+    if (pendienteTecla0 && stamps.length >= 2) {
+      const ms0 = Math.min(Math.max(0, stamps[1] - stamps[0]), UMBRAL_PAUSA_MS);
+      for (const p of pendienteTecla0) {
+        onTecla(p.code, p.acierto, ms0);
+      }
+      pendienteTecla0 = null;
+    }
+
     for (let i = desde; i < hasta; i++) {
       const esperado = target[i];
       if (esperado === undefined) continue;
       const pasos = index.get(esperado);
       if (!pasos) continue;
-      const ms = i > 0 && stamps[i] && stamps[i - 1] ? stamps[i] - stamps[i - 1] : 0;
       const acierto = typed[i] === esperado;
+
+      if (i === 0) {
+        if (stamps.length >= 2) {
+          const ms = Math.min(Math.max(0, stamps[1] - stamps[0]), UMBRAL_PAUSA_MS);
+          for (const paso of pasos) onTecla(paso.code, acierto, ms);
+        } else {
+          pendienteTecla0 = pasos.map((p) => ({ code: p.code, acierto }));
+        }
+        continue;
+      }
+
+      const delta = stamps[i] && stamps[i - 1] ? stamps[i] - stamps[i - 1] : 0;
+      const ms = Math.min(Math.max(0, delta), UMBRAL_PAUSA_MS);
       for (const paso of pasos) onTecla(paso.code, acierto, ms);
     }
   }
@@ -174,6 +209,12 @@
   $effect(() => {
     if (finished && !composing && !avisado) {
       avisado = true;
+      if (pendienteTecla0) {
+        for (const p of pendienteTecla0) {
+          onTecla?.(p.code, p.acierto, MS_RAPIDO);
+        }
+        pendienteTecla0 = null;
+      }
       onDone?.(stats);
     }
   });
@@ -183,6 +224,8 @@
     engine?.reset();
     typed = '';
     stamps = [];
+    errores = 0;
+    pendienteTecla0 = null;
     avisado = false;
   }
 </script>
@@ -220,6 +263,12 @@
       spellcheck="false"
       disabled={!activo}
       aria-label="Escribe aquí el texto de la lección"
+      onpaste={(e) => e.preventDefault()}
+      onbeforeinput={(e) => {
+        if ((e as InputEvent).inputType === 'insertFromPaste') {
+          e.preventDefault();
+        }
+      }}
     ></textarea>
     <span aria-hidden="true">
       {#each [...target] as ch, i (i)}

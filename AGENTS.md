@@ -21,6 +21,9 @@ están en español; mantenlo así.
 
     cd src-tauri && cargo build    # solo el backend Rust
 
+    # Repositorio apt, de punta a punta con un apt de verdad. Necesita Linux:
+    bash empaquetado/apt/probar-repo.sh
+
 Un solo test: `pnpm test -- -t "acento cancelado"` (por nombre) o
 `pnpm test src/lib/keyboard/layouts.test.ts` (por fichero).
 
@@ -272,6 +275,44 @@ Reglas que están ahí por algo:
   porque este público no va a ir a mirar si hay versión nueva, pero la promesa
   de no hablar con ningún servidor es parte de lo que se ofrece: si se añade
   cualquier otra petición, hay que decirlo en el README y en Ajustes.
+
+### El repositorio apt
+
+`empaquetado/apt/`. Se **reconstruye entero** en cada publicación a partir de
+los `.deb` de las Releases estables, y eso no es fuerza bruta: hace que el
+repositorio sea siempre una función de lo que hay en GitHub. Ir añadiendo al
+que ya está publicado es de donde salen los índices que anuncian ficheros
+inexistentes.
+
+- El nombre del paquete es **`libre-type`**, con guion. Lo decide Tauri
+  partiendo el CamelCase del `productName` y no se puede cambiar sin renombrar
+  la aplicación. `construir-repo.sh` lo **lee del `.deb`** en vez de escribirlo,
+  para que no pueda quedarse desfasado.
+- Un solo suite `stable`, no uno por nombre de distribución: el `.deb` depende
+  de `libwebkit2gtk-4.1-0`, que está en Ubuntu 22.04+ y Debian 12+. Ese
+  conjunto es todo lo que hay; partirlo daría a entender que se prueban por
+  separado.
+- Solo **amd64**. Si algún día se compila para arm64, hay que tocar
+  `Architectures` en `construir-repo.sh` además del workflow.
+
+`probar-repo.sh` lo ataca con un `apt` de verdad y **rompe el build si algo
+falla**, en el mismo espíritu que el job de dead keys. Comprueba cuatro cosas,
+y las dos últimas son las que importan: que un índice manipulado se rechace por
+el hash, y que un `InRelease` manipulado se rechace por la firma. Sin ellas, un
+repositorio con la firma puesta de adorno pasaría el resto en verde.
+
+Dos trampas que ya se cayeron al escribirlo y que conviene no repetir:
+
+1. **apt no vuelve a descargar el índice si el `InRelease` no ha cambiado.** Un
+   test que manipula ficheros sin vaciar `/var/lib/apt/lists` no comprueba la
+   cadena de confianza, comprueba que apt tiene caché.
+2. **Un `sed` que no encaja no cambia nada y el test pasa en verde.** De ahí la
+   función `manipular`, que verifica que el fichero cambió de verdad antes de
+   preguntarle a apt.
+
+Los `.deb` de la prueba son sintéticos a propósito: lo que se prueba es la
+maquinaria del repositorio, no la compilación de la app. Meter el toolchain de
+Rust y pnpm ahí convertiría un job de un minuto en uno de diez.
 
 ## Persistencia
 

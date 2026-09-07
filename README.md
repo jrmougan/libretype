@@ -124,17 +124,40 @@ orb -m spike bash linux/run.sh
 
 ---
 
-## Actualizaciones
+## Instalación y actualizaciones
+
+Hay dos caminos, y la aplicación sabe en cuál está.
+
+### Debian y Ubuntu: repositorio apt
+
+Es el recomendado en esas distribuciones, porque LibreType se mantiene al día con el resto del sistema:
+
+```bash
+curl -fsSL https://jrmougan.github.io/libretype/apt/libretype-archive-keyring.gpg \
+  | sudo tee /usr/share/keyrings/libretype-archive-keyring.gpg > /dev/null
+
+echo "deb [signed-by=/usr/share/keyrings/libretype-archive-keyring.gpg] \
+https://jrmougan.github.io/libretype/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/libretype.list
+
+sudo apt update && sudo apt install libre-type
+```
+
+El paquete se llama **`libre-type`**, con guion: lo deriva Tauri del `productName` partiendo el CamelCase, y no hay forma de cambiarlo sin renombrar la aplicación.
+
+Requiere `libwebkit2gtk-4.1-0`, así que funciona en Ubuntu 22.04+ y Debian 12+, y solo se publica para **amd64**. `sudo apt upgrade` trae las versiones nuevas; que se instalen solas requiere configurar `unattended-upgrades` para orígenes de terceros, cosa que por defecto no hace.
+
+### El resto: la aplicación se actualiza sola
 
 En AppImage, macOS y Windows, LibreType mira al arrancar si hay una versión nueva y lo avisa en la barra de arriba. Nunca instala ni reinicia por su cuenta: las dos cosas son un clic, porque reiniciar a mitad de una lección tiraría el intento por la borda.
 
-Es la única petición de red que hace la aplicación —un fichero JSON público en GitHub— y se puede desactivar en Ajustes.
+Es la única petición de red que hace la aplicación —un fichero JSON público en GitHub— y se puede desactivar en Ajustes. Instalada por apt o dnf, ni siquiera eso: manda el gestor de paquetes y la aplicación no consulta nada.
 
-En Linux, el actualizador solo sabe reemplazar un AppImage. Un `.deb` o un `.rpm` son del gestor de paquetes: instalada así, la aplicación lo detecta, no ofrece el botón y dice quién se encarga.
+### Puesta en marcha (solo para quien publique)
 
-### Firma del actualizador (solo para quien publique)
+Ambos caminos necesitan secretos en el repositorio de GitHub. Sin ellos, `release.yml` y `apt.yml` fallan a propósito en vez de publicar algo roto.
 
-No tiene nada que ver con firmar el binario para Gatekeeper o SmartScreen: es una clave minisign, es gratis y no necesita cuenta de Apple ni certificado de Windows. Sin ella, `release.yml` falla a propósito en vez de publicar binarios incapaces de verificar ninguna actualización futura.
+**1. Firma del actualizador.** No tiene nada que ver con firmar el binario para Gatekeeper o SmartScreen: es una clave minisign, es gratis y no necesita cuenta de Apple ni certificado de Windows.
 
 ```bash
 pnpm tauri signer generate -w ~/.tauri/libretype.key
@@ -144,6 +167,26 @@ pnpm tauri signer generate -w ~/.tauri/libretype.key
 - La **privada** (`~/.tauri/libretype.key`) va en el secreto `TAURI_SIGNING_PRIVATE_KEY`, y su contraseña en `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 
 > Guarda la privada también fuera de GitHub. Si se pierde, quien ya tenga la aplicación instalada no podrá volver a actualizarla y tendrá que reinstalar a mano.
+
+**2. Firma del repositorio apt.** Una clave GPG que firma el índice; es lo que hace que apt no exija `[trusted=yes]` a cada usuario.
+
+```bash
+gpg --quick-generate-key "LibreType <tu@correo>" default sign never
+gpg --armor --export-secret-keys <ID>   # → secreto APT_GPG_PRIVATE_KEY
+```
+
+La contraseña, si la tiene, va en `APT_GPG_PASSPHRASE`. Además hay que activar GitHub Pages con **GitHub Actions** como origen.
+
+Después, `apt.yml` reconstruye el repositorio entero al publicar cada Release, a partir de los `.deb` de todas las releases estables. Se reconstruye desde cero a propósito: así el repositorio es siempre una función de lo que hay en GitHub y no puede quedarse un paquete huérfano ni un índice desfasado.
+
+Para probarlo sin publicar nada, hay una prueba de punta a punta con un `apt` de verdad —instala, actualiza y comprueba que un índice o una firma manipulados se rechazan:
+
+```bash
+# Dentro de Linux (orb, o un contenedor Ubuntu)
+bash empaquetado/apt/probar-repo.sh
+```
+
+Corre también en CI, en el job `Repositorio apt`.
 
 ---
 

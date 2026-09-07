@@ -1,0 +1,121 @@
+<!doctype html>
+<!--
+  Portada del repositorio apt. La publica .github/workflows/apt.yml, que
+  sustituye PAQUETE por el nombre real que trae el .deb; no se escribe a mano
+  porque lo decide Tauri a partir del productName.
+
+  Sin dependencias externas a propósito: es la página que alguien abre para
+  copiar tres órdenes, y tiene que cargar entera aunque el resto de internet
+  no conteste.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LibreType para Debian y Ubuntu</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #faf9f7; --surface: #fff; --sunken: #f0eee9;
+    --fg: #1b1b19; --fg-muted: #5f5c55; --border: #d9d5cd; --accent: #1d4ed8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15151a; --surface: #1d1d24; --sunken: #111116;
+      --fg: #ecebe7; --fg-muted: #a3a09a; --border: #33333d; --accent: #7ba7f5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1.25rem 4rem;
+    background: var(--bg); color: var(--fg);
+    font: 1rem/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 46rem; margin: 0 auto; }
+  h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 .25rem; }
+  h2 { font-size: 1.2rem; margin: 2.5rem 0 .5rem; }
+  .entradilla { color: var(--fg-muted); margin: 0 0 2rem; font-size: 1.05rem; }
+  pre {
+    background: var(--sunken); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1rem; overflow-x: auto; margin: 0;
+    font: .875rem/1.7 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  p code { background: var(--sunken); padding: .1em .35em; border-radius: 4px; font-size: .9em; }
+  .nota {
+    border-left: 3px solid var(--border); padding: .25rem 0 .25rem 1rem;
+    color: var(--fg-muted); margin: 1.25rem 0;
+  }
+  a { color: var(--accent); }
+  footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--fg-muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>LibreType para Debian y Ubuntu</h1>
+  <p class="entradilla">
+    Tutor de mecanografía en español, visual y accesible. Instalándolo desde
+    aquí, LibreType se mantiene al día con el resto de actualizaciones del
+    sistema.
+  </p>
+
+  <h2>Instalación</h2>
+  <p>Tres órdenes, una sola vez:</p>
+<pre><code>curl -fsSL https://jrmougan.github.io/libretype/apt/libretype-archive-keyring.gpg \
+  | sudo tee /usr/share/keyrings/libretype-archive-keyring.gpg &gt; /dev/null
+
+echo "deb [signed-by=/usr/share/keyrings/libretype-archive-keyring.gpg] \
+https://jrmougan.github.io/libretype/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/libretype.list
+
+sudo apt update &amp;&amp; sudo apt install PAQUETE</code></pre>
+
+  <div class="nota">
+    <p>
+      A partir de ahí, <code>sudo apt upgrade</code> trae las versiones nuevas
+      junto con las del resto del sistema. Si quieres que se instalen solas sin
+      que tengas que hacer nada, hay que configurar
+      <code>unattended-upgrades</code> para orígenes de terceros: por defecto
+      solo se ocupa de las actualizaciones de seguridad de la distribución.
+    </p>
+  </div>
+
+  <h2>Qué hace falta</h2>
+  <p>
+    El paquete depende de <code>libwebkit2gtk-4.1-0</code>, así que funciona en
+    <strong>Ubuntu 22.04 y posteriores</strong> y en <strong>Debian 12 y
+    posteriores</strong>, además de las distribuciones derivadas de ellas.
+    En Ubuntu 20.04 o Debian 11 no se instalará: llevan la versión 4.0 de esa
+    biblioteca.
+  </p>
+  <p>
+    Solo se publica para <strong>amd64</strong> (procesadores Intel y AMD de 64
+    bits). En un ARM —una Raspberry Pi o un portátil con ese procesador— apt
+    dirá que no encuentra el paquete.
+  </p>
+
+  <h2>Desinstalar</h2>
+<pre><code>sudo apt remove PAQUETE
+sudo rm /etc/apt/sources.list.d/libretype.list
+sudo rm /usr/share/keyrings/libretype-archive-keyring.gpg</code></pre>
+
+  <h2>Otros sistemas</h2>
+  <p>
+    Para Windows, macOS y el resto de Linux (AppImage y RPM), los archivos
+    están en
+    <a href="https://github.com/jrmougan/libretype/releases">las Releases del
+    proyecto</a>. La aplicación de escritorio avisa sola cuando hay una versión
+    nueva, salvo cuando se instala por apt: en ese caso lo lleva el gestor de
+    paquetes, que es donde debe estar.
+  </p>
+
+  <footer>
+    <p>
+      LibreType es software libre con licencia MIT.
+      <a href="https://github.com/jrmougan/libretype">Código y documentación</a>.
+      No recoge ningún dato: el progreso se queda en el ordenador.
+    </p>
+  </footer>
+</main>
+</body>
+</html>

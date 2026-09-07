@@ -98,6 +98,9 @@ jobs:
           releaseBody: |
             Binarios sin firmar. En macOS puede hacer falta abrir con clic
             derecho la primera vez; en Windows, aceptar el aviso de SmartScreen.
+
+            En Debian y Ubuntu conviene el repositorio apt, que lo mantiene al
+            día con el resto del sistema: ver el README.
           # Sale en borrador y el actualizador apunta a `releases/latest`, que
           # ignora los borradores. Es lo que se quiere: nadie recibe una
           # actualización hasta que la release se publica a mano.

@@ -69,7 +69,7 @@
   --surface: #ffffff;
   --surface-sunken: #f0eee9;
   --border: #d9d5cd;
-  --border-strong: #a8a296;
+  --border-strong: #8c867b;
 
   --fg: #1b1b19;
   --fg-muted: #5f5c55;
@@ -92,10 +92,17 @@
   --finger-l-ring: #2563eb;
   --finger-l-middle: #0891b2;
   --finger-l-index: #059669;
-  --finger-r-index: #ca8a04;
+  --finger-r-index: #a16207;
   --finger-r-middle: #ea580c;
   --finger-r-ring: #dc2626;
   --finger-r-pinky: #be185d;
+  --finger-thumb: #475569;
+
+  /* Alias de cinco dedos */
+  --finger-pinky: var(--finger-l-pinky);
+  --finger-ring: var(--finger-l-ring);
+  --finger-middle: var(--finger-l-middle);
+  --finger-index: var(--finger-l-index);
 
   /* --- Movimiento --- */
   --motion-fast: 90ms;
@@ -112,7 +119,7 @@
     --surface: #1d1d24;
     --surface-sunken: #111116;
     --border: #33333d;
-    --border-strong: #565664;
+    --border-strong: #707080;
 
     --fg: #ecebe7;
     --fg-muted: #a3a09a;
@@ -135,6 +142,12 @@
     --finger-r-middle: #fdba74;
     --finger-r-ring: #fca5a5;
     --finger-r-pinky: #f9a8d4;
+    --finger-thumb: #94a3b8;
+
+    --finger-pinky: var(--finger-l-pinky);
+    --finger-ring: var(--finger-l-ring);
+    --finger-middle: var(--finger-l-middle);
+    --finger-index: var(--finger-l-index);
   }
 }
 
@@ -143,7 +156,7 @@
   --surface: #1d1d24;
   --surface-sunken: #111116;
   --border: #33333d;
-  --border-strong: #565664;
+  --border-strong: #707080;
   --fg: #ecebe7;
   --fg-muted: #a3a09a;
   --accent: #7ba7f5;
@@ -162,6 +175,11 @@
   --finger-r-middle: #fdba74;
   --finger-r-ring: #fca5a5;
   --finger-r-pinky: #f9a8d4;
+  --finger-thumb: #94a3b8;
+  --finger-pinky: var(--finger-l-pinky);
+  --finger-ring: var(--finger-l-ring);
+  --finger-middle: var(--finger-l-middle);
+  --finger-index: var(--finger-l-index);
 }
 
 /* Alto contraste del sistema. forced-colors lo aplica Windows por su cuenta;

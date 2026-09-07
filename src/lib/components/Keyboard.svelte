@@ -149,7 +149,7 @@
       {:else}
         {#if k.shift}
           <text x={k.x + 9} y={k.y + 19} class="lbl tiny sup" opacity={opac}
-                fill="var(--fg-muted)">{k.shift}</text>
+                fill={opac < 1 ? "var(--fg)" : "var(--fg-muted)"}>{k.shift}</text>
         {/if}
         <text
           x={k.x + 9} y={k.y + H - 17} class="lbl main" opacity={opac}
@@ -157,13 +157,13 @@
         >{k.base}</text>
         {#if k.altgr}
           <text x={k.x + k.w - 9} y={k.y + H - 17} class="lbl tiny alt" opacity={opac}
-                fill="var(--fg-muted)">{k.altgr}</text>
+                fill={opac < 1 ? "var(--fg)" : "var(--fg-muted)"}>{k.altgr}</text>
         {/if}
         <!-- La tecla aprendida no se queda vacía, que parecería un fallo de
              dibujo: lleva una marca que significa «esta ya te la sabes». -->
         {#if opac === 0}
           <circle cx={k.x + k.w / 2} cy={k.y + H / 2 - 2} r="3"
-                  fill="var(--fg-muted)" opacity="0.5" />
+                  fill="var(--fg-muted)" />
         {/if}
       {/if}
 

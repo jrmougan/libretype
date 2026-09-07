@@ -262,10 +262,27 @@
   .puntos li.hecho { background: var(--border-strong); }
   .puntos li.actual { background: var(--accent); border-color: var(--accent); transform: scale(1.3); }
 
-  .saltar { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
+  .saltar {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex-wrap: wrap;
+    min-height: var(--target-min);
+  }
   .enlace {
-    background: none; border: none; padding: 0; min-height: 0;
-    color: var(--accent); text-decoration: underline; cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0 var(--space-1);
+    min-height: var(--target-min);
+    min-width: var(--target-min);
+    display: inline-flex;
+    align-items: center;
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
     font-size: inherit;
   }
 </style>

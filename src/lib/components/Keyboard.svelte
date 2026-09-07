@@ -148,7 +148,7 @@
         </text>
       {:else}
         {#if k.shift}
-          <text x={k.x + 9} y={k.y + 19} class="lbl tiny" opacity={opac}
+          <text x={k.x + 9} y={k.y + 19} class="lbl tiny sup" opacity={opac}
                 fill="var(--fg-muted)">{k.shift}</text>
         {/if}
         <text
@@ -197,8 +197,12 @@
     pointer-events: none;
     user-select: none;
   }
-  .main { font-size: 19px; }
-  .small { font-size: 12px; text-anchor: middle; }
-  .tiny { font-size: 11px; }
+  .main { font-size: var(--text-key-main); }
+  .small { font-size: var(--text-key-small); text-anchor: middle; }
+  .tiny { font-size: var(--text-key-tiny); }
   .alt { text-anchor: end; }
+  /* La `y` de esta etiqueta es una constante del viewBox (k.y + 19), así que al
+     crecer la letra principal se le echa encima. Se sube en proporción a lo que
+     ha crecido la fuente; a escala 1 es translateY(0). */
+  .sup { transform: translateY(calc(-20px * (var(--factor-tecla) - 1))); }
 </style>

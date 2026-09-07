@@ -331,9 +331,18 @@
   /* El teclado se adapta a la altura disponible, pero con suelo: por debajo de
      esto las letras dejan de leerse y un teclado ilegible es peor que uno al
      que haya que desplazarse. Si ni así cabe, es `.escena` quien se desplaza
-     por dentro; nunca se recorta contenido. */
+     por dentro; nunca se recorta contenido.
+
+     El suelo va multiplicado por `--ui-scale` porque estaba escrito en píxeles
+     de caja y no en legibilidad de la letra: al 200% todo lo demás crecía, el
+     teclado se pegaba al suelo y sus letras acababan más pequeñas que al 100%
+     (issue #13). Ojo con el paréntesis: se multiplica el `min()` entero, no una
+     de sus ramas. `min(34vh, calc(230px * var(--ui-scale)))` —que es lo que
+     proponía la issue— no sirve, porque `min()` coge el menor y a 771px de alto
+     el menor sigue siendo `34vh`. Esta palanca solo actúa cuando el límite es
+     el ALTO; cuando lo es el ancho, el que trabaja es `--factor-tecla`. */
   .teclado {
-    min-height: min(34vh, 230px);
+    min-height: calc(min(34vh, 230px) * var(--ui-scale));
     display: grid;
   }
 </style>

@@ -13,7 +13,8 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      include: ['src/lib/**'],
+      reporter: ['text', 'json', 'html', 'lcov'],
       exclude: [
         'node_modules/**',
         'dist/**',
@@ -22,6 +23,14 @@ export default defineConfig({
         'vitest.config.ts',
         'vitest.setup.ts',
       ],
+      // Umbrales fijados al nivel actual de src/lib/** para evitar regresiones.
+      // Subirlos a medida que se incorporen los tests de componentes restantes.
+      thresholds: {
+        lines: 80,
+        functions: 70,
+        branches: 70,
+        statements: 70,
+      },
     },
   },
 });

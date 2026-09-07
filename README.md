@@ -124,6 +124,29 @@ orb -m spike bash linux/run.sh
 
 ---
 
+## Actualizaciones
+
+En AppImage, macOS y Windows, LibreType mira al arrancar si hay una versión nueva y lo avisa en la barra de arriba. Nunca instala ni reinicia por su cuenta: las dos cosas son un clic, porque reiniciar a mitad de una lección tiraría el intento por la borda.
+
+Es la única petición de red que hace la aplicación —un fichero JSON público en GitHub— y se puede desactivar en Ajustes.
+
+En Linux, el actualizador solo sabe reemplazar un AppImage. Un `.deb` o un `.rpm` son del gestor de paquetes: instalada así, la aplicación lo detecta, no ofrece el botón y dice quién se encarga.
+
+### Firma del actualizador (solo para quien publique)
+
+No tiene nada que ver con firmar el binario para Gatekeeper o SmartScreen: es una clave minisign, es gratis y no necesita cuenta de Apple ni certificado de Windows. Sin ella, `release.yml` falla a propósito en vez de publicar binarios incapaces de verificar ninguna actualización futura.
+
+```bash
+pnpm tauri signer generate -w ~/.tauri/libretype.key
+```
+
+- La **pública** que imprime va en `src-tauri/tauri.conf.json`, en `plugins.updater.pubkey`.
+- La **privada** (`~/.tauri/libretype.key`) va en el secreto `TAURI_SIGNING_PRIVATE_KEY`, y su contraseña en `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+
+> Guarda la privada también fuera de GitHub. Si se pierde, quien ya tenga la aplicación instalada no podrá volver a actualizarla y tendrá que reinstalar a mano.
+
+---
+
 ## Licencia
 
 Distribuido bajo la licencia [MIT](LICENSE).

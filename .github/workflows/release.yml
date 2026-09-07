@@ -29,6 +29,26 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # La `pubkey` vacía no rompe la compilación ni el arranque: el plugin
+      # solo verifica al descargar. Publicar así es la trampa — los binarios
+      # saldrían incapaces de validar ninguna actualización futura, y eso no se
+      # arregla con una release nueva porque el fallo está en el que ya está
+      # instalado. Mejor romper aquí.
+      - name: Comprobar que el actualizador está configurado
+        shell: bash
+        run: |
+          pubkey=$(node -p "require('./src-tauri/tauri.conf.json').plugins?.updater?.pubkey || ''")
+          if [ -z "$pubkey" ]; then
+            echo "::error::Falta plugins.updater.pubkey en src-tauri/tauri.conf.json."
+            echo "Genérala con 'pnpm tauri signer generate -w ~/.tauri/libretype.key'."
+            exit 1
+          fi
+          if [ -z "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
+            echo "::error::Falta el secreto TAURI_SIGNING_PRIVATE_KEY."
+            echo "Sin él tauri-action no firma ni genera latest.json."
+            exit 1
+          fi
+
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -58,6 +78,15 @@ jobs:
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Firma del actualizador (minisign). No tiene nada que ver con firmar
+          # el binario para Gatekeeper o SmartScreen: es gratis, no necesita
+          # cuenta de Apple ni certificado, y es lo que hace que una
+          # actualización venga de quien dice venir.
+          #
+          # Si se pierde la privada no se puede volver a actualizar a quien ya
+          # tenga la app instalada; tendría que reinstalar a mano.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Para firmar en el futuro basta con añadir aquí los secretos:
           #   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
           #   APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID  (macOS)
@@ -69,6 +98,9 @@ jobs:
           releaseBody: |
             Binarios sin firmar. En macOS puede hacer falta abrir con clic
             derecho la primera vez; en Windows, aceptar el aviso de SmartScreen.
+          # Sale en borrador y el actualizador apunta a `releases/latest`, que
+          # ignora los borradores. Es lo que se quiere: nadie recibe una
+          # actualización hasta que la release se publica a mano.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

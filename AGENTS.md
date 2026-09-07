@@ -239,6 +239,40 @@ binario la fija la máquina donde se construye.
 Los binarios van **sin firmar**. Añadir firma es meter secretos en
 `release.yml`, no reescribirlo.
 
+## Cómo llega y se actualiza
+
+Dos caminos, y **la aplicación tiene que saber en cuál está**. El comando
+`tipo_de_paquete` de `lib.rs` lee lo que el bundler estampó al empaquetar
+(`bundle_type()`), no lo deduce del sistema operativo.
+
+La razón es concreta: en un `.deb` o `.rpm`, el actualizador de Tauri intenta
+`dpkg -i` / `rpm -U`. Como usuario normal falla por permisos, y si funcionara
+sería peor —tocaría por detrás un fichero del que manda apt—. Así que
+`detectarEntorno()` en `src/lib/actualizacion.ts` devuelve tres cosas, no dos,
+y en `gestionado` la interfaz **no ofrece el botón**: dice quién se encarga.
+
+`actualizacion.ts` no importa `@tauri-apps/*` en el cuerpo: recibe la API por
+parámetro y la carga en diferido. Es lo que permite probarlo entero en jsdom y
+lo que mantiene vivo `pnpm dev` en el navegador, igual que los dos backends de
+`almacen.ts`.
+
+Reglas que están ahí por algo:
+
+- **Nunca instala ni reinicia sola.** Reiniciar a mitad de una lección tira el
+  intento. Descargar e instalar son dos clics distintos y explícitos.
+- **Fallar al comprobar es silencioso**, salvo si alguien pulsó «Buscar
+  actualizaciones» y está esperando respuesta. Sin red no puede aparecer un
+  aviso que nadie pidió.
+- **El aviso de la barra no añade altura.** Está medido al 100% y al 200%: la
+  barra ya envolvía a dos y tres filas respectivamente, y el aviso encaja en el
+  hueco. Si se le añade texto hay que volver a medirlo, porque el orden de
+  sacrificio de la ventana no se negocia.
+- **La comprobación es la única petición de red de la aplicación**, y por eso
+  hay preferencia para apagarla (`buscarActualizaciones`). Viene activada
+  porque este público no va a ir a mirar si hay versión nueva, pero la promesa
+  de no hablar con ningún servidor es parte de lo que se ofrece: si se añade
+  cualquier otra petición, hay que decirlo en el README y en Ajustes.
+
 ## Persistencia
 
 El progreso vive en SQLite local (`tauri-plugin-sql`), en el directorio de datos

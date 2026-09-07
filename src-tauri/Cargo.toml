@@ -24,3 +24,10 @@ log = "0.4"
 tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-sql = { version = "2.4.1", features = ["sqlite"] }
+
+# El actualizador solo existe en escritorio: en móvil actualiza la tienda, no
+# la app. Se declaran aparte para no arrastrar reqwest ni zip a un build de
+# Android, donde además no compilarían.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2.11.0"
+tauri-plugin-process = "2.3.1"

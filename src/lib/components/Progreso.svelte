@@ -1,10 +1,14 @@
 <script lang="ts">
   import {
-    formatearDuracion, resumirGlobal, resumirLecciones, type Sesion,
+    formatearDuracion, resumirEvolucion, resumirGlobal, resumirLecciones, type Sesion,
   } from "../storage/progreso";
   import { tituloRetirada } from "../storage/equivalencias";
   import type { Lesson } from "../lessons";
   import type { Almacen } from "../storage/almacen";
+  import type { EstadoTecla } from "../keyboard/dominio";
+  import {
+    generarEjercicioRefuerzo, obtenerTeclasOrdenadas, type EjercicioRefuerzo,
+  } from "../refuerzo";
 
   interface Props {
     sesiones: readonly Sesion[];
@@ -14,9 +18,11 @@
     /** Avisa de que falló SQLite en entorno de escritorio y se degradó a local. */
     errorAlmacen?: boolean;
     almacen?: Almacen | null;
+    teclas?: ReadonlyMap<string, EstadoTecla>;
     onBorrar: () => void;
     onExportar?: () => Promise<string> | string;
     onImportar?: (json: string) => Promise<void> | void;
+    onPracticarRefuerzo?: (ejercicio: EjercicioRefuerzo) => void;
   }
 
   let {
@@ -25,14 +31,19 @@
     tipoAlmacen,
     errorAlmacen = false,
     almacen = null,
+    teclas,
     onBorrar,
     onExportar,
     onImportar,
+    onPracticarRefuerzo,
   }: Props = $props();
 
   const esDegradado = $derived(errorAlmacen || Boolean(almacen?.errorAlmacen));
   const porLeccion = $derived(resumirLecciones(sesiones));
   const global = $derived(resumirGlobal(sesiones));
+  const evolucion = $derived(resumirEvolucion(sesiones));
+  const listaTeclas = $derived(teclas ? obtenerTeclasOrdenadas(teclas) : []);
+  const teclasFlojas = $derived(listaTeclas.filter((t) => t.esFloja));
   const idsActuales = $derived(new Set(lecciones.map((l) => l.id)));
 
   /**
@@ -154,6 +165,12 @@
     confirmandoImportar = false;
     if (inputArchivo) inputArchivo.value = "";
   }
+
+  function iniciarRefuerzo(): void {
+    if (!teclas || !onPracticarRefuerzo) return;
+    const ej = generarEjercicioRefuerzo(teclas);
+    if (ej) onPracticarRefuerzo(ej);
+  }
 </script>
 
 <section class="progreso" aria-label="Tu progreso">
@@ -168,6 +185,8 @@
     <dl class="global">
       <div><dt>Lecciones practicadas</dt><dd>{tocadasActuales} <small>de {lecciones.length}</small></dd></div>
       <div><dt>Sesiones</dt><dd>{global.sesiones}</dd></div>
+      <div><dt>Días practicados</dt><dd>{evolucion.diasPracticados}</dd></div>
+      <div><dt>Racha</dt><dd>{evolucion.rachaActual} <small>{evolucion.rachaActual === 1 ? 'día' : 'días'}</small></dd></div>
       <div><dt>Tiempo total</dt><dd>{formatearDuracion(global.msTotales)}</dd></div>
       <div><dt>Mejor marca</dt><dd>{global.mejorPpm} <small>ppm</small></dd></div>
     </dl>
@@ -236,6 +255,77 @@
       Solo cuentan para la marca los intentos con 90% de acierto o más: ir
       rápido fallando no es escribir mejor.
     </p>
+
+    {#if evolucion.dias.length > 0}
+      <section class="seccion-bloque" aria-labelledby="titulo-evolucion">
+        <h3 id="titulo-evolucion">Evolución temporal</h3>
+        <div class="tabla">
+          <table>
+            <caption class="sr-only">Evolución de velocidad y práctica por día</caption>
+            <thead>
+              <tr>
+                <th scope="col">Fecha</th>
+                <th scope="col">Sesiones</th>
+                <th scope="col">Mejor</th>
+                <th scope="col">Media</th>
+                <th scope="col">Tiempo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each [...evolucion.dias].reverse() as d (d.fecha)}
+                <tr>
+                  <th scope="row">{fecha(d.fecha)}</th>
+                  <td>{d.sesiones}</td>
+                  <td>
+                    {#if d.mejorPpm > 0}
+                      <strong>{d.mejorPpm}</strong> ppm
+                    {:else}
+                      <span class="nota">sin marca limpia</span>
+                    {/if}
+                  </td>
+                  <td>{d.ppmMedia} ppm · {d.pctMedio}%</td>
+                  <td>{formatearDuracion(d.msTotales)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {/if}
+  {/if}
+
+  {#if listaTeclas.length > 0}
+    <section class="seccion-bloque" aria-labelledby="titulo-teclas">
+      <div class="cab-bloque">
+        <h3 id="titulo-teclas">Teclas y precisión</h3>
+        {#if onPracticarRefuerzo}
+          <button
+            type="button"
+            class="btn-refuerzo"
+            onclick={iniciarRefuerzo}
+            aria-label="Iniciar práctica con las teclas que más te cuestan"
+          >
+            Reforzar teclas flojas
+          </button>
+        {/if}
+      </div>
+      {#if teclasFlojas.length > 0}
+        <p class="nota aviso">
+          Teclas destacadas que necesitan más práctica para consolidar el hábito.
+        </p>
+      {/if}
+      <div class="rejilla-teclas" role="list" aria-label="Lista de teclas practicadas ordenadas por dificultad">
+        {#each listaTeclas as t (t.code)}
+          <div class="tecla-card" class:tecla-floja={t.esFloja} role="listitem">
+            <span class="tecla-char">{t.char.toUpperCase()}</span>
+            <span class="tecla-pct">{t.precision}%</span>
+            {#if t.esFloja}
+              <span class="badge-floja">reforzar</span>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    </section>
   {/if}
 
   {#if esDegradado}
@@ -400,4 +490,67 @@
   }
 
   .borrar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+
+  .seccion-bloque {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+  .seccion-bloque h3 {
+    font-size: var(--text-md, 1rem);
+    margin: 0;
+  }
+  .cab-bloque {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  .btn-refuerzo {
+    min-height: var(--target-min);
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 0 var(--space-3);
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .rejilla-teclas {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    gap: var(--space-2);
+  }
+  .tecla-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--target-min);
+    padding: var(--space-1) var(--space-2);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-variant-numeric: tabular-nums;
+  }
+  .tecla-char {
+    font-weight: 600;
+    font-size: var(--text-md, 1rem);
+  }
+  .tecla-pct {
+    font-size: var(--text-xs);
+    color: var(--fg-muted);
+  }
+  .tecla-card.tecla-floja {
+    border: 2px double var(--pending);
+    background: var(--pending-bg);
+  }
+  .badge-floja {
+    font-size: 0.65rem;
+    color: var(--pending);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
 </style>

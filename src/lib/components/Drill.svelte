@@ -47,12 +47,16 @@
     /** Permite forzar animaciones reducidas en la lección. */
     movimiento?: 'auto' | 'reducido';
     animaciones?: 'normales' | 'reducidas' | 'auto';
+    /** Indica si el ejercicio está pausado. */
+    pausado?: boolean;
+    /** Callback para reanudar desde el cartel de pausa. */
+    onReanudar?: () => void;
   }
 
   let {
     layout, target, activo = true, onDone, onTecla, dominios, onStats,
     titulo = '', explicacion = '', cobertura = '', espacioJusto = false,
-    movimiento = 'auto', animaciones = 'auto',
+    movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar,
   }: Props = $props();
 
   const sinAnimaciones = $derived(movimiento === 'reducido' || animaciones === 'reducidas');
@@ -67,9 +71,26 @@
   let errores = $state(0);
   let pendienteTecla0: { code: string; acierto: boolean }[] | null = null;
 
+  let pausadoEn: number | null = null;
+  let tiempoDescontado = $state(0);
+
+  $effect(() => {
+    if (pausado) {
+      pausadoEn = performance.now();
+    } else if (pausadoEn !== null) {
+      tiempoDescontado += performance.now() - pausadoEn;
+      pausadoEn = null;
+    }
+  });
+
   const index = $derived(buildIndex(layout));
   const states = $derived<CharState[]>(diffAgainstTarget(typed, target));
-  const stats = $derived(computeStats(typed, target, stamps, errores));
+  const stampsEfectivos = $derived(
+    tiempoDescontado > 0
+      ? stamps.map((st, idx) => (idx === 0 ? st : Math.max(stamps[0], st - tiempoDescontado)))
+      : stamps,
+  );
+  const stats = $derived(computeStats(typed, target, stampsEfectivos, errores));
   const finished = $derived(typed.length >= target.length);
 
   /** Carácter que toca escribir ahora. */
@@ -160,11 +181,11 @@
   // Solo al entrar en la lección o volver de un panel. Perder el foco nunca
   // lo recupera: Tab y Mayús+Tab tienen que poder llegar a los demás controles.
   $effect(() => {
-    if (activo) field?.focus();
+    if (activo && !pausado) field?.focus();
   });
 
   export function enfocar(): void {
-    if (activo) field?.focus();
+    if (activo && !pausado) field?.focus();
   }
 
   /**
@@ -233,6 +254,8 @@
     errores = 0;
     pendienteTecla0 = null;
     avisado = false;
+    tiempoDescontado = 0;
+    pausadoEn = null;
   }
 </script>
 
@@ -251,7 +274,10 @@
         {explicacionAbierta ? 'Ocultar' : '¿Qué se practica?'}
       </button>
     {/if}
-    <button onclick={enfocar} disabled={!activo}>Seguir escribiendo</button>
+    <button onclick={enfocar} disabled={!activo || pausado}>Seguir escribiendo</button>
+    <button type="button" class="reiniciar" onclick={restart} aria-label="Empezar de nuevo esta lección">
+      Empezar de nuevo
+    </button>
   </header>
 
   {#if explicacionAbierta && explicacion}
@@ -261,13 +287,23 @@
   <!-- La etiqueta devuelve el foco al pulsar el texto sin interceptar teclas.
        El campo real conserva la composición del método de entrada del sistema. -->
   <label class="text" aria-label={`Texto de la lección: ${target}`}>
+    {#if pausado}
+      <div class="pausa-cartel" role="status" aria-live="polite">
+        <span>Ejercicio pausado</span>
+        {#if onReanudar}
+          <button type="button" class="btn-reanudar" onclick={onReanudar}>
+            Reanudar
+          </button>
+        {/if}
+      </div>
+    {/if}
     <textarea
       bind:this={field}
       class="capture"
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"
-      disabled={!activo}
+      disabled={!activo || pausado}
       aria-label={`Escribe el texto de la lección: ${target}`}
       onpaste={(e) => e.preventDefault()}
       onbeforeinput={(e) => {
@@ -302,6 +338,33 @@
 </div>
 
 <style>
+  .pausa-cartel {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    z-index: 5;
+    border-radius: var(--radius);
+    font-size: var(--text-lg);
+    font-weight: 500;
+  }
+
+  .btn-reanudar {
+    min-height: var(--target-min);
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 0 var(--space-4);
+    font-size: var(--text-base);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
   /* El teclado se lleva el espacio que sobre; todo lo demás ocupa lo justo.
      `min-height: 0` es lo que permite que la rejilla encoja de verdad en vez
      de desbordar. */

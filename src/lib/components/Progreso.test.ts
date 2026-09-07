@@ -249,3 +249,71 @@ describe("Progreso.svelte - Exportación e importación (Issue #28)", () => {
     expect(document.querySelector("[role='status']")?.textContent).toContain("con éxito");
   });
 });
+
+describe("Progreso.svelte - Evolución temporal (Issue #26) y Teclas flojas (Issue #22)", () => {
+  it("muestra la evolución temporal y los días practicados", () => {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: {
+        sesiones: [sesionPrueba],
+        lecciones: LESSONS,
+        tipoAlmacen: "sqlite",
+        onBorrar: () => {},
+      },
+    });
+    flushSync();
+
+    const dtDias = [...document.querySelectorAll("dt")].find(
+      (dt) => dt.textContent?.includes("Días practicados"),
+    );
+    expect(dtDias).not.toBeNull();
+    expect(dtDias?.nextElementSibling?.textContent).toContain("1");
+
+    const tituloEvolucion = document.querySelector("#titulo-evolucion");
+    expect(tituloEvolucion).not.toBeNull();
+    expect(tituloEvolucion?.textContent).toContain("Evolución temporal");
+  });
+
+  it("muestra la lista de teclas y permite iniciar ejercicio de refuerzo", async () => {
+    const onPracticarRefuerzo = vi.fn();
+    const teclas = new Map([
+      ["KeyP", { intentos: 10, aciertos: 6, msTotal: 8000 }], // floja (60%)
+      ["KeyA", { intentos: 15, aciertos: 15, msTotal: 4000 }], // dominada (100%)
+    ]);
+
+    componente = mount(Progreso, {
+      target: document.body,
+      props: {
+        sesiones: [sesionPrueba],
+        lecciones: LESSONS,
+        tipoAlmacen: "sqlite",
+        teclas,
+        onBorrar: () => {},
+        onPracticarRefuerzo,
+      },
+    });
+    flushSync();
+
+    // Comprobar que aparece la sección de teclas
+    const tituloTeclas = document.querySelector("#titulo-teclas");
+    expect(tituloTeclas).not.toBeNull();
+
+    // Comprobar que la tecla floja está destacada
+    const teclaFloja = document.querySelector(".tecla-card.tecla-floja");
+    expect(teclaFloja).not.toBeNull();
+    expect(teclaFloja?.textContent).toContain("P");
+    expect(teclaFloja?.textContent).toContain("reforzar");
+
+    // Comprobar que existe el botón de refuerzo y funciona
+    const btnRefuerzo = document.querySelector(".btn-refuerzo") as HTMLButtonElement;
+    expect(btnRefuerzo).not.toBeNull();
+
+    btnRefuerzo.click();
+    await tick();
+
+    expect(onPracticarRefuerzo).toHaveBeenCalled();
+    const arg = onPracticarRefuerzo.mock.calls[0][0];
+    expect(arg.id).toBe("refuerzo");
+    expect(arg.teclasFlojas).toContain("p");
+  });
+});

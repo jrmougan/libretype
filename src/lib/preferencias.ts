@@ -26,6 +26,8 @@
  */
 export type Tono = 'juego' | 'sobrio';
 
+import { LESSONS } from './lessons';
+
 export interface Preferencias {
   /** Escala del texto, de 1 a 2. */
   escala: number;
@@ -36,6 +38,8 @@ export interface Preferencias {
   tono: Tono | null;
   /** Si el teclado en pantalla retira las letras dominadas. */
   ayudaTeclado: 'auto' | 'siempre';
+  /** Última lección seleccionada por el alumno para recordar por dónde iba. */
+  ultimaLeccion?: string;
 }
 
 export const POR_DEFECTO: Preferencias = {
@@ -45,6 +49,7 @@ export const POR_DEFECTO: Preferencias = {
   fuente: 'normal',
   tono: null,
   ayudaTeclado: 'auto',
+  ultimaLeccion: LESSONS[0]?.id ?? 'reposo',
 };
 
 const CLAVE = 'libretype.preferencias';
@@ -62,6 +67,10 @@ const unaDe = <T extends string>(v: unknown, opciones: readonly T[], sino: T): T
 export function normalizar(crudo: unknown): Preferencias {
   const o = (typeof crudo === 'object' && crudo !== null ? crudo : {}) as Record<string, unknown>;
   const movimientoCrudo = o.movimiento ?? (o.animaciones === 'reducidas' ? 'reducido' : undefined);
+  const leccionValida =
+    typeof o.ultimaLeccion === 'string' &&
+    LESSONS.some((l) => l.id === o.ultimaLeccion);
+
   return {
     escala: enRango(o.escala, 1, 2, POR_DEFECTO.escala),
     tema: unaDe(o.tema, ['auto', 'claro', 'oscuro'] as const, POR_DEFECTO.tema),
@@ -69,6 +78,7 @@ export function normalizar(crudo: unknown): Preferencias {
     fuente: unaDe(o.fuente, ['normal', 'dislexia'] as const, POR_DEFECTO.fuente),
     tono: o.tono === 'juego' || o.tono === 'sobrio' ? o.tono : null,
     ayudaTeclado: unaDe(o.ayudaTeclado, ['auto', 'siempre'] as const, POR_DEFECTO.ayudaTeclado),
+    ultimaLeccion: leccionValida ? (o.ultimaLeccion as string) : (POR_DEFECTO.ultimaLeccion ?? LESSONS[0].id),
   };
 }
 

@@ -32,6 +32,13 @@ describe('normalizar', () => {
     expect(normalizar({ animaciones: 'reducidas' }).movimiento).toBe('reducido');
     expect(normalizar({ movimiento: 'reducido' }).movimiento).toBe('reducido');
   });
+
+  it('sanitiza la ultimaLeccion con fallback a la primera si no existe o es invalida', () => {
+    expect(normalizar({}).ultimaLeccion).toBe('reposo');
+    expect(normalizar({ ultimaLeccion: 'tildes' }).ultimaLeccion).toBe('tildes');
+    expect(normalizar({ ultimaLeccion: 'leccion-inexistente' }).ultimaLeccion).toBe('reposo');
+    expect(normalizar({ ultimaLeccion: 123 }).ultimaLeccion).toBe('reposo');
+  });
 });
 
 describe('guardar y cargar', () => {

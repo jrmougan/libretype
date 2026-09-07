@@ -188,3 +188,59 @@ describe('reporte de tiempos por tecla (issue #9)', () => {
     expect(reportes[0].ms).toBe(350);
   });
 });
+
+describe('reiniciar y pausar lección (issue #24)', () => {
+  it('el botón Empezar de nuevo reinicia el texto y las métricas', async () => {
+    let statsReportadas: any = null;
+    componente = mount(Drill, {
+      target: document.body,
+      props: {
+        layout: ES_ISO,
+        target: 'as',
+        titulo: 'Prueba',
+        onStats: (s) => { statsReportadas = s; },
+      },
+    });
+    flushSync();
+    const campo = document.querySelector('textarea')!;
+
+    campo.value = 'a';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    expect(campo.value).toBe('a');
+    expect(statsReportadas.typed).toBe(1);
+
+    const botonReiniciar = [...document.querySelectorAll('button')].find(
+      (b) => b.textContent?.includes('Empezar de nuevo'),
+    );
+    expect(botonReiniciar).not.toBeNull();
+
+    botonReiniciar?.click();
+    flushSync();
+    await tick();
+
+    expect(campo.value).toBe('');
+    expect(statsReportadas.typed).toBe(0);
+    expect(statsReportadas.correct).toBe(0);
+  });
+
+  it('cuando está pausado deshabilita el campo y muestra el cartel de pausa', async () => {
+    componente = mount(Drill, {
+      target: document.body,
+      props: {
+        layout: ES_ISO,
+        target: 'as',
+        titulo: 'Prueba',
+        pausado: true,
+      },
+    });
+    flushSync();
+
+    const campo = document.querySelector('textarea')!;
+    expect(campo.disabled).toBe(true);
+
+    const cartel = document.querySelector('.pausa-cartel');
+    expect(cartel).not.toBeNull();
+    expect(cartel?.textContent).toContain('Ejercicio pausado');
+  });
+});

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   esRecord, formatearDuracion, PCT_MINIMO_PARA_RECORD,
-  resumirGlobal, resumirLecciones, type Sesion,
+  resumirEvolucion, resumirGlobal, resumirLecciones, type Sesion,
 } from './progreso';
 import { AlmacenLocal, AlmacenMemoria } from './almacen';
 
@@ -205,5 +205,63 @@ describe('almacén en memoria', () => {
     await a.borrarTodo();
     expect(await a.leerTodas()).toEqual([]);
     expect(await a.leerTeclas()).toEqual(new Map());
+  });
+});
+
+describe('resumen de evolución y racha', () => {
+  it('vacío da 0 días y racha 0', () => {
+    const e = resumirEvolucion([]);
+    expect(e).toEqual({
+      dias: [],
+      diasPracticados: 0,
+      rachaActual: 0,
+      rachaMax: 0,
+    });
+  });
+
+  it('agrupa sesiones del mismo día y calcula mejor ppm limpia', () => {
+    const s1 = sesion({ ppm: 25, pctAcierto: 95, ms: 30000, terminadaEn: '2026-09-01T10:00:00.000Z' });
+    const s2 = sesion({ ppm: 45, pctAcierto: 80, ms: 30000, terminadaEn: '2026-09-01T11:00:00.000Z' }); // sucia
+    const s3 = sesion({ ppm: 35, pctAcierto: 92, ms: 40000, terminadaEn: '2026-09-01T12:00:00.000Z' }); // limpia
+
+    const e = resumirEvolucion([s1, s2, s3], '2026-09-01');
+    expect(e.diasPracticados).toBe(1);
+    expect(e.rachaActual).toBe(1);
+    expect(e.rachaMax).toBe(1);
+    expect(e.dias).toHaveLength(1);
+    expect(e.dias[0]).toEqual({
+      fecha: '2026-09-01',
+      sesiones: 3,
+      mejorPpm: 35,
+      msTotales: 100000,
+      ppmMedia: 35,
+      pctMedio: 89,
+    });
+  });
+
+  it('calcula rachas consecutivas y racha máxima', () => {
+    const sesiones = [
+      sesion({ terminadaEn: '2026-09-01T10:00:00.000Z' }),
+      sesion({ terminadaEn: '2026-09-02T10:00:00.000Z' }),
+      sesion({ terminadaEn: '2026-09-03T10:00:00.000Z' }),
+      // Hueco
+      sesion({ terminadaEn: '2026-09-06T10:00:00.000Z' }),
+      sesion({ terminadaEn: '2026-09-07T10:00:00.000Z' }),
+    ];
+
+    // Hoy es 2026-09-07 (la racha actual es 2 días: 06 y 07; la racha max histórica es 3 días: 01, 02, 03)
+    const e = resumirEvolucion(sesiones, '2026-09-07');
+    expect(e.diasPracticados).toBe(5);
+    expect(e.rachaActual).toBe(2);
+    expect(e.rachaMax).toBe(3);
+
+    // Si hoy fuera 2026-09-08 (ayer practicó), la racha sigue activa
+    const eAyer = resumirEvolucion(sesiones, '2026-09-08');
+    expect(eAyer.rachaActual).toBe(2);
+
+    // Si hoy fuera 2026-09-10 (pasaron 3 días), la racha actual se rompió
+    const eRoto = resumirEvolucion(sesiones, '2026-09-10');
+    expect(eRoto.rachaActual).toBe(0);
+    expect(eRoto.rachaMax).toBe(3);
   });
 });

@@ -5,7 +5,8 @@
   import Progreso from './lib/components/Progreso.svelte';
   import SelectorTono from './lib/components/SelectorTono.svelte';
   import { LAYOUTS } from './lib/keyboard/layouts';
-  import { LESSONS } from './lib/lessons';
+  import { LESSONS, type Lesson } from './lib/lessons';
+  import type { EjercicioRefuerzo } from './lib/refuerzo';
   import type { Stats } from './lib/keyboard/engine';
   import {
     contarDominadas, mapaDeDominio, registrar, type EstadoTecla,
@@ -28,7 +29,10 @@
   let settingsOpen = $state(false);
 
   let layout = $state(LAYOUTS[0]);
-  let lessonIx = $state(0);
+  const ixGuardada = LESSONS.findIndex((l) => l.id === prefs.ultimaLeccion);
+  let lessonIx = $state(ixGuardada >= 0 ? ixGuardada : 0);
+  let leccionPersonalizada = $state<Lesson | null>(null);
+  let pausado = $state(false);
   let drill = $state<ReturnType<typeof Drill> | null>(null);
   let result = $state<{ stats: Stats; record: boolean } | null>(null);
   let dialogoResultado = $state<HTMLDialogElement | null>(null);
@@ -59,7 +63,7 @@
   const porLeccion = $derived(resumirLecciones(sesiones));
 
   const voz = $derived(vozDe(prefs.tono));
-  const lesson = $derived(LESSONS[lessonIx]);
+  const lesson = $derived(leccionPersonalizada ?? LESSONS[lessonIx]);
 
   /** En español el separador decimal es la coma, no el punto. */
   const pct = (n: number) => n.toLocaleString('es-ES', { maximumFractionDigits: 1 });
@@ -76,6 +80,21 @@
     // manos. Nunca soltarle un ejercicio a alguien que no ha tecleado nunca.
     if (prefs.tono === null) vista = 'tono';
     else if (sesiones.length === 0) vista = 'cero';
+    else {
+      const ix = LESSONS.findIndex((l) => l.id === prefs.ultimaLeccion);
+      if (ix >= 0) lessonIx = ix;
+    }
+
+  });
+
+  onMount(() => {
+    function onWindowBlur(): void {
+      if (vista === 'leccion' && !result && !settingsOpen && !verProgreso && ultimasStats.typed > 0) {
+        pausado = true;
+      }
+    }
+    window.addEventListener('blur', onWindowBlur);
+    return () => window.removeEventListener('blur', onWindowBlur);
   });
 
   function elegirTono(tono: Tono): void {
@@ -155,8 +174,11 @@
       // persistido según AGENTS.md (el dominio solo se persiste al terminar).
       teclas = new Map(teclasBase);
     }
+    leccionPersonalizada = null;
     lessonIx = i;
+    prefs = { ...prefs, ultimaLeccion: LESSONS[i]?.id ?? LESSONS[0].id };
     result = null;
+    pausado = false;
     vista = 'leccion';
     settingsOpen = false;
     verProgreso = false;
@@ -172,6 +194,41 @@
       teclas = new Map(teclasBase);
     }
     result = null;
+    pausado = false;
+    drill?.restart();
+    await tick();
+    drill?.enfocar();
+  }
+
+  async function reiniciarLeccion(): Promise<void> {
+    pausado = false;
+    ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
+    drill?.restart();
+    await tick();
+    drill?.enfocar();
+  }
+
+  function alternarPausa(): void {
+    pausado = !pausado;
+    if (!pausado) {
+      tick().then(() => drill?.enfocar());
+    }
+  }
+
+  async function practicarRefuerzo(ej: EjercicioRefuerzo): Promise<void> {
+    await cerrarPanel();
+    leccionPersonalizada = {
+      id: ej.id,
+      title: ej.titulo,
+      focus: ej.focus,
+      nuevas: ej.teclasFlojas.join(''),
+      cobertura: 100,
+      text: ej.text,
+    };
+    result = null;
+    pausado = false;
+    vista = 'leccion';
+    ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     drill?.restart();
     await tick();
     drill?.enfocar();
@@ -210,24 +267,49 @@
     <label class="selector">
       <span class="sr-only">Lección</span>
       <select
-        value={vista === 'leccion' ? String(lessonIx) : 'cero'}
+        value={vista === 'leccion' ? (leccionPersonalizada ? 'refuerzo' : String(lessonIx)) : 'cero'}
         onchange={(e) => {
           const v = e.currentTarget.value;
           if (v === 'cero') vista = 'cero';
+          else if (v === 'refuerzo') { /* ya activa */ }
           else pick(+v);
         }}
       >
         <option value="cero">Antes de empezar · dónde van las manos</option>
+        {#if leccionPersonalizada}
+          <option value="refuerzo">{leccionPersonalizada.title}</option>
+        {/if}
         {#each LESSONS as l, i (l.id)}
           {@const marca = porLeccion.get(l.id)}
+          {@const esUltima = l.id === prefs.ultimaLeccion && sesiones.length > 0}
           <option value={String(i)}>
-            {i + 1}. {l.title}{marca && marca.mejorPpm > 0 ? ` · ${marca.mejorPpm} ppm` : ''}
+            {i + 1}. {l.title}{marca && marca.mejorPpm > 0 ? ` · ${marca.mejorPpm} ppm` : ''}{esUltima ? ' · Seguías por aquí' : ''}
           </option>
         {/each}
       </select>
     </label>
 
     {#if vista === 'leccion'}
+      <div class="controles-intento">
+        <button
+          type="button"
+          class="btn-intento"
+          onclick={reiniciarLeccion}
+          aria-label="Empezar de nuevo esta lección"
+        >
+          Reiniciar
+        </button>
+        <button
+          type="button"
+          class="btn-intento"
+          onclick={alternarPausa}
+          aria-label={pausado ? 'Reanudar lección' : 'Pausar lección'}
+          aria-pressed={pausado}
+        >
+          {pausado ? 'Reanudar' : 'Pausar'}
+        </button>
+      </div>
+
       <dl class="metricas">
         <div><dt>Velocidad</dt><dd>{ultimasStats.wpm}<small>ppm</small></dd></div>
         <div><dt>Precisión</dt><dd>{ultimasStats.accuracy}<small>%</small></dd></div>
@@ -264,6 +346,8 @@
           bind:this={drill}
           {layout}
           activo={!settingsOpen && !verProgreso && !result}
+          {pausado}
+          onReanudar={() => { pausado = false; tick().then(() => drill?.enfocar()); }}
           target={lesson.text}
           titulo={lesson.title}
           explicacion={lesson.focus}
@@ -304,13 +388,20 @@
         <div id="resultado-desc">
           <span>{result.stats.wpm} palabras por minuto, {result.stats.accuracy}% de precisión.</span>
           <span class="animo">
-            {result.stats.accuracy >= PRECISION_ALTA ? voz.animoAlto : voz.animoBajo}
+            {result.stats.accuracy < 90 ? voz.animoBajo : (result.stats.accuracy >= PRECISION_ALTA ? voz.animoAlto : voz.animoAlto)}
           </span>
         </div>
         <div class="botones">
-          <button onclick={again}>{voz.repetir}</button>
-          {#if lessonIx < LESSONS.length - 1}
-            <button class="primario" onclick={() => pick(lessonIx + 1)}>{voz.siguiente}</button>
+          {#if result.stats.accuracy < 90}
+            <button class="primario" onclick={again}>{voz.repetir}</button>
+            {#if lessonIx < LESSONS.length - 1}
+              <button onclick={() => pick(lessonIx + 1)}>{voz.siguiente}</button>
+            {/if}
+          {:else}
+            <button onclick={again}>{voz.repetir}</button>
+            {#if lessonIx < LESSONS.length - 1}
+              <button class="primario" onclick={() => pick(lessonIx + 1)}>{voz.siguiente}</button>
+            {/if}
           {/if}
         </div>
       </div>
@@ -413,7 +504,18 @@
             </p>
           </div>
         {:else}
-          <Progreso {sesiones} lecciones={LESSONS} {tipoAlmacen} {errorAlmacen} {almacen} onBorrar={borrarProgreso} onExportar={exportarProgreso} onImportar={importarProgreso} />
+          <Progreso
+            {sesiones}
+            lecciones={LESSONS}
+            {tipoAlmacen}
+            {errorAlmacen}
+            {almacen}
+            {teclas}
+            onBorrar={borrarProgreso}
+            onExportar={exportarProgreso}
+            onImportar={importarProgreso}
+            onPracticarRefuerzo={practicarRefuerzo}
+          />
         {/if}
       </div>
     </dialog>
@@ -467,6 +569,9 @@
     font-variant-numeric: tabular-nums;
   }
   .metricas small { font-size: var(--text-xs); color: var(--fg-muted); }
+
+  .controles-intento { display: flex; gap: var(--space-2); }
+  .btn-intento { min-height: var(--target-min); }
 
   .acciones { display: flex; gap: var(--space-2); margin-left: auto; }
   .acciones button { min-height: var(--target-min); }

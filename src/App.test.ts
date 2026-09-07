@@ -149,3 +149,68 @@ describe('captura y paneles', () => {
     expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
   });
 });
+describe('experiencia de producto (#21, #23, #24)', () => {
+  it('actualiza la ultimaLeccion en preferencias al cambiar de lección (#21)', async () => {
+    const selector = document.querySelector('select')!;
+    selector.value = '2';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    const guardado = JSON.parse(localStorage.getItem('libretype.preferencias')!);
+    expect(guardado.ultimaLeccion).toBe(LESSONS[2].id);
+  });
+
+  it('criterio de superación dinámico: accuracy < 90% hace que Repetir sea primario (#23)', async () => {
+    // Escribimos texto con muchos fallos
+    const target = LESSONS[0].text;
+    let err = '';
+    for (let i = 0; i < target.length; i++) {
+      err += i % 2 === 0 ? 'x' : target[i];
+    }
+    campo().value = err;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+
+    const dialogo = document.querySelector('dialog#dialogo-resultado');
+    expect(dialogo).not.toBeNull();
+    const btnPrimario = dialogo?.querySelector('button.primario');
+    expect(btnPrimario?.textContent).toContain('Repetir');
+  });
+
+  it('criterio de superación dinámico: accuracy >= 90% hace que Siguiente sea primario (#23)', async () => {
+    completar();
+    await tick();
+
+    const dialogo = document.querySelector('dialog#dialogo-resultado');
+    expect(dialogo).not.toBeNull();
+    const btnPrimario = dialogo?.querySelector('button.primario');
+    expect(btnPrimario?.textContent).toContain('Siguiente');
+  });
+
+  it('permite reiniciar el intento en marcha desde la barra superior (#24)', async () => {
+    campo().value = 'la';
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    expect(campo().value).toBe('la');
+
+    boton('Reiniciar').click();
+    await tick();
+
+    expect(campo().value).toBe('');
+  });
+
+  it('permite pausar y reanudar el ejercicio (#24)', async () => {
+    boton('Pausar').click();
+    await tick();
+
+    expect(campo().disabled).toBe(true);
+    expect(document.querySelector('.pausa-cartel')).not.toBeNull();
+
+    boton('Reanudar').click();
+    await tick();
+
+    expect(campo().disabled).toBe(false);
+    expect(document.querySelector('.pausa-cartel')).toBeNull();
+  });
+});

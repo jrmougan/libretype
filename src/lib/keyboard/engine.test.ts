@@ -12,7 +12,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TypingEngine, computeStats, diffAgainstTarget } from './engine';
 import {
   ALL_TRACES, LINUX_ACUTE_A, MACOS_ACUTE_A, MACOS_ACUTE_CANCELLED,
-  MACOS_DIAERESIS_U, PLAIN_TYPING, replay, type Trace,
+  MACOS_DIAERESIS_U, PLAIN_TYPING, WINDOWS_ACUTE_A, WINDOWS_ACUTE_CANCELLED,
+  WINDOWS_DIAERESIS_U, WINDOWS_PLAIN_TYPING, replay, type Trace,
 } from './traces';
 
 let el: HTMLTextAreaElement;
@@ -93,6 +94,17 @@ describe('el acento a medias no cuenta como escrito', () => {
     expect(engine.committed).toBe('á');
   });
 
+  it('Windows / WebView2: lo confirmado no avanza hasta compositionend con orden estándar (Issue #39)', () => {
+    const snaps = run(WINDOWS_ACUTE_A);
+    const duranteComposicion = snaps.filter((s) => s.composing);
+    expect(duranteComposicion.length).toBeGreaterThan(0);
+    for (const s of duranteComposicion) {
+      expect(s.committed, `tras ${s.after}`).toBe('');
+    }
+    expect(snaps.some((s) => s.composing && s.text === '´')).toBe(true);
+    expect(engine.committed).toBe('á');
+  });
+
   it('a mitad de palabra solo avanza al confirmar', () => {
     const snaps = run(MACOS_ACUTE_A, 'pap');
     for (const s of snaps.filter((s) => s.composing)) {
@@ -124,7 +136,7 @@ describe('el compositionend fuerza el recálculo', () => {
   });
 });
 
-describe('acento cancelado', () => {
+describe('acento cancelado y composición avanzada', () => {
   it('´ + t da los dos caracteres, sin duplicar ni perder', () => {
     run(MACOS_ACUTE_CANCELLED);
     expect(engine.committed).toBe('´t');
@@ -133,6 +145,22 @@ describe('acento cancelado', () => {
   it('diéresis', () => {
     run(MACOS_DIAERESIS_U);
     expect(engine.committed).toBe('ü');
+  });
+
+  it('Windows / WebView2: acento cancelado (´ + t) emite ambos caracteres (Issue #39)', () => {
+    run(WINDOWS_ACUTE_CANCELLED);
+    expect(engine.committed).toBe('´t');
+  });
+
+  it('Windows / WebView2: diéresis con Shift (ü) (Issue #39)', () => {
+    run(WINDOWS_DIAERESIS_U);
+    expect(engine.committed).toBe('ü');
+  });
+
+  it('Windows / WebView2: pulsación directa avanza de forma inmediata sin composición (Issue #39)', () => {
+    const snaps = run(WINDOWS_PLAIN_TYPING);
+    expect(snaps.every((s) => !s.composing)).toBe(true);
+    expect(engine.committed).toBe('de');
   });
 });
 

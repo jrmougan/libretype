@@ -191,12 +191,137 @@ export const PLAIN_TYPING: Trace = {
   ],
 };
 
+/**
+ * Windows / WebView2 (Edge / Chromium) — `´` + `a` = `á`.
+ *
+ * RECONSTRUIDA. En Windows / WebView2 (Chromium), el manejo de teclado sigue
+ * el estándar W3C UI Events y los mensajes WM_DEADCHAR del sistema:
+ * 1. Al pulsar la tecla muerta (`Quote`), llega primero `keydown` (`Dead`),
+ *    seguido de `compositionstart`, `compositionupdate` ('´'), `beforeinput`,
+ *    `input` y `keyup`.
+ * 2. Al pulsar la vocal (`KeyA`), llega primero `keydown` (`a`), seguido de
+ *    `compositionupdate` ('á'), `beforeinput`, `input` ('á') y finalmente
+ *    `compositionend` ('á').
+ *
+ * Esta traza verifica que el motor soporta la secuencia nativa de Chromium en
+ * Windows, donde el keydown antecede a la composición y la confirmación final
+ * concluye en compositionend.
+ */
+export const WINDOWS_ACUTE_A: Trace = {
+  id: 'windows-acute-a',
+  platform: 'Windows / WebView2 (Chromium)',
+  origin: 'reconstructed',
+  description: '´ + a = á en Windows/WebView2 (keydown antes de composición)',
+  committed: 'á',
+  steps: [
+    k('keydown', 'Dead', 'Quote', ''),
+    { type: 'compositionstart', data: '', value: '' },
+    { type: 'compositionupdate', data: '´', value: '' },
+    { type: 'beforeinput', data: '´', value: '' },
+    { type: 'input', data: '´', value: '´' },
+    k('keyup', 'Dead', 'Quote', '´'),
+    k('keydown', 'a', 'KeyA', '´'),
+    { type: 'compositionupdate', data: 'á', value: '´' },
+    { type: 'beforeinput', data: 'á', value: '´' },
+    { type: 'input', data: 'á', value: 'á' },
+    { type: 'compositionend', data: 'á', value: 'á' },
+    k('keyup', 'a', 'KeyA', 'á'),
+  ],
+};
+
+/**
+ * Windows / WebView2 — `´` + `t` = `´t` (acento cancelado con consonante).
+ *
+ * RECONSTRUIDA. Si tras una tecla muerta se pulsa una letra no combinable (t),
+ * Windows/Chromium emite keydown ('t'), cierra la composición previa emitiendo
+ * `compositionend` con el acento huérfano ('´') y a continuación inserta la 't'
+ * ('´t').
+ */
+export const WINDOWS_ACUTE_CANCELLED: Trace = {
+  id: 'windows-acute-cancelled',
+  platform: 'Windows / WebView2 (Chromium)',
+  origin: 'reconstructed',
+  description: '´ + t = ´t en Windows/WebView2 (acento cancelado)',
+  committed: '´t',
+  steps: [
+    k('keydown', 'Dead', 'Quote', ''),
+    { type: 'compositionstart', data: '', value: '' },
+    { type: 'compositionupdate', data: '´', value: '' },
+    { type: 'beforeinput', data: '´', value: '' },
+    { type: 'input', data: '´', value: '´' },
+    k('keyup', 'Dead', 'Quote', '´'),
+    k('keydown', 't', 'KeyT', '´'),
+    { type: 'compositionend', data: '´', value: '´' },
+    { type: 'beforeinput', data: 't', value: '´' },
+    { type: 'input', data: 't', value: '´t' },
+    k('keyup', 't', 'KeyT', '´t'),
+  ],
+};
+
+/**
+ * Windows / WebView2 — Mayús+´ + u = ü (diéresis).
+ *
+ * RECONSTRUIDA. La diéresis con Shift sigue el mismo ciclo de composición
+ * precedido por el modificador Shift.
+ */
+export const WINDOWS_DIAERESIS_U: Trace = {
+  id: 'windows-diaeresis-u',
+  platform: 'Windows / WebView2 (Chromium)',
+  origin: 'reconstructed',
+  description: 'Mayús+´ + u = ü en Windows/WebView2',
+  committed: 'ü',
+  steps: [
+    k('keydown', 'Shift', 'ShiftLeft', ''),
+    k('keydown', 'Dead', 'Quote', ''),
+    { type: 'compositionstart', data: '', value: '' },
+    { type: 'compositionupdate', data: '¨', value: '' },
+    { type: 'beforeinput', data: '¨', value: '' },
+    { type: 'input', data: '¨', value: '¨' },
+    k('keyup', 'Dead', 'Quote', '¨'),
+    k('keyup', 'Shift', 'ShiftLeft', '¨'),
+    k('keydown', 'u', 'KeyU', '¨'),
+    { type: 'compositionupdate', data: 'ü', value: '¨' },
+    { type: 'beforeinput', data: 'ü', value: '¨' },
+    { type: 'input', data: 'ü', value: 'ü' },
+    { type: 'compositionend', data: 'ü', value: 'ü' },
+    k('keyup', 'u', 'KeyU', 'ü'),
+  ],
+};
+
+/**
+ * Windows / WebView2 — Pulsación directa sin composición ('de').
+ *
+ * RECONSTRUIDA. Comprueba la entrada directa estándar en Chromium/Windows
+ * donde no intervienen eventos de composición.
+ */
+export const WINDOWS_PLAIN_TYPING: Trace = {
+  id: 'windows-plain-typing',
+  platform: 'Windows / WebView2 (Chromium)',
+  origin: 'reconstructed',
+  description: 'd, e (pulsación directa sin composición en Windows)',
+  committed: 'de',
+  steps: [
+    k('keydown', 'd', 'KeyD', ''),
+    { type: 'beforeinput', data: 'd', value: '' },
+    { type: 'input', data: 'd', value: 'd' },
+    k('keyup', 'd', 'KeyD', 'd'),
+    k('keydown', 'e', 'KeyE', 'd'),
+    { type: 'beforeinput', data: 'e', value: 'd' },
+    { type: 'input', data: 'e', value: 'de' },
+    k('keyup', 'e', 'KeyE', 'de'),
+  ],
+};
+
 export const ALL_TRACES: Trace[] = [
   MACOS_ACUTE_A,
   MACOS_ACUTE_CANCELLED,
   MACOS_DIAERESIS_U,
   LINUX_ACUTE_A,
   PLAIN_TYPING,
+  WINDOWS_ACUTE_A,
+  WINDOWS_ACUTE_CANCELLED,
+  WINDOWS_DIAERESIS_U,
+  WINDOWS_PLAIN_TYPING,
 ];
 
 /**

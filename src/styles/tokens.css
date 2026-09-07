@@ -22,6 +22,27 @@
   --text-xl: calc(1.75rem * var(--ui-scale));
   --text-drill: calc(2rem * var(--ui-scale));
 
+  /* El SVG del teclado escala con su caja: sus px son unidades del viewBox, no
+   * píxeles reales. Con el texto al 200% la caja se comprime y las letras
+   * acababan MÁS pequeñas que al 100% (issue #13, WCAG 1.4.4). Hacen falta las
+   * dos palancas: esta agranda la letra dentro del teclado (es lo único que
+   * sirve cuando el límite es el ANCHO, como en la lección cero) y el suelo de
+   * .teclado en Drill.svelte agranda el teclado entero (sirve cuando el límite
+   * es el ALTO).
+   *
+   * El tope de 1,25 NO es redondeo: es lo que cabe en una tecla de 58 unidades
+   * con la etiqueta de Mayús en y+19, la principal en y+41 y la barra del dedo
+   * en y+51. Por encima de ~1,27 la etiqueta de Mayús se sale de la tecla por
+   * ARRIBA (ese es el límite que ata primero; el choque con la letra principal
+   * llega algo después, porque `.sup` la va subiendo). Medido en Chrome al
+   * tope: 0,91u hasta el borde de la tecla y 1,52u hasta la letra principal.
+   * Subir el tope obliga a rehacer la geometría, no solo este número.
+   * Lo comprueba geometria.test.ts, que explica cómo remedirlo. */
+  --factor-tecla: min(1.25, 0.5 + 0.5 * var(--ui-scale));
+  --text-key-main: calc(19px * var(--factor-tecla));
+  --text-key-small: calc(12px * var(--factor-tecla));
+  --text-key-tiny: calc(11px * var(--factor-tecla));
+
   --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-drill: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 

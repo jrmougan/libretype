@@ -3,6 +3,7 @@
   import Drill from './lib/components/Drill.svelte';
   import LeccionCero from './lib/components/LeccionCero.svelte';
   import Progreso from './lib/components/Progreso.svelte';
+  import SelectorTono from './lib/components/SelectorTono.svelte';
   import { buildIndex, LAYOUTS, obtenerLayout } from './lib/keyboard/layouts';
   import {
     generarTextoPractica,

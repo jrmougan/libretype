@@ -44,12 +44,18 @@
      * quien conoce la escala elegida, no el componente.
      */
     espacioJusto?: boolean;
+    /** Permite forzar animaciones reducidas en la lección. */
+    movimiento?: 'auto' | 'reducido';
+    animaciones?: 'normales' | 'reducidas' | 'auto';
   }
 
   let {
     layout, target, activo = true, onDone, onTecla, dominios, onStats,
     titulo = '', explicacion = '', cobertura = '', espacioJusto = false,
+    movimiento = 'auto', animaciones = 'auto',
   }: Props = $props();
+
+  const sinAnimaciones = $derived(movimiento === 'reducido' || animaciones === 'reducidas');
 
   let field = $state<HTMLTextAreaElement | null>(null);
   let engine: TypingEngine | null = null;
@@ -187,7 +193,7 @@
   }
 </script>
 
-<div class="drill">
+<div class="drill" class:sin-animaciones={sinAnimaciones}>
   <header class="cab">
     <h2>{titulo}</h2>
     {#if cobertura}
@@ -211,7 +217,7 @@
 
   <!-- La etiqueta devuelve el foco al pulsar el texto sin interceptar teclas.
        El campo real conserva la composición del método de entrada del sistema. -->
-  <label class="text">
+  <label class="text" aria-label={`Texto de la lección: ${target}`}>
     <textarea
       bind:this={field}
       class="capture"
@@ -219,7 +225,7 @@
       autocapitalize="off"
       spellcheck="false"
       disabled={!activo}
-      aria-label="Escribe aquí el texto de la lección"
+      aria-label={`Escribe el texto de la lección: ${target}`}
     ></textarea>
     <span aria-hidden="true">
       {#each [...target] as ch, i (i)}
@@ -232,7 +238,7 @@
        pista sí tiene que ser audible, y el progreso legible. -->
   <p class="sr-only" aria-live="polite">{hint}</p>
 
-  <p class="hint">
+  <p class="hint" aria-hidden="true">
     {#if nextStep}
       <span class="swatch" style="background: var(--finger-{nextStep.finger})"
             aria-hidden="true"></span>{hint}
@@ -241,7 +247,7 @@
     {/if}
   </p>
 
-  <div class="teclado">
+  <div class="teclado" aria-hidden="true">
     <Keyboard {layout} {held} next={nextStep} {lastWrong} {dominios} />
   </div>
 </div>
@@ -335,12 +341,24 @@
     background: var(--accent);
     color: var(--accent-fg);
     border-radius: 3px;
-    animation: pulse 1.1s var(--ease) infinite;
+    animation: blink 1.1s var(--ease) infinite;
   }
 
+  @keyframes blink { 50% { opacity: 0.62; } }
   @keyframes pulse { 50% { opacity: 0.62; } }
   @media (prefers-reduced-motion: reduce) {
-    .ch.current { animation: none; outline: 2px solid var(--fg); }
+    .ch.current {
+      animation: none;
+      opacity: 1;
+      outline: 2px solid var(--fg);
+    }
+  }
+  :global(:root[data-motion="reducido"]) .ch.current,
+  :global(:root[data-motion="reduced"]) .ch.current,
+  .sin-animaciones .ch.current {
+    animation: none;
+    opacity: 1;
+    outline: 2px solid var(--fg);
   }
 
   .hint {

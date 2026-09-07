@@ -27,6 +27,11 @@ describe('normalizar', () => {
     expect(normalizar({ tono: 'otro' }).tono).toBeNull();
     expect(normalizar({ tono: 'juego' }).tono).toBe('juego');
   });
+
+  it('normaliza animaciones reducidas a movimiento reducido', () => {
+    expect(normalizar({ animaciones: 'reducidas' }).movimiento).toBe('reducido');
+    expect(normalizar({ movimiento: 'reducido' }).movimiento).toBe('reducido');
+  });
 });
 
 describe('guardar y cargar', () => {
@@ -71,6 +76,11 @@ describe('aplicar al documento', () => {
     expect(raiz.getAttribute('data-font')).toBe('dyslexic');
     expect(raiz.getAttribute('data-tono')).toBe('juego');
     expect(raiz.style.getPropertyValue('--ui-scale')).toBe('1.8');
+  });
+
+  it('aplica movimiento reducido si se indica mediante animaciones reducidas', () => {
+    aplicar({ ...POR_DEFECTO, ...({ animaciones: 'reducidas' } as any) }, raiz);
+    expect(raiz.getAttribute('data-motion')).toBe('reducido');
   });
 
   it('quita los atributos al volver a automático', () => {

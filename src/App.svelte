@@ -223,10 +223,18 @@
     {/if}
 
     <div class="acciones">
-      <button aria-expanded={verProgreso} onclick={() => { verProgreso = !verProgreso; settingsOpen = false; }}>
+      <button
+        aria-expanded={verProgreso}
+        aria-controls="panel-dialogo"
+        onclick={() => { verProgreso = !verProgreso; settingsOpen = false; }}
+      >
         Progreso
       </button>
-      <button aria-expanded={settingsOpen} onclick={() => { settingsOpen = !settingsOpen; verProgreso = false; }}>
+      <button
+        aria-expanded={settingsOpen}
+        aria-controls="panel-dialogo"
+        onclick={() => { settingsOpen = !settingsOpen; verProgreso = false; }}
+      >
         Ajustes
       </button>
     </div>
@@ -248,6 +256,8 @@
           explicacion={lesson.focus}
           cobertura={pct(lesson.cobertura)}
           espacioJusto={prefs.escala >= 1.4}
+          movimiento={prefs.movimiento}
+          animaciones={prefs.movimiento === 'reducido' ? 'reducidas' : 'normales'}
           {dominios}
           onDone={terminada}
           onTecla={anotarTecla}
@@ -259,17 +269,31 @@
 
   <!-- Superpuesto: aparecer no puede mover el teclado de sitio. -->
   {#if result}
-    <dialog class="capa" bind:this={dialogoResultado} use:abrirDialogo aria-labelledby="resultado-titulo"
-            oncancel={(e) => { e.preventDefault(); again(); }}>
-      <div class="resultado" class:record={result.record}
-           class:celebra={result.record && prefs.tono === 'juego'}>
+    <dialog
+      id="dialogo-resultado"
+      class="capa"
+      bind:this={dialogoResultado}
+      use:abrirDialogo
+      aria-labelledby="resultado-titulo"
+      aria-describedby="resultado-desc"
+      aria-live="polite"
+      oncancel={(e) => { e.preventDefault(); again(); }}
+    >
+      <div
+        class="resultado"
+        class:record={result.record}
+        class:celebra={result.record && prefs.tono === 'juego'}
+        aria-live="polite"
+      >
         <strong id="resultado-titulo">
           {#if result.record}★ {voz.record}{:else}{voz.terminada}{/if}
         </strong>
-        <span>{result.stats.wpm} palabras por minuto, {result.stats.accuracy}% de precisión.</span>
-        <span class="animo">
-          {result.stats.accuracy >= PRECISION_ALTA ? voz.animoAlto : voz.animoBajo}
-        </span>
+        <div id="resultado-desc">
+          <span>{result.stats.wpm} palabras por minuto, {result.stats.accuracy}% de precisión.</span>
+          <span class="animo">
+            {result.stats.accuracy >= PRECISION_ALTA ? voz.animoAlto : voz.animoBajo}
+          </span>
+        </div>
         <div class="botones">
           <button onclick={again}>{voz.repetir}</button>
           {#if lessonIx < LESSONS.length - 1}
@@ -281,8 +305,14 @@
   {/if}
 
   {#if settingsOpen || verProgreso}
-    <dialog class="panel" bind:this={dialogoPanel} use:abrirDialogo aria-label={settingsOpen ? 'Ajustes' : 'Progreso'}
-            oncancel={(e) => { e.preventDefault(); cerrarPanel(); }}>
+    <dialog
+      id="panel-dialogo"
+      class="panel"
+      bind:this={dialogoPanel}
+      use:abrirDialogo
+      aria-label={settingsOpen ? 'Ajustes' : 'Progreso'}
+      oncancel={(e) => { e.preventDefault(); cerrarPanel(); }}
+    >
       <div class="panel-cab">
         <h2>{settingsOpen ? 'Ajustes' : voz.progreso}</h2>
         <button onclick={cerrarPanel}>Cerrar</button>
@@ -467,6 +497,7 @@
     border-radius: var(--radius);
     box-shadow: 0 12px 40px rgb(0 0 0 / 0.28);
   }
+  #resultado-desc { display: grid; gap: var(--space-1); }
   .resultado strong { font-size: var(--text-lg); }
   .resultado .animo { color: var(--fg-muted); }
   .botones { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
@@ -480,6 +511,10 @@
   }
   @keyframes celebrar { from { transform: scale(1); } to { transform: scale(1.015); } }
   @media (prefers-reduced-motion: reduce) { .resultado.celebra { animation: none; } }
+  :global(:root[data-motion="reducido"]) .resultado.celebra,
+  :global(:root[data-motion="reduced"]) .resultado.celebra {
+    animation: none;
+  }
 
   .panel {
     position: fixed; top: 0; right: 0; bottom: 0; left: auto;

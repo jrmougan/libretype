@@ -61,10 +61,11 @@ const unaDe = <T extends string>(v: unknown, opciones: readonly T[], sino: T): T
  */
 export function normalizar(crudo: unknown): Preferencias {
   const o = (typeof crudo === 'object' && crudo !== null ? crudo : {}) as Record<string, unknown>;
+  const movimientoCrudo = o.movimiento ?? (o.animaciones === 'reducidas' ? 'reducido' : undefined);
   return {
     escala: enRango(o.escala, 1, 2, POR_DEFECTO.escala),
     tema: unaDe(o.tema, ['auto', 'claro', 'oscuro'] as const, POR_DEFECTO.tema),
-    movimiento: unaDe(o.movimiento, ['auto', 'reducido'] as const, POR_DEFECTO.movimiento),
+    movimiento: unaDe(movimientoCrudo, ['auto', 'reducido'] as const, POR_DEFECTO.movimiento),
     fuente: unaDe(o.fuente, ['normal', 'dislexia'] as const, POR_DEFECTO.fuente),
     tono: o.tono === 'juego' || o.tono === 'sobrio' ? o.tono : null,
     ayudaTeclado: unaDe(o.ayudaTeclado, ['auto', 'siempre'] as const, POR_DEFECTO.ayudaTeclado),
@@ -94,7 +95,8 @@ export function aplicar(p: Preferencias, raiz: HTMLElement): void {
     valor === null ? raiz.removeAttribute(nombre) : raiz.setAttribute(nombre, valor);
 
   atributo('data-theme', p.tema === 'auto' ? null : p.tema === 'claro' ? 'light' : 'dark');
-  atributo('data-motion', p.movimiento === 'reducido' ? 'reducido' : null);
+  const reducido = p.movimiento === 'reducido' || (p as unknown as Record<string, unknown>).animaciones === 'reducidas';
+  atributo('data-motion', reducido ? 'reducido' : null);
   atributo('data-font', p.fuente === 'dislexia' ? 'dyslexic' : null);
   atributo('data-tono', p.tono);
 }

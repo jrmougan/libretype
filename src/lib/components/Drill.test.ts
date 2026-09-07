@@ -66,3 +66,34 @@ describe('foco de la lección', () => {
     expect(document.querySelector('.ch.current')?.textContent).toBe('s');
   });
 });
+
+describe('accesibilidad de la lección (#15, #16)', () => {
+  it('proporciona un aria-label descriptivo con el texto de la lección al textarea', () => {
+    const campo = montar();
+    expect(campo.getAttribute('aria-label')).toBe('Escribe el texto de la lección: ás');
+    const contenedor = campo.closest('label');
+    expect(contenedor?.getAttribute('aria-label')).toBe('Texto de la lección: ás');
+  });
+
+  it('mantiene elementos decorativos con aria-hidden para no inundar el lector de pantalla', () => {
+    montar();
+    const pista = document.querySelector('.hint');
+    expect(pista?.getAttribute('aria-hidden')).toBe('true');
+
+    const teclado = document.querySelector('.teclado');
+    expect(teclado?.getAttribute('aria-hidden')).toBe('true');
+
+    const enVivo = document.querySelector('.sr-only');
+    expect(enVivo?.getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('permite desactivar animaciones mediante las props de movimiento o animaciones', async () => {
+    if (componente) await unmount(componente);
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'ás', titulo: 'Tildes', animaciones: 'reducidas' },
+    });
+    flushSync();
+    expect(document.querySelector('.drill.sin-animaciones')).not.toBeNull();
+  });
+});

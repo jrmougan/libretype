@@ -38,9 +38,10 @@
     { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 },
   );
 
-  let almacen: Almacen | null = null;
+  let almacen = $state<Almacen | null>(null);
   let sesiones = $state<Sesion[]>([]);
   let tipoAlmacen = $state<'sqlite' | 'local'>('local');
+  let errorAlmacen = $state(false);
   let verProgreso = $state(false);
   /** 'tono' solo aparece la primera vez; 'cero' es la colocación de manos. */
   let vista = $state<'tono' | 'cero' | 'leccion'>('leccion');
@@ -64,6 +65,7 @@
   onMount(async () => {
     almacen = await abrirAlmacen();
     tipoAlmacen = almacen.tipo;
+    errorAlmacen = Boolean(almacen.errorAlmacen);
     sesiones = await almacen.leerTodas();
     teclas = await almacen.leerTeclas();
 
@@ -111,6 +113,18 @@
     } catch (err) {
       console.warn('[libretype] no se pudo guardar la sesión:', err);
     }
+  }
+
+  async function exportarProgreso(): Promise<string> {
+    if (!almacen) return "";
+    return await almacen.exportar();
+  }
+
+  async function importarProgreso(json: string): Promise<void> {
+    if (!almacen) return;
+    await almacen.importar(json);
+    sesiones = await almacen.leerTodas();
+    teclas = await almacen.leerTeclas();
   }
 
   async function borrarProgreso(): Promise<void> {
@@ -356,7 +370,7 @@
             </p>
           </div>
         {:else}
-          <Progreso {sesiones} lecciones={LESSONS} {tipoAlmacen} onBorrar={borrarProgreso} />
+          <Progreso {sesiones} lecciones={LESSONS} {tipoAlmacen} {errorAlmacen} {almacen} onBorrar={borrarProgreso} onExportar={exportarProgreso} onImportar={importarProgreso} />
         {/if}
       </div>
     </dialog>

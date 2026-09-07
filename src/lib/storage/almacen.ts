@@ -8,26 +8,48 @@
  * Si abrir SQLite falla, se cae a localStorage en vez de romper la app: perder
  * el histórico es malo, no poder practicar es peor.
  */
-import type { EstadoTecla } from '../keyboard/dominio';
-import type { Sesion } from './progreso';
+import type { EstadoTecla } from "../keyboard/dominio";
+import type { Sesion } from "./progreso";
 
 export interface Almacen {
-  readonly tipo: 'sqlite' | 'local';
+  readonly tipo: "sqlite" | "local";
+  /** Indica si falló la base de datos local en escritorio y se degradó a local. */
+  readonly errorAlmacen?: boolean;
   guardar(s: Sesion): Promise<void>;
   leerTodas(): Promise<Sesion[]>;
   /** Dominio acumulado por tecla, para saber cuánta ayuda visual retirar. */
   leerTeclas(): Promise<Map<string, EstadoTecla>>;
   guardarTeclas(teclas: ReadonlyMap<string, EstadoTecla>): Promise<void>;
   borrarTodo(): Promise<void>;
+  /** Exporta el progreso completo a una cadena JSON. */
+  exportar(): Promise<string>;
+  exportarProgreso(): Promise<string>;
+  /** Importa sesiones y estado de teclas desde una cadena JSON. */
+  importar(json: string, opciones?: { reemplazar?: boolean }): Promise<void>;
+  importarProgreso(json: string, opciones?: { reemplazar?: boolean }): Promise<void>;
 }
 
-const CLAVE_LOCAL = 'libretype.sesiones';
-const CLAVE_TECLAS = 'libretype.teclas';
+export interface CopiaSeguridad {
+  version: number;
+  creadaEn: string;
+  sesiones: Sesion[];
+  teclas: Record<string, EstadoTecla>;
+}
+
+const CLAVE_LOCAL = "libretype.sesiones";
+const CLAVE_TECLAS = "libretype.teclas";
 /** Tope del respaldo en navegador; localStorage no es para histórico infinito. */
 const TOPE_LOCAL = 500;
 
+/** Bandera exportada que indica si se produjo una degradación por fallo de SQLite. */
+export let errorAlmacen = false;
+
+export function setErrorAlmacen(valor: boolean): void {
+  errorAlmacen = valor;
+}
+
 /** Lo que usamos de `Database` de tauri-plugin-sql. */
-interface DbSql {
+export interface DbSql {
   execute(query: string, valores?: unknown[]): Promise<unknown>;
   select<T>(query: string, valores?: unknown[]): Promise<T>;
 }
@@ -42,8 +64,89 @@ interface FilaSql {
   terminada_en: string;
 }
 
-class AlmacenSqlite implements Almacen {
-  readonly tipo = 'sqlite' as const;
+/**
+ * Valida y parsea el contenido JSON de una copia de seguridad.
+ * Lanza un error descriptivo en español si el formato o los campos son inválidos.
+ */
+export function parsearCopiaSeguridad(json: string): {
+  sesiones: Sesion[];
+  teclas: Map<string, EstadoTecla>;
+} {
+  let datos: unknown;
+  try {
+    datos = JSON.parse(json);
+  } catch {
+    throw new Error("El archivo no contiene un JSON válido.");
+  }
+
+  if (!datos || typeof datos !== "object") {
+    throw new Error("El formato de la copia de seguridad no es un objeto válido.");
+  }
+
+  const obj = datos as Record<string, unknown>;
+
+  if (!Array.isArray(obj.sesiones)) {
+    throw new Error("La copia de seguridad no contiene una lista de sesiones válida.");
+  }
+
+  const sesionesValidas: Sesion[] = [];
+  for (const s of obj.sesiones) {
+    if (
+      typeof s !== "object" ||
+      s === null ||
+      typeof s.leccion !== "string" ||
+      typeof s.ppm !== "number" ||
+      typeof s.pctAcierto !== "number" ||
+      typeof s.aciertos !== "number" ||
+      typeof s.escritos !== "number" ||
+      typeof s.ms !== "number" ||
+      typeof s.terminadaEn !== "string"
+    ) {
+      throw new Error("Una o más sesiones de la copia de seguridad contienen campos inválidos.");
+    }
+    sesionesValidas.push({
+      leccion: s.leccion,
+      ppm: s.ppm,
+      pctAcierto: s.pctAcierto,
+      aciertos: s.aciertos,
+      escritos: s.escritos,
+      ms: s.ms,
+      terminadaEn: s.terminadaEn,
+    });
+  }
+
+  const teclasValidas = new Map<string, EstadoTecla>();
+  if (obj.teclas && typeof obj.teclas === "object") {
+    const entradas = Array.isArray(obj.teclas)
+      ? (obj.teclas as [string, unknown][])
+      : Object.entries(obj.teclas as Record<string, unknown>);
+
+    for (const [code, val] of entradas) {
+      if (
+        typeof code !== "string" ||
+        typeof val !== "object" ||
+        val === null ||
+        typeof (val as EstadoTecla).intentos !== "number" ||
+        typeof (val as EstadoTecla).aciertos !== "number" ||
+        typeof (val as EstadoTecla).msTotal !== "number"
+      ) {
+        throw new Error(`El estado de la tecla "${code}" en la copia de seguridad es inválido.`);
+      }
+      const e = val as EstadoTecla;
+      teclasValidas.set(code, {
+        intentos: e.intentos,
+        aciertos: e.aciertos,
+        msTotal: e.msTotal,
+      });
+    }
+  }
+
+  return { sesiones: sesionesValidas, teclas: teclasValidas };
+}
+
+export class AlmacenSqlite implements Almacen {
+  readonly tipo = "sqlite" as const;
+  readonly errorAlmacen = false;
   #db: DbSql;
 
   constructor(db: DbSql) { this.#db = db; }
@@ -76,7 +179,7 @@ class AlmacenSqlite implements Almacen {
   async leerTeclas(): Promise<Map<string, EstadoTecla>> {
     const filas = await this.#db.select<
       { code: string; intentos: number; aciertos: number; ms_total: number }[]
-    >('SELECT code, intentos, aciertos, ms_total FROM teclas');
+    >("SELECT code, intentos, aciertos, ms_total FROM teclas");
     return new Map(filas.map((f) => [
       f.code,
       { intentos: f.intentos, aciertos: f.aciertos, msTotal: f.ms_total },
@@ -98,13 +201,75 @@ class AlmacenSqlite implements Almacen {
   }
 
   async borrarTodo(): Promise<void> {
-    await this.#db.execute('DELETE FROM sesiones');
-    await this.#db.execute('DELETE FROM teclas');
+    await this.#db.execute("DELETE FROM sesiones");
+    await this.#db.execute("DELETE FROM teclas");
+    await this.#db.execute("VACUUM");
+  }
+
+  async exportar(): Promise<string> {
+    const sesiones = await this.leerTodas();
+    const teclas = await this.leerTeclas();
+    const copia: CopiaSeguridad = {
+      version: 1,
+      creadaEn: new Date().toISOString(),
+      sesiones,
+      teclas: Object.fromEntries(teclas),
+    };
+    return JSON.stringify(copia, null, 2);
+  }
+
+  async exportarProgreso(): Promise<string> {
+    return this.exportar();
+  }
+
+  async importar(json: string, opciones?: { reemplazar?: boolean }): Promise<void> {
+    const { sesiones, teclas } = parsearCopiaSeguridad(json);
+    const reemplazar = opciones?.reemplazar ?? true;
+
+    if (reemplazar) {
+      await this.#db.execute("DELETE FROM sesiones");
+      await this.#db.execute("DELETE FROM teclas");
+      for (const s of sesiones) {
+        await this.guardar(s);
+      }
+      await this.guardarTeclas(teclas);
+    } else {
+      const existentes = await this.leerTodas();
+      const claves = new Set(existentes.map((s) => `${s.terminadaEn}|${s.leccion}`));
+      for (const s of sesiones) {
+        if (!claves.has(`${s.terminadaEn}|${s.leccion}`)) {
+          await this.guardar(s);
+        }
+      }
+      const teclasExistentes = await this.leerTeclas();
+      for (const [code, val] of teclas) {
+        const prev = teclasExistentes.get(code);
+        if (!prev) {
+          teclasExistentes.set(code, val);
+        } else {
+          teclasExistentes.set(code, {
+            intentos: prev.intentos + val.intentos,
+            aciertos: prev.aciertos + val.aciertos,
+            msTotal: prev.msTotal + val.msTotal,
+          });
+        }
+      }
+      await this.guardarTeclas(teclasExistentes);
+    }
+  }
+
+  async importarProgreso(json: string, opciones?: { reemplazar?: boolean }): Promise<void> {
+    return this.importar(json, opciones);
   }
 }
 
 export class AlmacenLocal implements Almacen {
-  readonly tipo = 'local' as const;
+  readonly tipo = "local" as const;
+  readonly errorAlmacen: boolean;
+
+  constructor(errorAlmacen = false) {
+    this.errorAlmacen = errorAlmacen;
+  }
 
   #leer(): Sesion[] {
     try {
@@ -149,13 +314,75 @@ export class AlmacenLocal implements Almacen {
       localStorage.removeItem(CLAVE_TECLAS);
     } catch { /* ignorado */ }
   }
+
+  async exportar(): Promise<string> {
+    const sesiones = await this.leerTodas();
+    const teclas = await this.leerTeclas();
+    const copia: CopiaSeguridad = {
+      version: 1,
+      creadaEn: new Date().toISOString(),
+      sesiones,
+      teclas: Object.fromEntries(teclas),
+    };
+    return JSON.stringify(copia, null, 2);
+  }
+
+  async exportarProgreso(): Promise<string> {
+    return this.exportar();
+  }
+
+  async importar(json: string, opciones?: { reemplazar?: boolean }): Promise<void> {
+    const { sesiones, teclas } = parsearCopiaSeguridad(json);
+    const reemplazar = opciones?.reemplazar ?? true;
+
+    if (reemplazar) {
+      try {
+        localStorage.setItem(CLAVE_LOCAL, JSON.stringify(sesiones.slice(-TOPE_LOCAL)));
+        localStorage.setItem(CLAVE_TECLAS, JSON.stringify([...teclas]));
+      } catch { /* modo privado o cuota llena */ }
+    } else {
+      const existentes = this.#leer();
+      const claves = new Set(existentes.map((s) => `${s.terminadaEn}|${s.leccion}`));
+      const aAnadir = sesiones.filter((s) => !claves.has(`${s.terminadaEn}|${s.leccion}`));
+      const unidas = [...existentes, ...aAnadir].slice(-TOPE_LOCAL);
+
+      const teclasExistentes = await this.leerTeclas();
+      for (const [code, val] of teclas) {
+        const prev = teclasExistentes.get(code);
+        if (!prev) {
+          teclasExistentes.set(code, val);
+        } else {
+          teclasExistentes.set(code, {
+            intentos: prev.intentos + val.intentos,
+            aciertos: prev.aciertos + val.aciertos,
+            msTotal: prev.msTotal + val.msTotal,
+          });
+        }
+      }
+
+      try {
+        localStorage.setItem(CLAVE_LOCAL, JSON.stringify(unidas));
+        localStorage.setItem(CLAVE_TECLAS, JSON.stringify([...teclasExistentes]));
+      } catch { /* cuota llena */ }
+    }
+  }
+
+  async importarProgreso(json: string, opciones?: { reemplazar?: boolean }): Promise<void> {
+    return this.importar(json, opciones);
+  }
 }
 
 /** Almacén que no guarda nada. Para tests y para entornos sin storage. */
 export class AlmacenMemoria implements Almacen {
-  readonly tipo = 'local' as const;
+  readonly tipo = "local" as const;
+  readonly errorAlmacen: boolean;
   #sesiones: Sesion[] = [];
   #teclas = new Map<string, EstadoTecla>();
+
+  constructor(errorAlmacen = false) {
+    this.errorAlmacen = errorAlmacen;
+  }
+
   async guardar(s: Sesion): Promise<void> { this.#sesiones.push(s); }
   async leerTodas(): Promise<Sesion[]> { return [...this.#sesiones]; }
   async leerTeclas(): Promise<Map<string, EstadoTecla>> { return new Map(this.#teclas); }
@@ -163,18 +390,72 @@ export class AlmacenMemoria implements Almacen {
     this.#teclas = new Map(t);
   }
   async borrarTodo(): Promise<void> { this.#sesiones = []; this.#teclas = new Map(); }
+
+  async exportar(): Promise<string> {
+    const copia: CopiaSeguridad = {
+      version: 1,
+      creadaEn: new Date().toISOString(),
+      sesiones: [...this.#sesiones],
+      teclas: Object.fromEntries(this.#teclas),
+    };
+    return JSON.stringify(copia, null, 2);
+  }
+
+  async exportarProgreso(): Promise<string> {
+    return this.exportar();
+  }
+
+  async importar(json: string, opciones?: { reemplazar?: boolean }): Promise<void> {
+    const { sesiones, teclas } = parsearCopiaSeguridad(json);
+    const reemplazar = opciones?.reemplazar ?? true;
+
+    if (reemplazar) {
+      this.#sesiones = [...sesiones];
+      this.#teclas = new Map(teclas);
+    } else {
+      const claves = new Set(this.#sesiones.map((s) => `${s.terminadaEn}|${s.leccion}`));
+      for (const s of sesiones) {
+        if (!claves.has(`${s.terminadaEn}|${s.leccion}`)) {
+          this.#sesiones.push(s);
+        }
+      }
+      for (const [code, val] of teclas) {
+        const prev = this.#teclas.get(code);
+        if (!prev) {
+          this.#teclas.set(code, val);
+        } else {
+          this.#teclas.set(code, {
+            intentos: prev.intentos + val.intentos,
+            aciertos: prev.aciertos + val.aciertos,
+            msTotal: prev.msTotal + val.msTotal,
+          });
+        }
+      }
+    }
+  }
+
+  async importarProgreso(json: string, opciones?: { reemplazar?: boolean }): Promise<void> {
+    return this.importar(json, opciones);
+  }
 }
 
 export async function abrirAlmacen(): Promise<Almacen> {
+  let enEscritorio = false;
   try {
-    const { isTauri } = await import('@tauri-apps/api/core');
-    if (!isTauri()) return new AlmacenLocal();
+    const { isTauri } = await import("@tauri-apps/api/core");
+    enEscritorio = isTauri();
+    if (!enEscritorio) {
+      errorAlmacen = false;
+      return new AlmacenLocal(false);
+    }
 
-    const { default: Database } = await import('@tauri-apps/plugin-sql');
-    const db = await Database.load('sqlite:libretype.db');
+    const { default: Database } = await import("@tauri-apps/plugin-sql");
+    const db = await Database.load("sqlite:libretype.db");
+    errorAlmacen = false;
     return new AlmacenSqlite(db as unknown as DbSql);
   } catch (err) {
-    console.warn('[libretype] SQLite no disponible, se usa localStorage:', err);
-    return new AlmacenLocal();
+    console.warn("[libretype] SQLite no disponible, se usa localStorage:", err);
+    errorAlmacen = enEscritorio;
+    return new AlmacenLocal(enEscritorio);
   }
 }

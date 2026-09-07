@@ -4,8 +4,13 @@
   import LeccionCero from './lib/components/LeccionCero.svelte';
   import Progreso from './lib/components/Progreso.svelte';
   import SelectorTono from './lib/components/SelectorTono.svelte';
-  import { LAYOUTS } from './lib/keyboard/layouts';
-  import { LESSONS } from './lib/lessons';
+  import { buildIndex, LAYOUTS, obtenerLayout } from './lib/keyboard/layouts';
+  import {
+    generarTextoPractica,
+    LESSONS,
+    nivelDesbloqueado,
+    normalizarTextoLibre,
+  } from './lib/lessons';
   import type { Stats } from './lib/keyboard/engine';
   import {
     contarDominadas, mapaDeDominio, registrar, type EstadoTecla,
@@ -22,12 +27,11 @@
    * Preferencias de interfaz. Se cargan de disco antes del primer pintado para
    * que quien necesita el texto al 200% no vea un parpadeo al 100%.
    */
-  let prefs = $state<Preferencias>(
-    typeof localStorage === 'undefined' ? { ...POR_DEFECTO } : cargar(),
-  );
+  const prefsIniciales = typeof localStorage === 'undefined' ? { ...POR_DEFECTO } : cargar();
+  let prefs = $state<Preferencias>(prefsIniciales);
   let settingsOpen = $state(false);
 
-  let layout = $state(LAYOUTS[0]);
+  let layout = $state(obtenerLayout(prefsIniciales.layout));
   let lessonIx = $state(0);
   let drill = $state<ReturnType<typeof Drill> | null>(null);
   let result = $state<{ stats: Stats; record: boolean } | null>(null);
@@ -43,8 +47,20 @@
   let tipoAlmacen = $state<'sqlite' | 'local'>('local');
   let errorAlmacen = $state(false);
   let verProgreso = $state(false);
-  /** 'tono' solo aparece la primera vez; 'cero' es la colocación de manos. */
-  let vista = $state<'tono' | 'cero' | 'leccion'>('leccion');
+  /** 'tono' solo aparece la primera vez; 'cero' es la colocación de manos; 'continua' y 'propio' son práctica libre. */
+  let vista = $state<'tono' | 'cero' | 'leccion' | 'continua' | 'propio'>('leccion');
+
+  /** Variables para Práctica continua (Issue #19) */
+  let nivelPractica = $state(0);
+  let textoContinua = $state(generarTextoPractica(0));
+  let continuaKey = $state(0);
+
+  /** Variables para Texto propio (Issue #19) */
+  let textoPropio = $state('');
+  let textoPropioActivo = $state('');
+  let enEdicionPropio = $state(true);
+  let errorTextoPropio = $state('');
+  let propioKey = $state(0);
 
   /** Intentos acumulados por tecla, que deciden cuánta ayuda visual retirar. */
   let teclas = $state<Map<string, EstadoTecla>>(new Map());
@@ -57,6 +73,7 @@
   const aprendidas = $derived(contarDominadas(mapaDeDominio(teclas)));
 
   const porLeccion = $derived(resumirLecciones(sesiones));
+  const maxDesbloqueado = $derived(nivelDesbloqueado(sesiones.map((s) => s.leccion)));
 
   const voz = $derived(vozDe(prefs.tono));
   const lesson = $derived(LESSONS[lessonIx]);
@@ -91,8 +108,15 @@
   }
 
   async function terminada(stats: Stats): Promise<void> {
+    const idLeccion =
+      vista === 'continua'
+        ? 'practica-continua'
+        : vista === 'propio'
+          ? 'texto-propio'
+          : lesson.id;
+
     const sesion: Sesion = {
-      leccion: lesson.id,
+      leccion: idLeccion,
       ppm: stats.wpm,
       pctAcierto: stats.accuracy,
       aciertos: stats.correct,
@@ -102,7 +126,7 @@
     };
 
     // Se calcula antes de guardar: después, la propia sesión ya sería la marca.
-    const record = esRecord(porLeccion.get(lesson.id), sesion);
+    const record = esRecord(porLeccion.get(idLeccion), sesion);
     result = { stats, record };
 
     // Que falle el guardado no puede tumbar la práctica.
@@ -166,6 +190,78 @@
     drill?.enfocar();
   }
 
+  async function activarContinua(): Promise<void> {
+    dialogoResultado?.close();
+    dialogoPanel?.close();
+    if (!result) {
+      teclas = new Map(teclasBase);
+    }
+    nivelPractica = maxDesbloqueado;
+    textoContinua = generarTextoPractica(nivelPractica);
+    continuaKey++;
+    result = null;
+    vista = 'continua';
+    settingsOpen = false;
+    verProgreso = false;
+    ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
+    await tick();
+    drill?.restart();
+    drill?.enfocar();
+  }
+
+  async function nuevaContinua(nivel = nivelPractica): Promise<void> {
+    dialogoResultado?.close();
+    if (!result) {
+      teclas = new Map(teclasBase);
+    }
+    nivelPractica = nivel;
+    textoContinua = generarTextoPractica(nivelPractica);
+    continuaKey++;
+    result = null;
+    ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
+    await tick();
+    drill?.restart();
+    drill?.enfocar();
+  }
+
+  async function activarPropio(): Promise<void> {
+    dialogoResultado?.close();
+    dialogoPanel?.close();
+    if (!result) {
+      teclas = new Map(teclasBase);
+    }
+    result = null;
+    settingsOpen = false;
+    verProgreso = false;
+    ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
+    vista = 'propio';
+    if (textoPropioActivo && !enEdicionPropio) {
+      await tick();
+      drill?.restart();
+      drill?.enfocar();
+    } else {
+      enEdicionPropio = true;
+    }
+  }
+
+  async function empezarTextoPropio(): Promise<void> {
+    errorTextoPropio = '';
+    const index = buildIndex(layout);
+    const permitido = new Set(index.keys());
+    const limpio = normalizarTextoLibre(textoPropio, permitido);
+    if (!limpio) {
+      errorTextoPropio = 'Introduce un texto con caracteres válidos para la distribución actual.';
+      return;
+    }
+    textoPropioActivo = limpio;
+    enEdicionPropio = false;
+    propioKey++;
+    ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
+    await tick();
+    drill?.restart();
+    drill?.enfocar();
+  }
+
   async function again(): Promise<void> {
     dialogoResultado?.close();
     if (!result) {
@@ -189,9 +285,10 @@
     settingsOpen = false;
     verProgreso = false;
     await tick();
-    if (vista === 'leccion') drill?.enfocar();
+    if (vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio)) {
+      drill?.enfocar();
+    }
   }
-
 </script>
 
 <!--
@@ -208,12 +305,14 @@
     <h1>LibreType</h1>
 
     <label class="selector">
-      <span class="sr-only">Lección</span>
+      <span class="sr-only">Lección o modo de práctica</span>
       <select
-        value={vista === 'leccion' ? String(lessonIx) : 'cero'}
+        value={vista === 'leccion' ? String(lessonIx) : vista}
         onchange={(e) => {
           const v = e.currentTarget.value;
           if (v === 'cero') vista = 'cero';
+          else if (v === 'continua') activarContinua();
+          else if (v === 'propio') activarPropio();
           else pick(+v);
         }}
       >
@@ -224,14 +323,17 @@
             {i + 1}. {l.title}{marca && marca.mejorPpm > 0 ? ` · ${marca.mejorPpm} ppm` : ''}
           </option>
         {/each}
+        <option value="continua">Práctica continua · vocabulario acumulado</option>
+        <option value="propio">Texto propio · práctica libre</option>
       </select>
     </label>
 
-    {#if vista === 'leccion'}
+    {#if vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio)}
+      {@const textoObjetivo = vista === 'continua' ? textoContinua : vista === 'propio' ? textoPropioActivo : lesson.text}
       <dl class="metricas">
         <div><dt>Velocidad</dt><dd>{ultimasStats.wpm}<small>ppm</small></dd></div>
         <div><dt>Precisión</dt><dd>{ultimasStats.accuracy}<small>%</small></dd></div>
-        <div><dt>Avance</dt><dd>{ultimasStats.typed}<small>/{lesson.text.length}</small></dd></div>
+        <div><dt>Avance</dt><dd>{ultimasStats.typed}<small>/{textoObjetivo.length}</small></dd></div>
       </dl>
     {/if}
 
@@ -258,6 +360,83 @@
       <div class="centrado"><SelectorTono onElegir={elegirTono} /></div>
     {:else if vista === 'cero'}
       <LeccionCero {layout} onTerminar={() => pick(0)} />
+    {:else if vista === 'continua'}
+      <div class="barra-practica">
+        <label for="selector-nivel-practica">Vocabulario desbloqueado hasta:</label>
+        <select
+          id="selector-nivel-practica"
+          bind:value={nivelPractica}
+          onchange={() => nuevaContinua(nivelPractica)}
+        >
+          {#each LESSONS.slice(0, Math.max(nivelPractica, maxDesbloqueado) + 1) as l, i}
+            <option value={i}>{i + 1}. {l.title}</option>
+          {/each}
+        </select>
+        <button onclick={() => nuevaContinua(nivelPractica)}>Nuevo texto aleatorio</button>
+      </div>
+      {#key continuaKey}
+        <Drill
+          bind:this={drill}
+          {layout}
+          activo={!settingsOpen && !verProgreso && !result}
+          target={textoContinua}
+          titulo="Práctica continua"
+          explicacion={`Vocabulario acumulado hasta la lección ${nivelPractica + 1}: ${LESSONS[nivelPractica].title}.`}
+          cobertura={pct(LESSONS[nivelPractica].cobertura)}
+          espacioJusto={prefs.escala >= 1.4}
+          movimiento={prefs.movimiento}
+          animaciones={prefs.movimiento === 'reducido' ? 'reducidas' : 'normales'}
+          {dominios}
+          onDone={terminada}
+          onTecla={anotarTecla}
+          onStats={(s) => (ultimasStats = s)}
+        />
+      {/key}
+    {:else if vista === 'propio'}
+      {#if enEdicionPropio}
+        <div class="centrado editor-propio">
+          <h2>Práctica libre con texto propio</h2>
+          <p class="note">Escribe o pega el texto que desees practicar. Se utilizarán las teclas disponibles en la distribución activa.</p>
+          <label for="texto-propio-input" class="sr-only">Texto personalizado</label>
+          <textarea
+            id="texto-propio-input"
+            class="input-texto-propio"
+            rows="5"
+            bind:value={textoPropio}
+            placeholder="Escribe o pega aquí tu propio texto..."
+          ></textarea>
+          {#if errorTextoPropio}
+            <p class="nota aviso aviso-error" role="alert">{errorTextoPropio}</p>
+          {/if}
+          <div class="acciones-propio">
+            <button class="primario" onclick={empezarTextoPropio}>Empezar a teclear</button>
+          </div>
+        </div>
+      {:else}
+        <div class="barra-practica">
+          <span>Practicando tu propio texto ({textoPropioActivo.length} caracteres)</span>
+          <button onclick={() => { enEdicionPropio = true; }}>Cambiar texto</button>
+          <button onclick={again}>Reiniciar</button>
+        </div>
+        {#key propioKey}
+          <Drill
+            bind:this={drill}
+            {layout}
+            activo={!settingsOpen && !verProgreso && !result}
+            target={textoPropioActivo}
+            titulo="Texto propio"
+            explicacion="Práctica libre con texto personalizado."
+            cobertura=""
+            espacioJusto={prefs.escala >= 1.4}
+            movimiento={prefs.movimiento}
+            animaciones={prefs.movimiento === 'reducido' ? 'reducidas' : 'normales'}
+            {dominios}
+            onDone={terminada}
+            onTecla={anotarTecla}
+            onStats={(s) => (ultimasStats = s)}
+          />
+        {/key}
+      {/if}
     {:else}
       {#key lesson.id}
         <Drill
@@ -309,7 +488,11 @@
         </div>
         <div class="botones">
           <button onclick={again}>{voz.repetir}</button>
-          {#if lessonIx < LESSONS.length - 1}
+          {#if vista === 'continua'}
+            <button class="primario" onclick={() => nuevaContinua()}>Nuevo texto</button>
+          {:else if vista === 'propio'}
+            <button class="primario" onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
+          {:else if lessonIx < LESSONS.length - 1}
             <button class="primario" onclick={() => pick(lessonIx + 1)}>{voz.siguiente}</button>
           {/if}
         </div>
@@ -404,8 +587,16 @@
 
           <div class="field">
             <label for="layout">Distribución del teclado</label>
-            <select id="layout" bind:value={layout}>
-              {#each LAYOUTS as l (l.id)}<option value={l}>{l.name}</option>{/each}
+            <select
+              id="layout"
+              value={layout.id}
+              onchange={(e) => {
+                const id = e.currentTarget.value;
+                layout = obtenerLayout(id);
+                prefs = { ...prefs, layout: id };
+              }}
+            >
+              {#each LAYOUTS as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
             </select>
             <p class="note">
               No la detectamos automáticamente: la API que lo permite solo existe en
@@ -568,5 +759,48 @@
     .barra { padding: var(--space-1) var(--space-3); }
     .escena { padding: var(--space-2) var(--space-3); }
     .metricas { gap: var(--space-3); }
+  }
+
+  .barra-practica {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+    flex-wrap: wrap;
+  }
+  .barra-practica select {
+    font: inherit;
+    min-height: var(--target-min);
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--fg);
+  }
+  .barra-practica button {
+    min-height: var(--target-min);
+  }
+  .editor-propio {
+    display: grid;
+    gap: var(--space-3);
+    width: 100%;
+  }
+  .input-texto-propio {
+    width: 100%;
+    min-height: 120px;
+    font-family: var(--font-drill);
+    font-size: var(--text-base);
+    padding: var(--space-3);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--fg);
+    resize: vertical;
+  }
+  .acciones-propio {
+    display: flex;
+    gap: var(--space-2);
   }
 </style>

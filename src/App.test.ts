@@ -148,4 +148,49 @@ describe('captura y paneles', () => {
     expect(campo().value).toBe('');
     expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
   });
+
+  it('permite acceder al modo de práctica continua (Issue #19)', async () => {
+    const selector = document.querySelector('select')!;
+    selector.value = 'continua';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    expect(document.querySelector('h2')?.textContent).toBe('Práctica continua');
+    expect(campo()).not.toBeNull();
+  });
+
+  it('permite introducir texto propio para práctica libre (Issue #19)', async () => {
+    const selector = document.querySelector('select')!;
+    selector.value = 'propio';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    expect(document.querySelector('h2')?.textContent).toContain('texto propio');
+    const inputTexto = document.querySelector('textarea.input-texto-propio') as HTMLTextAreaElement;
+    expect(inputTexto).not.toBeNull();
+    inputTexto.value = 'hola mundo';
+    inputTexto.dispatchEvent(new Event('input', { bubbles: true }));
+
+    boton('Empezar a teclear').click();
+    await tick();
+
+    expect(document.querySelector('h2')?.textContent).toBe('Texto propio');
+    expect(campo()).not.toBeNull();
+  });
+
+  it('persiste la distribución seleccionada en preferencias (Issue #25)', async () => {
+    boton('Ajustes').click();
+    await tick();
+
+    const selectorLayout = document.querySelector('select#layout') as HTMLSelectElement;
+    expect(selectorLayout).not.toBeNull();
+    selectorLayout.value = 'es-iso';
+    selectorLayout.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    const raw = localStorage.getItem('libretype.preferencias');
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw!);
+    expect(parsed.layout).toBe('es-iso');
+  });
 });

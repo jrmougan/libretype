@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildIndex, ES_ISO, FINGER_NAMES, LAYOUTS } from './layouts';
+import { adaptarEtiquetasSO, buildIndex, detectarSO, ES_ISO, FINGER_NAMES, LAYOUTS, obtenerLayout } from './layouts';
 import { LESSONS } from '../lessons';
 
 const index = buildIndex(ES_ISO);
@@ -129,3 +129,57 @@ describe('todas las distribuciones registradas', () => {
   }
 });
 
+
+describe('etiquetas modificadoras según sistema operativo (Issue #25)', () => {
+  it('detecta un sistema operativo válido', () => {
+    const so = detectarSO();
+    expect(['mac', 'windows', 'linux']).toContain(so);
+  });
+
+  it('adapta etiquetas para macOS (Cmd y Alt/Opción)', () => {
+    const layout = adaptarEtiquetasSO(ES_ISO, 'mac');
+    const flat = layout.rows.flat();
+    const metaLeft = flat.find((k) => k.code === 'MetaLeft');
+    const metaRight = flat.find((k) => k.code === 'MetaRight');
+    const altLeft = flat.find((k) => k.code === 'AltLeft');
+    const altRight = flat.find((k) => k.code === 'AltRight');
+
+    expect(metaLeft?.label).toBe('Cmd');
+    expect(metaRight?.label).toBe('Cmd');
+    expect(altLeft?.label).toBe('Alt');
+    expect(altRight?.label).toBe('Opción');
+  });
+
+  it('adapta etiquetas para Windows (Win y Alt/AltGr)', () => {
+    const layout = adaptarEtiquetasSO(ES_ISO, 'windows');
+    const flat = layout.rows.flat();
+    const metaLeft = flat.find((k) => k.code === 'MetaLeft');
+    const metaRight = flat.find((k) => k.code === 'MetaRight');
+    const altLeft = flat.find((k) => k.code === 'AltLeft');
+    const altRight = flat.find((k) => k.code === 'AltRight');
+
+    expect(metaLeft?.label).toBe('Win');
+    expect(metaRight?.label).toBe('Win');
+    expect(altLeft?.label).toBe('Alt');
+    expect(altRight?.label).toBe('AltGr');
+  });
+
+  it('adapta etiquetas para Linux (Super y Alt/AltGr)', () => {
+    const layout = adaptarEtiquetasSO(ES_ISO, 'linux');
+    const flat = layout.rows.flat();
+    const metaLeft = flat.find((k) => k.code === 'MetaLeft');
+    const metaRight = flat.find((k) => k.code === 'MetaRight');
+    const altLeft = flat.find((k) => k.code === 'AltLeft');
+    const altRight = flat.find((k) => k.code === 'AltRight');
+
+    expect(metaLeft?.label).toBe('Super');
+    expect(metaRight?.label).toBe('Super');
+    expect(altLeft?.label).toBe('Alt');
+    expect(altRight?.label).toBe('AltGr');
+  });
+
+  it('obtenerLayout devuelve distribución adaptada', () => {
+    const macLayout = obtenerLayout('es-iso', 'mac');
+    expect(macLayout.rows.flat().find((k) => k.code === 'MetaLeft')?.label).toBe('Cmd');
+  });
+});

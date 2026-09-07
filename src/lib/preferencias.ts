@@ -36,6 +36,8 @@ export interface Preferencias {
   tono: Tono | null;
   /** Si el teclado en pantalla retira las letras dominadas. */
   ayudaTeclado: 'auto' | 'siempre';
+  /** Identificador de la distribución seleccionada (p. ej. 'es-iso'). */
+  layout: string;
 }
 
 export const POR_DEFECTO: Preferencias = {
@@ -45,6 +47,7 @@ export const POR_DEFECTO: Preferencias = {
   fuente: 'normal',
   tono: null,
   ayudaTeclado: 'auto',
+  layout: 'es-iso',
 };
 
 const CLAVE = 'libretype.preferencias';
@@ -69,6 +72,7 @@ export function normalizar(crudo: unknown): Preferencias {
     fuente: unaDe(o.fuente, ['normal', 'dislexia'] as const, POR_DEFECTO.fuente),
     tono: o.tono === 'juego' || o.tono === 'sobrio' ? o.tono : null,
     ayudaTeclado: unaDe(o.ayudaTeclado, ['auto', 'siempre'] as const, POR_DEFECTO.ayudaTeclado),
+    layout: typeof o.layout === 'string' && o.layout.trim() ? o.layout.trim() : POR_DEFECTO.layout,
   };
 }
 

@@ -20,6 +20,9 @@ describe('normalizar', () => {
     expect(normalizar({ tema: 'fucsia' }).tema).toBe('auto');
     expect(normalizar({ fuente: 42 }).fuente).toBe('normal');
     expect(normalizar({ escala: 'grande' }).escala).toBe(1);
+    expect(normalizar({ layout: 42 }).layout).toBe('es-iso');
+    expect(normalizar({ layout: '  ' }).layout).toBe('es-iso');
+    expect(normalizar({ layout: 'es-iso' }).layout).toBe('es-iso');
   });
 
   it('el tono sin elegir se queda en null para poder preguntarlo', () => {
@@ -40,11 +43,12 @@ describe('guardar y cargar', () => {
   it('sobrevive a cerrar la aplicación', () => {
     // El fallo que esto arregla: alguien pone el texto al 200% porque lo
     // necesita y al volver a abrir estaba otra vez al 100%.
-    guardar({ ...POR_DEFECTO, escala: 2, fuente: 'dislexia', tono: 'sobrio' });
+    guardar({ ...POR_DEFECTO, escala: 2, fuente: 'dislexia', tono: 'sobrio', layout: 'es-iso' });
     const p = cargar();
     expect(p.escala).toBe(2);
     expect(p.fuente).toBe('dislexia');
     expect(p.tono).toBe('sobrio');
+    expect(p.layout).toBe('es-iso');
   });
 
   it('con datos corruptos no revienta', () => {
@@ -70,6 +74,7 @@ describe('aplicar al documento', () => {
     aplicar({
       escala: 1.8, tema: 'oscuro', movimiento: 'reducido',
       fuente: 'dislexia', tono: 'juego', ayudaTeclado: 'siempre',
+      layout: 'es-iso',
     }, raiz);
     expect(raiz.getAttribute('data-theme')).toBe('dark');
     expect(raiz.getAttribute('data-motion')).toBe('reducido');

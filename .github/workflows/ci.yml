@@ -33,20 +33,31 @@ jobs:
             libxdo-dev libssl-dev build-essential file
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Tipos
-        run: pnpm check
+      - name: Lint y tipos
+        run: pnpm lint
 
       - name: Tests
         run: pnpm test
 
       - name: Bundle del frontend
         run: pnpm build
+
+      - name: Formato Rust
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+      - name: Clippy Rust
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+      - name: Tests Rust
+        run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Backend Rust
         run: cargo build --manifest-path src-tauri/Cargo.toml --locked

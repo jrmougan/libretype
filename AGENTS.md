@@ -17,6 +17,7 @@ están en español; mantenlo así.
     pnpm check         # svelte-check + tsc; debe dar 0 errores
     pnpm test          # vitest sobre el motor y la tabla de teclado
     pnpm test:watch
+    pnpm test:coverage # con informe y umbrales de cobertura
 
     cd src-tauri && cargo build    # solo el backend Rust
 

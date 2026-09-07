@@ -42,8 +42,8 @@ jobs:
       - name: Tipos
         run: pnpm check
 
-      - name: Tests
-        run: pnpm test
+      - name: Tests con cobertura
+        run: pnpm test:coverage
 
       - name: Bundle del frontend
         run: pnpm build

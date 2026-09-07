@@ -204,6 +204,12 @@ class Driver:
             print("INCONCLUYENTE: no llego nada a ninguno de los dos. Problema de")
             print("foco X o de inyeccion, no del motor.")
             self.codigo = 2
+        elif self.nat.get("T1") != "á" or self.nat.get("T6") != "ü":
+            print("INCONCLUYENTE: el entorno no compone, prueba no ejecutada.")
+            print("  GTK nativo no produjo los caracteres de referencia:")
+            print(f"    T1 (dead_acute + a): obtenido {self.nat.get('T1')!r}, esperado 'á'")
+            print(f"    T6 (dead_diaeresis + u): obtenido {self.nat.get('T6')!r}, esperado 'ü'")
+            self.codigo = 3
         elif "T2" in diffs:
             print("BUG REPRODUCE en T2: WebKitGTK diverge del texto nativo GTK.")
             print("-> Tauri descartado en Linux.")
@@ -211,16 +217,29 @@ class Driver:
         elif diffs:
             print(f"T2 pasa, pero divergen {diffs}. Revisar a mano.")
             self.codigo = 1
-        elif rotos:
-            print("SIN DIVERGENCIA en 8/8: WebKitGTK se comporta igual que un")
-            print("GtkTextView nativo.")
-            print(f"\nDiferencias con macOS en {rotos}: ambos motores de Linux")
-            print("coinciden entre si, asi que es como compone GTK, no un fallo.")
-            self.codigo = 0
-        else:
+        elif not rotos:
             print("SIN DIVERGENCIA en 8/8: WebKitGTK se comporta igual que un")
             print("GtkTextView nativo con layout espanol.")
             self.codigo = 0
+        elif set(rotos) <= {"T3", "T4"}:
+            gtk_esperados = {"T3": "'", "T4": "´"}
+            rotos_no_doc = [t for t in rotos if self.nat.get(t) != gtk_esperados.get(t)]
+            if rotos_no_doc:
+                print(f"FALLO: diferencias no documentadas en {rotos_no_doc}:")
+                for t in rotos_no_doc:
+                    print(f"  {t}: obtenido {self.nat.get(t)!r}, esperado en GTK {gtk_esperados.get(t)!r}")
+                self.codigo = 1
+            else:
+                print("SIN DIVERGENCIA en 8/8: WebKitGTK se comporta igual que un")
+                print("GtkTextView nativo.")
+                print(f"\nDiferencias con macOS en {rotos}: ambos motores de Linux")
+                print("coinciden entre si, asi que es como compone GTK, no un fallo.")
+                self.codigo = 0
+        else:
+            inesperados = sorted(set(rotos) - {"T3", "T4"})
+            print(f"FALLO: diferencias no documentadas con macOS en {inesperados}.")
+            print("Revisar si el comportamiento de GTK ha cambiado o el entorno es incorrecto.")
+            self.codigo = 1
         print(line)
         Gtk.main_quit()
 

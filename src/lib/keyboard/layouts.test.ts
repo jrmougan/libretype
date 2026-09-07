@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildIndex, ES_ISO, LAYOUTS } from './layouts';
+import { buildIndex, ES_ISO, FINGER_NAMES, LAYOUTS } from './layouts';
 import { LESSONS } from '../lessons';
 
 const index = buildIndex(ES_ISO);
@@ -105,9 +105,9 @@ describe('todas las distribuciones registradas', () => {
         }
       });
 
-      it('toda tecla tiene dedo asignado', () => {
+      it('toda tecla tiene dedo asignado y válido', () => {
         for (const k of layout.rows.flat()) {
-          expect(k.finger, `sin dedo: ${k.code}`).toBeTruthy();
+          expect(k.finger in FINGER_NAMES, `dedo inválido o ausente en ${k.code}: ${k.finger}`).toBe(true);
         }
       });
 
@@ -118,6 +118,11 @@ describe('todas las distribuciones registradas', () => {
             expect(ix.has(parte), `${ch} necesita "${parte}", que no está en la tabla`)
               .toBe(true);
           }
+          expect(ix.has(ch), `${ch} debe estar indexado en la distribución`).toBe(true);
+          const pasos = ix.get(ch);
+          expect(pasos, `${ch} no tiene pasos en el índice`).toBeDefined();
+          expect(pasos!.length, `${ch} debe requerir tantos pasos como caracteres en la secuencia compose`).toBe([...seq].length);
+          expect(pasos![0].dead, `el primer paso de composición para "${ch}" debe ser tecla muerta`).toBe(true);
         }
       });
     });

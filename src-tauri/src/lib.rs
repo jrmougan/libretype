@@ -5,10 +5,10 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 /// no hay que protegerlo.
 fn migraciones() -> Vec<Migration> {
     vec![
-    Migration {
-        version: 1,
-        description: "sesiones de practica",
-        sql: "
+        Migration {
+            version: 1,
+            description: "sesiones de practica",
+            sql: "
             CREATE TABLE IF NOT EXISTS sesiones (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 leccion       TEXT    NOT NULL,
@@ -22,12 +22,12 @@ fn migraciones() -> Vec<Migration> {
             CREATE INDEX IF NOT EXISTS idx_sesiones_leccion
                 ON sesiones (leccion);
         ",
-        kind: MigrationKind::Up,
-    },
-    Migration {
-        version: 2,
-        description: "dominio por tecla",
-        sql: "
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "dominio por tecla",
+            sql: "
             CREATE TABLE IF NOT EXISTS teclas (
                 code      TEXT    PRIMARY KEY,
                 intentos  INTEGER NOT NULL,
@@ -35,8 +35,9 @@ fn migraciones() -> Vec<Migration> {
                 ms_total  INTEGER NOT NULL
             );
         ",
-        kind: MigrationKind::Up,
-    }]
+            kind: MigrationKind::Up,
+        },
+    ]
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -59,4 +60,31 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migraciones_tienen_versiones_validas_y_sql_no_vacio() {
+        let migs = migraciones();
+        assert_eq!(migs.len(), 2, "debe haber 2 migraciones iniciales");
+
+        // Versión 1: sesiones de práctica
+        assert_eq!(migs[0].version, 1);
+        assert!(migs[0].sql.contains("CREATE TABLE IF NOT EXISTS sesiones"));
+        assert!(migs[0].sql.contains("idx_sesiones_leccion"));
+
+        // Versión 2: dominio por tecla
+        assert_eq!(migs[1].version, 2);
+        assert!(migs[1].sql.contains("CREATE TABLE IF NOT EXISTS teclas"));
+
+        // Invariantes generales
+        for (idx, m) in migs.iter().enumerate() {
+            assert_eq!(m.version as usize, idx + 1);
+            assert!(!m.sql.trim().is_empty());
+            assert!(!m.description.trim().is_empty());
+        }
+    }
 }

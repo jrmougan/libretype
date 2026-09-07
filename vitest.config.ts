@@ -11,5 +11,17 @@ export default defineConfig({
     // Devuelve el `localStorage` de jsdom, que Node 24 tapa con el suyo.
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/**',
+        'dist/**',
+        '**/*.d.ts',
+        '**/*.test.ts',
+        'vitest.config.ts',
+        'vitest.setup.ts',
+      ],
+    },
   },
 });

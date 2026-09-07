@@ -51,6 +51,7 @@ function completar(): void {
 
 describe('captura y paneles', () => {
   it.each(['Ajustes', 'Progreso'])('suspende la captura en %s y la restaura al cerrar', async (nombre) => {
+    expect(boton(nombre).getAttribute('aria-controls')).toBe('panel-dialogo');
     const captura = campo();
     captura.value = 'a';
     captura.dispatchEvent(new InputEvent('input', { bubbles: true }));
@@ -58,6 +59,7 @@ describe('captura y paneles', () => {
     await tick();
     const dialogo = document.querySelector('dialog')!;
     expect(dialogo.open).toBe(true);
+    expect(dialogo.id).toBe('panel-dialogo');
     expect(captura.disabled).toBe(true);
     expect(HTMLDialogElement.prototype.showModal).toHaveBeenCalled();
 
@@ -87,6 +89,10 @@ describe('captura y paneles', () => {
     const dialogo = document.querySelector('dialog')!;
     expect(dialogo.open).toBe(true);
     expect(dialogo.getAttribute('aria-labelledby')).toBe('resultado-titulo');
+    expect(dialogo.getAttribute('aria-describedby')).toBe('resultado-desc');
+    expect(dialogo.getAttribute('aria-live')).toBe('polite');
+    expect(dialogo.querySelector('#resultado-desc')).not.toBeNull();
+    expect(dialogo.querySelector('.resultado')?.getAttribute('aria-live')).toBe('polite');
     expect(campo().disabled).toBe(true);
     boton(accion).click();
     await tick();

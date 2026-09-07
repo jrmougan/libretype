@@ -1,3 +1,4 @@
+import appSvelte from "../App.svelte?raw";
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import drillSvelte from "./components/Drill.svelte?raw";
@@ -124,6 +125,48 @@ describe("Accesibilidad visual (WCAG 2.2)", () => {
     it("LeccionCero.svelte: el botón .enlace respeta --target-min", () => {
       expect(leccionCeroSvelte).toMatch(/\.enlace\s*\{[^}]*min-height:\s*var\(--target-min\)/);
       expect(leccionCeroSvelte).toMatch(/\.enlace\s*\{[^}]*min-width:\s*var\(--target-min\)/);
+    });
+  });
+
+  describe("Issue #11: Accesibilidad de paneles y modales", () => {
+    it("App.svelte: los botones de Progreso y Ajustes apuntan a aria-controls='panel-dialogo'", () => {
+      expect(appSvelte).toMatch(/<button[\s\S]*?aria-controls="panel-dialogo"[\s\S]*?>\s*Progreso\s*<\/button>/);
+      expect(appSvelte).toMatch(/<button[\s\S]*?aria-controls="panel-dialogo"[\s\S]*?>\s*Ajustes\s*<\/button>/);
+    });
+
+    it("App.svelte: el panel lateral tiene id='panel-dialogo'", () => {
+      expect(appSvelte).toContain('id="panel-dialogo"');
+    });
+
+    it("App.svelte: el diálogo de resultado anuncia estado con aria-live y aria-describedby", () => {
+      expect(appSvelte).toContain('id="dialogo-resultado"');
+      expect(appSvelte).toContain('aria-live="polite"');
+      expect(appSvelte).toContain('aria-describedby="resultado-desc"');
+    });
+  });
+
+  describe("Issue #15: Animaciones reducidas y cursor", () => {
+    it("Drill.svelte: cursor usa animation: blink y se desactiva con reduced motion", () => {
+      expect(drillSvelte).toMatch(/\.ch\.current\s*\{[^}]*animation:\s*blink/);
+      expect(drillSvelte).toMatch(/@media\s*\(\s*prefers-reduced-motion:\s*reduce\s*\)[\s\S]*?\.ch\.current\s*\{[^}]*animation:\s*none;[^}]*opacity:\s*1/);
+      expect(drillSvelte).toMatch(/data-motion="reducido"[\s\S]*?\.ch\.current\s*\{[^}]*animation:\s*none;[^}]*opacity:\s*1/);
+    });
+
+    it("tokens.css: desactiva animación del cursor y resetea tokens con reduced motion y data-motion", () => {
+      expect(tokensCss).toMatch(/@media\s*\(\s*prefers-reduced-motion:\s*reduce\s*\)[\s\S]*?\.ch\.current\s*\{[^}]*animation:\s*none;\s*opacity:\s*1;/);
+      expect(tokensCss).toMatch(/:root\[data-motion="reducido"\]\s*\.ch\.current[\s\S]*?\{[^}]*animation:\s*none;\s*opacity:\s*1;/);
+    });
+  });
+
+  describe("Issue #16: Texto accesible a lector de pantalla sin inundar pista", () => {
+    it("Drill.svelte: textarea y contenedor tienen aria-label descriptivo con el texto de la lección", () => {
+      expect(drillSvelte).toMatch(/aria-label=\{`Escribe el texto de la lección: \$\{target\}`\}/);
+      expect(drillSvelte).toMatch(/aria-label=\{`Texto de la lección: \$\{target\}`\}/);
+    });
+
+    it("Drill.svelte: elementos decorativos tienen aria-hidden='true'", () => {
+      expect(drillSvelte).toMatch(/<p\s+class="hint"\s+aria-hidden="true">/);
+      expect(drillSvelte).toMatch(/<div\s+class="teclado"\s+aria-hidden="true">/);
     });
   });
 });

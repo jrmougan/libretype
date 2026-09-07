@@ -60,6 +60,7 @@ export class TypingEngine {
   #held = new Set<string>();
   #composing = false;
   #last = '';
+  #lastCommitted = '';
   /**
    * Longitud del texto confirmado cuando arrancó la composición actual, o
    * null si no hay ninguna en curso. Todo lo que se añada por encima de esta
@@ -86,13 +87,18 @@ export class TypingEngine {
   get stamps(): readonly number[] { return this.#stamps; }
 
   reset(): void {
+    const now = performance.now();
+    for (const code of this.#held) {
+      this.#on.physical?.({ code, down: false, repeat: false, at: now });
+    }
+    this.#held.clear();
     this.#el.value = '';
     this.#last = '';
+    this.#lastCommitted = '';
     this.#stamps = [];
     this.#composing = false;
     this.#compBase = null;
-    this.#held.clear();
-    this.#emitText(performance.now());
+    this.#emitText(now);
   }
 
   focus(): void { this.#el.focus(); }
@@ -122,15 +128,45 @@ export class TypingEngine {
    * Si la ventana pierde el foco con teclas pulsadas, el `keyup` no llega
    * nunca y la tecla se queda encendida para siempre. Pasa constantemente al
    * cambiar de aplicación a media palabra.
+   *
+   * Además, si había una composición de tecla muerta a medias, se cancela para
+   * evitar que el motor quede congelado para siempre al perder el foco.
    */
   #onBlur = (): void => {
     for (const code of this.#held) {
       this.#on.physical?.({ code, down: false, repeat: false, at: performance.now() });
     }
     this.#held.clear();
+
+    if (this.#composing) {
+      this.#composing = false;
+      this.#compBase = null;
+      this.#sync(performance.now(), true);
+    }
   };
 
   // --- Canal B: caracteres --------------------------------------------------
+
+  #onPaste = (ev: ClipboardEvent): void => {
+    ev.preventDefault();
+  };
+
+  #onBeforeInput = (ev: Event): void => {
+    if ((ev as InputEvent).inputType === 'insertFromPaste') {
+      ev.preventDefault();
+    }
+  };
+
+  #ensureCursorAtEnd = (): void => {
+    const len = this.#el.value.length;
+    if (this.#el.selectionStart !== len || this.#el.selectionEnd !== len) {
+      try {
+        this.#el.setSelectionRange(len, len);
+      } catch {
+        // Silencioso si el elemento no soporta rangos de selección
+      }
+    }
+  };
 
   #onCompositionStart = (): void => {
     // Pone al día `#last` antes de fijar la frontera. La frontera se toma del
@@ -175,12 +211,34 @@ export class TypingEngine {
     // medias no es todavía un carácter escrito y contarlo falsearía la
     // velocidad.
     const committed = this.committed;
-    if (committed.length > this.#stamps.length) {
-      while (this.#stamps.length < committed.length) this.#stamps.push(at);
-    } else {
-      this.#stamps.length = committed.length;
+    if (committed !== this.#lastCommitted) {
+      let start = 0;
+      const minLen = Math.min(this.#lastCommitted.length, committed.length);
+      while (start < minLen && this.#lastCommitted[start] === committed[start]) {
+        start++;
+      }
+      let oldEnd = this.#lastCommitted.length - 1;
+      let newEnd = committed.length - 1;
+      while (oldEnd >= start && newEnd >= start && this.#lastCommitted[oldEnd] === committed[newEnd]) {
+        oldEnd--;
+        newEnd--;
+      }
+      const deleteCount = Math.max(0, oldEnd - start + 1);
+      const insertCount = Math.max(0, newEnd - start + 1);
+      const newStamps = Array(insertCount).fill(at);
+      this.#stamps.splice(start, deleteCount, ...newStamps);
+      this.#lastCommitted = committed;
     }
 
+    if (this.#stamps.length !== committed.length) {
+      if (this.#stamps.length > committed.length) {
+        this.#stamps.length = committed.length;
+      } else {
+        while (this.#stamps.length < committed.length) this.#stamps.push(at);
+      }
+    }
+
+    this.#ensureCursorAtEnd();
     this.#emitText(at);
   }
 
@@ -199,6 +257,10 @@ export class TypingEngine {
       ['keydown', this.#onKeyDown as EventListener],
       ['keyup', this.#onKeyUp as EventListener],
       ['blur', this.#onBlur],
+      ['paste', this.#onPaste as EventListener],
+      ['beforeinput', this.#onBeforeInput as EventListener],
+      ['select', this.#ensureCursorAtEnd as EventListener],
+      ['click', this.#ensureCursorAtEnd as EventListener],
       ['compositionstart', this.#onCompositionStart],
       ['compositionend', this.#onCompositionEnd],
       ['input', this.#onInput],
@@ -212,6 +274,13 @@ export class TypingEngine {
 
 // --- Métricas ---------------------------------------------------------------
 
+/**
+ * Umbral en milisegundos a partir del cual una pausa entre pulsaciones se
+ * considera inactividad y se descuenta del tiempo transcurrido, para no hundir
+ * artificialmente las ppm si el usuario se ausenta.
+ */
+export const UMBRAL_PAUSA_MS = 2000;
+
 export interface Stats {
   /** Palabras por minuto, con la convención de 5 caracteres = 1 palabra. */
   wpm: number;
@@ -220,12 +289,15 @@ export interface Stats {
   correct: number;
   typed: number;
   elapsedMs: number;
+  /** Pulsaciones erróneas corregidas con retroceso u omisión. */
+  errores?: number;
 }
 
 export function computeStats(
   typed: string,
   target: string,
   stamps: readonly number[],
+  errores = 0,
 ): Stats {
   let correct = 0;
   for (let i = 0; i < typed.length; i++) {
@@ -234,17 +306,31 @@ export function computeStats(
 
   // Desde el primer carácter, no desde que aparece la lección: si no, quien se
   // toma su tiempo para colocar los dedos sale penalizado antes de empezar.
-  const elapsedMs =
-    stamps.length >= 2 ? stamps[stamps.length - 1] - stamps[0] : 0;
+  // Descontamos pausas largas de inactividad entre caracteres consecutivos.
+  let elapsedMs = 0;
+  if (stamps.length >= 2) {
+    if (stamps.length < typed.length) {
+      // Marcas agregadas (ej. inicio y fin en tests o llamadas simplificadas)
+      elapsedMs = stamps[stamps.length - 1] - stamps[0];
+    } else {
+      for (let i = 1; i < stamps.length; i++) {
+        const delta = stamps[i] - stamps[i - 1];
+        elapsedMs += Math.min(Math.max(0, delta), UMBRAL_PAUSA_MS);
+      }
+    }
+  }
+
   const minutes = elapsedMs / 60000;
   const wpm = minutes > 0 ? correct / 5 / minutes : 0;
+  const totalTyped = typed.length + errores;
 
   return {
     wpm: Number.isFinite(wpm) ? Math.round(wpm) : 0,
-    accuracy: typed.length ? Math.round((correct / typed.length) * 100) : 100,
+    accuracy: totalTyped ? Math.round((correct / totalTyped) * 100) : 100,
     correct,
-    typed: typed.length,
+    typed: totalTyped,
     elapsedMs,
+    errores,
   };
 }
 

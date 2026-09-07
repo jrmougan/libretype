@@ -204,6 +204,95 @@ describe('comparación con el objetivo', () => {
   });
 });
 
+describe('protección contra pegado (issue #4)', () => {
+  it('cancela el evento paste por defecto', () => {
+    const pasteEv = new Event('paste', { cancelable: true });
+    el.dispatchEvent(pasteEv);
+    expect(pasteEv.defaultPrevented).toBe(true);
+  });
+
+  it('cancela beforeinput de tipo insertFromPaste por defecto', () => {
+    const beforeInputEv = new InputEvent('beforeinput', {
+      inputType: 'insertFromPaste',
+      cancelable: true,
+    });
+    el.dispatchEvent(beforeInputEv);
+    expect(beforeInputEv.defaultPrevented).toBe(true);
+  });
+
+  it('no cancela beforeinput de inserción normal', () => {
+    const beforeInputEv = new InputEvent('beforeinput', {
+      inputType: 'insertText',
+      cancelable: true,
+    });
+    el.dispatchEvent(beforeInputEv);
+    expect(beforeInputEv.defaultPrevented).toBe(false);
+  });
+});
+
+describe('composición huérfana en blur (issue #5)', () => {
+  it('en blur resetea composing y compBase si había composición activa', () => {
+    el.dispatchEvent(new CompositionEvent('compositionstart'));
+    expect(engine.composing).toBe(true);
+
+    el.dispatchEvent(new FocusEvent('blur'));
+    expect(engine.composing).toBe(false);
+
+    // Tras recuperar el foco, el motor no se queda congelado
+    el.value = 'a';
+    el.dispatchEvent(new InputEvent('input', { data: 'a' }));
+    expect(engine.committed).toBe('a');
+  });
+});
+
+describe('cursor y sellos de tiempo (issue #6)', () => {
+  it('inserción en posición desplazada preserva los sellos correspondientes', () => {
+    const ev1 = new InputEvent('input');
+    Object.defineProperty(ev1, 'timeStamp', { value: 1000 });
+    el.value = 'ac';
+    el.dispatchEvent(ev1);
+    expect(engine.stamps).toEqual([1000, 1000]);
+
+    // Inserción de 'b' en medio a los 2000ms
+    const ev2 = new InputEvent('input');
+    Object.defineProperty(ev2, 'timeStamp', { value: 2000 });
+    el.value = 'abc';
+    el.dispatchEvent(ev2);
+    expect(engine.committed).toBe('abc');
+    expect(engine.stamps).toEqual([1000, 2000, 1000]);
+  });
+
+  it('borrado en el medio no desincroniza los sellos de caracteres posteriores', () => {
+    el.value = 'abc';
+    el.dispatchEvent(new InputEvent('input', { timeStamp: 1000 } as any));
+    // Se borra 'b'
+    el.value = 'ac';
+    el.dispatchEvent(new InputEvent('input', { timeStamp: 2000 } as any));
+    expect(engine.committed).toBe('ac');
+    expect(engine.stamps).toHaveLength(2);
+  });
+});
+
+describe('liberación de teclas retenidas en reset (issue #10)', () => {
+  it('emite down: false para cualquier tecla retenida en #held', () => {
+    const liberadas: string[] = [];
+    engine.destroy();
+    engine = new TypingEngine(el, {
+      physical: (k) => {
+        if (!k.down) liberadas.push(k.code);
+      },
+    });
+
+    el.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA' }));
+    el.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB' }));
+    expect(engine.heldCodes.size).toBe(2);
+
+    engine.reset();
+    expect(engine.heldCodes.size).toBe(0);
+    expect(liberadas).toEqual(['KeyA', 'KeyB']);
+  });
+});
+
 describe('métricas', () => {
   it('cuenta cinco caracteres por palabra sobre los aciertos', () => {
     const s = computeStats('papá café', 'papá café', [0, 60000]);
@@ -224,5 +313,33 @@ describe('métricas', () => {
 
   it('sin escribir nada la precisión es 100, no NaN', () => {
     expect(computeStats('', 'papá', []).accuracy).toBe(100);
+  });
+
+  it('descuenta pulsaciones erróneas corregidas con retroceso (issue #3)', () => {
+    // 4 caracteres correctos y 1 error corregido con retroceso = 4 / 5 = 80% precisión
+    const s = computeStats('hola', 'hola', [0, 1000, 2000, 3000], 1);
+    expect(s.correct).toBe(4);
+    expect(s.typed).toBe(5);
+    expect(s.accuracy).toBe(80);
+  });
+
+  it('con suficientes errores con retroceso la precisión cae bajo el 90% para evitar récord falso (issue #3)', () => {
+    // 10 correctos y 2 errores corregidos: 10 / 12 = 83% < 90%
+    const s = computeStats('abcdefghij', 'abcdefghij', [0, 1000], 2);
+    expect(s.accuracy).toBe(83);
+    expect(s.accuracy).toBeLessThan(90);
+  });
+
+  it('descuenta pausas largas de inactividad de elapsedMs (issue #8)', () => {
+    // 4 caracteres con una pausa de 5 minutos (300.000 ms) entre el segundo y tercer carácter
+    const stamps = [1000, 1500, 301500, 302000];
+    const s = computeStats('hola', 'hola', stamps);
+    // Con el tope de inactividad a 2000ms:
+    // delta 0->1: 500ms
+    // delta 1->2: 300.000ms -> acotado a 2000ms
+    // delta 2->3: 500ms
+    // Total: 3000ms
+    expect(s.elapsedMs).toBe(3000);
+    expect(s.wpm).toBeGreaterThan(0);
   });
 });

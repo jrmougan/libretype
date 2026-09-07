@@ -11,7 +11,7 @@
    * texto explicativo generoso, porque al contrario que el tópico del
    * onboarding, las personas mayores sí leen las instrucciones.
    */
-  import { tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import Keyboard from './Keyboard.svelte';
   import { ES_ISO, FINGER_NAMES, type Layout } from '../keyboard/layouts';
   import { PASOS } from '../leccion-cero';
@@ -59,6 +59,15 @@
     pulsadas = s;
   }
 
+  function alPerderFoco(): void {
+    pulsadas = new Set();
+  }
+
+  onMount(() => {
+    window.addEventListener('blur', alPerderFoco);
+    return () => window.removeEventListener('blur', alPerderFoco);
+  });
+
   async function ir(n: number): Promise<void> {
     i = Math.max(0, Math.min(PASOS.length - 1, n));
     hechas = new Set();
@@ -102,6 +111,7 @@
         aria-label="Zona de prueba: pulsa las teclas que se te indiquen"
         onkeydown={alPulsar}
         onkeyup={soltar}
+        onblur={alPerderFoco}
       ></textarea>
 
       {#if listo}

@@ -132,4 +132,20 @@ describe('captura y paneles', () => {
     expect(campo()).not.toBe(anterior);
     expect(document.activeElement).toBe(campo());
   });
+  it('preserva el estado de dominio al abandonar la lección antes de terminar (issue #9)', async () => {
+    const captura = campo();
+    captura.value = 'a';
+    captura.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    await tick();
+
+    // Cambia de lección sin haber completado la actual
+    const selector = document.querySelector('select')!;
+    selector.value = '1';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    // La lección se ha reiniciado sin persistir intentos incompletos
+    expect(campo().value).toBe('');
+    expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
+  });
 });

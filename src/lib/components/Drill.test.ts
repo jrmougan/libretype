@@ -97,3 +97,94 @@ describe('accesibilidad de la lección (#15, #16)', () => {
     expect(document.querySelector('.drill.sin-animaciones')).not.toBeNull();
   });
 });
+
+describe('precisión y retroceso (issue #3)', () => {
+  it('registra errores corregidos con retroceso en las métricas de la lección', async () => {
+    let estadisticasFinales: any = null;
+    componente = mount(Drill, {
+      target: document.body,
+      props: {
+        layout: ES_ISO,
+        target: 'as',
+        titulo: 'Prueba',
+        onDone: (s) => {
+          estadisticasFinales = s;
+        },
+      },
+    });
+    flushSync();
+    const campo = document.querySelector('textarea')!;
+
+    // Escribe error 'x' en lugar de 'a'
+    campo.value = 'x';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+
+    // Borra con retroceso
+    campo.value = '';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+
+    // Escribe 'a' y luego 's' correctamente
+    campo.value = 'a';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+
+    campo.value = 'as';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+
+    expect(estadisticasFinales).not.toBeNull();
+    expect(estadisticasFinales.correct).toBe(2);
+    expect(estadisticasFinales.typed).toBe(3); // 2 correctos + 1 error corregido
+    expect(estadisticasFinales.accuracy).toBe(67);
+  });
+});
+
+describe('protección contra pegado en Drill (issue #4)', () => {
+  it('previene el evento de pegado en el textarea', () => {
+    const campo = montar();
+    const pasteEv = new Event('paste', { cancelable: true, bubbles: true });
+    campo.dispatchEvent(pasteEv);
+    expect(pasteEv.defaultPrevented).toBe(true);
+  });
+});
+
+describe('reporte de tiempos por tecla (issue #9)', () => {
+  it('la primera tecla no reporta 0ms artificialmente al escribir', async () => {
+    const reportes: { code: string; acierto: boolean; ms: number }[] = [];
+    componente = mount(Drill, {
+      target: document.body,
+      props: {
+        layout: ES_ISO,
+        target: 'as',
+        titulo: 'Prueba',
+        onTecla: (code, acierto, ms) => {
+          reportes.push({ code, acierto, ms });
+        },
+      },
+    });
+    flushSync();
+    const campo = document.querySelector('textarea')!;
+
+    const ev1 = new InputEvent('input', { bubbles: true });
+    Object.defineProperty(ev1, 'timeStamp', { value: 1000 });
+    campo.value = 'a';
+    campo.dispatchEvent(ev1);
+    flushSync();
+
+    const ev2 = new InputEvent('input', { bubbles: true });
+    Object.defineProperty(ev2, 'timeStamp', { value: 1350 });
+    campo.value = 'as';
+    campo.dispatchEvent(ev2);
+    flushSync();
+    await tick();
+
+    expect(reportes.length).toBeGreaterThanOrEqual(2);
+    for (const r of reportes) {
+      expect(r.ms).toBeGreaterThan(0);
+    }
+    expect(reportes[0].ms).toBe(350);
+  });
+});

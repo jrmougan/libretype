@@ -38,6 +38,19 @@ export interface Preferencias {
   tono: Tono | null;
   /** Si el teclado en pantalla retira las letras dominadas. */
   ayudaTeclado: 'auto' | 'siempre';
+  /**
+   * Si la app mira al arrancar si hay una versión nueva.
+   *
+   * Es la única petición de red que hace LibreType, así que tiene que poder
+   * apagarse: en un aula puede no interesar, y la promesa de no hablar con
+   * ningún servidor es parte de lo que se le ofrece a quien la instala.
+   *
+   * Viene activada porque el público al que sirve esto —personas mayores,
+   * niños, ordenadores compartidos de un colegio— no va a ir a mirar si hay
+   * versión nueva, y quedarse con un fallo ya arreglado es peor que la
+   * consulta. Sin ella la actualización sigue siendo posible a mano.
+   */
+  buscarActualizaciones: boolean;
   /** Última lección seleccionada por el alumno para recordar por dónde iba. */
   ultimaLeccion?: string;
   /** Identificador de la distribución seleccionada (p. ej. 'es-iso'). */
@@ -51,6 +64,7 @@ export const POR_DEFECTO: Preferencias = {
   fuente: 'normal',
   tono: null,
   ayudaTeclado: 'auto',
+  buscarActualizaciones: true,
   ultimaLeccion: LESSONS[0]?.id ?? 'reposo',
   layout: 'es-iso',
 };
@@ -81,6 +95,13 @@ export function normalizar(crudo: unknown): Preferencias {
     fuente: unaDe(o.fuente, ['normal', 'dislexia'] as const, POR_DEFECTO.fuente),
     tono: o.tono === 'juego' || o.tono === 'sobrio' ? o.tono : null,
     ayudaTeclado: unaDe(o.ayudaTeclado, ['auto', 'siempre'] as const, POR_DEFECTO.ayudaTeclado),
+    // Solo un `false` explícito apaga la búsqueda. Un valor corrupto vuelve al
+    // de por defecto como todo lo demás, pero aquí importa el otro lado: quien
+    // la desactivó a propósito no puede encontrársela encendida otra vez.
+    buscarActualizaciones:
+      typeof o.buscarActualizaciones === 'boolean'
+        ? o.buscarActualizaciones
+        : POR_DEFECTO.buscarActualizaciones,
     ultimaLeccion: leccionValida ? (o.ultimaLeccion as string) : (POR_DEFECTO.ultimaLeccion ?? LESSONS[0].id),
     layout: typeof o.layout === 'string' && o.layout.trim() ? o.layout.trim() : POR_DEFECTO.layout,
   };

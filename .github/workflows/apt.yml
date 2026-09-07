@@ -1,0 +1,108 @@
+name: Repositorio apt
+
+# Se republica al publicar una Release (no al crearla en borrador: el job de
+# release.yml las deja en borrador a propósito, y hasta que alguien no le da a
+# publicar no debería llegarle a nadie).
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# Dos publicaciones a la vez dejarían GitHub Pages con la mezcla de las dos.
+# Sin cancelar la que esté en curso: la que llegue después reconstruye el
+# repositorio entero de todas formas, así que interrumpir no adelanta nada y sí
+# puede dejar el sitio a medio subir.
+concurrency:
+  group: apt
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    name: Construir y publicar
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.desplegar.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Dependencias
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends apt-utils dpkg-dev gnupg
+
+      # Se reconstruye desde las Releases y no desde lo ya publicado. Así el
+      # repositorio es siempre una función de lo que hay en GitHub: no puede
+      # quedarse un .deb huérfano en el pool ni un índice anunciando algo que
+      # ya no está.
+      - name: Descargar los .deb de todas las releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p debs
+          # Ni borradores ni prelanzamientos: el suite se llama «stable» y
+          # tiene que significarlo. Quien quiera probar una beta se baja el
+          # .deb de la Release a mano.
+          etiquetas=$(gh release list --limit 100 \
+            --json tagName,isDraft,isPrerelease \
+            --jq '.[] | select(.isDraft == false and .isPrerelease == false) | .tagName')
+          if [ -z "$etiquetas" ]; then
+            echo "::error::No hay ninguna release publicada y estable de la que sacar .deb."
+            exit 1
+          fi
+          for t in $etiquetas; do
+            echo "== $t"
+            mkdir -p "debs/$t"
+            # Una release sin .deb (por ejemplo si falló el runner de Linux) no
+            # puede tumbar la publicación de todas las demás.
+            gh release download "$t" --dir "debs/$t" --pattern '*.deb' --clobber \
+              || echo "   sin .deb, se salta"
+          done
+          find debs -name '*.deb' | sort
+
+      - name: Importar la clave de firma
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "::error::Falta el secreto APT_GPG_PRIVATE_KEY."
+            echo "Sin firma, apt exigiría [trusted=yes] a cada usuario. Ver README."
+            exit 1
+          fi
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "CLAVE=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')" >> "$GITHUB_ENV"
+
+      - name: Construir el repositorio
+        env:
+          GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          bash empaquetado/apt/construir-repo.sh \
+            --debs debs --salida _site/apt --firmar "$CLAVE"
+
+      - name: Llavero público y portada
+        run: |
+          set -euo pipefail
+          # Sin armadura: es el formato que espera `signed-by`, y así quien
+          # instala no tiene que pasarlo por `gpg --dearmor`.
+          gpg --export "$CLAVE" > _site/apt/libretype-archive-keyring.gpg
+
+          # El nombre del paquete lo pone Tauri a partir del productName, y
+          # parte el CamelCase: «LibreType» sale como «libre-type». Se lee del
+          # .deb en vez de escribirlo a mano para que las instrucciones no
+          # puedan quedarse desfasadas sin que nadie se entere.
+          paquete=$(dpkg-deb -f "$(find debs -name '*.deb' | sort | tail -1)" Package)
+          sed "s/PAQUETE/$paquete/g" empaquetado/apt/index.html > _site/index.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - id: desplegar
+        uses: actions/deploy-pages@v4

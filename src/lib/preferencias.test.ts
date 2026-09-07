@@ -31,6 +31,20 @@ describe('normalizar', () => {
     expect(normalizar({ tono: 'juego' }).tono).toBe('juego');
   });
 
+  it('la búsqueda de actualizaciones viene activada de fábrica', () => {
+    // Quien usa esto no va a ir a mirar si hay versión nueva; quedarse con un
+    // fallo ya arreglado es peor que la única consulta de red que hace la app.
+    expect(normalizar({}).buscarActualizaciones).toBe(true);
+    expect(normalizar(null).buscarActualizaciones).toBe(true);
+  });
+
+  it('desactivarla se respeta al volver a abrir', () => {
+    // Es lo que importa de esta preferencia: quien la apagó a propósito no
+    // puede encontrársela encendida otra vez.
+    expect(normalizar({ buscarActualizaciones: false }).buscarActualizaciones).toBe(false);
+    expect(normalizar({ buscarActualizaciones: 'no' }).buscarActualizaciones).toBe(true);
+  });
+
   it('normaliza animaciones reducidas a movimiento reducido', () => {
     expect(normalizar({ animaciones: 'reducidas' }).movimiento).toBe('reducido');
     expect(normalizar({ movimiento: 'reducido' }).movimiento).toBe('reducido');
@@ -81,7 +95,7 @@ describe('aplicar al documento', () => {
     aplicar({
       escala: 1.8, tema: 'oscuro', movimiento: 'reducido',
       fuente: 'dislexia', tono: 'juego', ayudaTeclado: 'siempre',
-      layout: 'es-iso',
+      buscarActualizaciones: true, layout: 'es-iso',
     }, raiz);
     expect(raiz.getAttribute('data-theme')).toBe('dark');
     expect(raiz.getAttribute('data-motion')).toBe('reducido');

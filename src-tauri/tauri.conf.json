@@ -37,6 +37,29 @@
     ],
     "android": {
       "debugApplicationIdSuffix": ".debug"
+    },
+    "shortDescription": "Tutor de mecanografía, visual y accesible",
+    "longDescription": "LibreType enseña a escribir a máquina sin mirar el teclado. El temario está ordenado por la frecuencia real de las letras en español, así que las tildes y la eñe llegan pronto en vez de quedarse para el final.\nPensado para todas las edades: escala el texto hasta el 200%, tiene tipografía para dislexia y alto contraste, y no recoge ningún dato: el progreso se queda en el ordenador.",
+    "homepage": "https://github.com/jrmougan/libretype",
+    "publisher": "Jesús Romeo",
+    "category": "Education",
+    "license": "MIT",
+    "linux": {
+      "deb": {
+        "section": "education",
+        "priority": "optional"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/jrmougan/libretype/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkyQTUxRTYzNUNDRUYwNzUKUldSMThNNWNZeDZsa2x0TW5UVHlwS3lUZDdpRVhWVFVrbWhTY1R0WHJ2L0hXbDBjQlNSUktCRC8K",
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

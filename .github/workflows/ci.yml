@@ -62,6 +62,29 @@ jobs:
       - name: Backend Rust
         run: cargo build --manifest-path src-tauri/Cargo.toml --locked
 
+  repo-apt:
+    name: Repositorio apt
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      # Monta el repositorio con .deb sintéticos y lo ataca con un apt de
+      # verdad: instala, actualiza, y comprueba que un índice o una firma
+      # manipulados se rechazan. Sin esto, que el repositorio esté roto solo se
+      # notaría cuando alguien intentase instalar desde él, que es tarde.
+      #
+      # Son .deb de mentira a propósito: aquí se prueba la maquinaria del
+      # repositorio, no la compilación de la app. Eso mantiene el job en menos
+      # de un minuto y permite que corra siempre.
+      - name: Dependencias
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            apt-utils dpkg-dev gnupg python3 curl
+
+      - name: Probar el repositorio de punta a punta
+        run: bash empaquetado/apt/probar-repo.sh
+
   spike-deadkeys:
     name: Dead keys en WebKitGTK
     runs-on: ubuntu-22.04

@@ -24,6 +24,10 @@
     type Preferencias, type Tono,
   } from './lib/preferencias';
   import { PRECISION_ALTA, vozDe } from './lib/voz';
+  import {
+    crearActualizador, detectarEntorno,
+    type Actualizador, type EstadoActualizacion,
+  } from './lib/actualizacion';
 
   /**
    * Preferencias de interfaz. Se cargan de disco antes del primer pintado para
@@ -77,6 +81,26 @@
   );
   const aprendidas = $derived(contarDominadas(mapaDeDominio(teclas)));
 
+  /**
+   * Actualizaciones. Fuera del escritorio no hay nada que hacer, así que el
+   * actualizador se queda en null y la barra no enseña nada.
+   */
+  let actualizador = $state<Actualizador | null>(null);
+  let estadoAct = $state<EstadoActualizacion>({ fase: 'inactivo' });
+  /** 'deb' o 'rpm' cuando el paquete lo gestiona apt o dnf, y no la app. */
+  let gestorDelSistema = $state<'deb' | 'rpm' | null>(null);
+  /**
+   * En la barra solo aparecen las tres fases que piden algo de la persona.
+   * «Buscando», «al día» y los errores viven en Ajustes: son la respuesta a
+   * una pregunta que se hace allí, y aquí competirían por sitio con las
+   * métricas de la lección.
+   */
+  const avisoActualizacion = $derived(
+    estadoAct.fase === 'disponible' || estadoAct.fase === 'descargando' || estadoAct.fase === 'lista'
+      ? estadoAct
+      : null,
+  );
+
   const porLeccion = $derived(resumirLecciones(sesiones));
   const maxDesbloqueado = $derived(nivelDesbloqueado(sesiones.map((s) => s.leccion)));
 
@@ -103,6 +127,21 @@
       if (ix >= 0) lessonIx = ix;
     }
 
+  });
+
+  onMount(() => {
+    let temporizador: ReturnType<typeof setTimeout> | null = null;
+    (async () => {
+      const entorno = await detectarEntorno();
+      if (entorno.tipo === 'gestionado') { gestorDelSistema = entorno.gestor; return; }
+      if (entorno.tipo !== 'propio') return; // Navegador: nada que actualizar.
+      actualizador = crearActualizador(entorno.api, (e) => { estadoAct = e; });
+      if (!prefs.buscarActualizaciones) return;
+      // Con retraso a propósito: al arrancar compiten la base de datos, las
+      // preferencias y el primer pintado, y esto es lo único que puede esperar.
+      temporizador = setTimeout(() => void actualizador?.comprobar(), 4000);
+    })();
+    return () => { if (temporizador) clearTimeout(temporizador); };
   });
 
   onMount(() => {
@@ -421,6 +460,32 @@
     {/if}
 
     <div class="acciones">
+      <!--
+        role="status" y no "alert": se anuncia cuando el lector de pantalla
+        termine lo que esté diciendo, no interrumpiendo a media lección. Nunca
+        instala ni reinicia solo; las dos cosas son un clic.
+      -->
+      {#if avisoActualizacion}
+        <div class="actualizacion" role="status">
+          {#if avisoActualizacion.fase === 'disponible'}
+            <button
+              class="btn-actualizar"
+              onclick={() => void actualizador?.instalar()}
+              title={avisoActualizacion.notas || undefined}
+            >
+              Actualizar <small>a la {avisoActualizacion.version}</small>
+            </button>
+          {:else if avisoActualizacion.fase === 'descargando'}
+            <span class="act-texto">
+              Descargando{avisoActualizacion.pct >= 0 ? ` ${avisoActualizacion.pct}%` : '…'}
+            </span>
+          {:else}
+            <button class="btn-actualizar" onclick={() => void actualizador?.reiniciar()}>
+              Reiniciar <small>para terminar</small>
+            </button>
+          {/if}
+        </div>
+      {/if}
       <button
         aria-expanded={verProgreso}
         aria-controls="panel-dialogo"
@@ -699,6 +764,56 @@
               Chromium, así que en macOS y Linux no sería fiable.
             </p>
           </div>
+
+          {#if gestorDelSistema}
+            <div class="field">
+              <span id="act-l">Actualizaciones</span>
+              <p class="note">
+                LibreType se instaló con
+                {gestorDelSistema === 'deb' ? 'apt' : 'dnf'}, así que las
+                actualizaciones llegan con las del resto del sistema. La
+                aplicación no las descarga por su cuenta ni consulta nada por
+                internet.
+              </p>
+            </div>
+          {:else if actualizador}
+            <div class="field">
+              <span id="act-l">Actualizaciones</span>
+              <div class="group" role="group" aria-labelledby="act-l">
+                <button aria-pressed={prefs.buscarActualizaciones}
+                        onclick={() => (prefs = { ...prefs, buscarActualizaciones: true })}>
+                  Avisarme
+                </button>
+                <button aria-pressed={!prefs.buscarActualizaciones}
+                        onclick={() => (prefs = { ...prefs, buscarActualizaciones: false })}>
+                  No buscar
+                </button>
+              </div>
+              <p class="note">
+                Es lo único que LibreType consulta por internet: un fichero público
+                en GitHub con el número de la última versión. No se envía nada de
+                tu progreso ni de quién eres. Nunca se instala sola.
+              </p>
+              <div class="act-manual">
+                <button
+                  onclick={() => void actualizador?.comprobar(true)}
+                  disabled={estadoAct.fase === 'buscando' || estadoAct.fase === 'descargando'}
+                >
+                  Buscar ahora
+                </button>
+                <!-- Aquí sí se cuentan todas las fases: alguien acaba de preguntar. -->
+                <p class="note" role="status">
+                  {#if estadoAct.fase === 'buscando'}Buscando…
+                  {:else if estadoAct.fase === 'al-dia'}Estás en la última versión, la {estadoAct.version}.
+                  {:else if estadoAct.fase === 'disponible'}Hay una versión nueva, la {estadoAct.version}.
+                  {:else if estadoAct.fase === 'descargando'}Descargando{estadoAct.pct >= 0 ? ` ${estadoAct.pct}%` : '…'}
+                  {:else if estadoAct.fase === 'lista'}Lista la {estadoAct.version}. Se aplica al reiniciar.
+                  {:else if estadoAct.fase === 'error'}No se ha podido comprobar. {estadoAct.mensaje}
+                  {/if}
+                </p>
+              </div>
+            </div>
+          {/if}
         {:else}
           <Progreso
             {sesiones}
@@ -769,8 +884,35 @@
   .controles-intento { display: flex; gap: var(--space-2); }
   .btn-intento { min-height: var(--target-min); }
 
-  .acciones { display: flex; gap: var(--space-2); margin-left: auto; }
+  .acciones { display: flex; gap: var(--space-2); margin-left: auto; align-items: center; }
   .acciones button { min-height: var(--target-min); }
+
+  /* El aviso de versión nueva vive con los demás botones de la barra y solo
+     aparece cuando hay algo que hacer. Ocupa sitio en una barra que ya va
+     justa, así que el texto es corto y el detalle va en el <small>. */
+  .actualizacion { display: flex; align-items: center; }
+  .btn-actualizar {
+    min-height: var(--target-min);
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-radius: var(--radius);
+    padding: 0 var(--space-3);
+    font: inherit;
+    white-space: nowrap;
+  }
+  /* El color no es lo que lo distingue: el texto ya dice qué hace. */
+  .btn-actualizar small { font-size: var(--text-xs); opacity: 0.9; }
+  .act-texto {
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .act-manual { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+  .act-manual button { min-height: var(--target-min); }
+  .act-manual .note { margin: 0; }
 
   .escena {
     min-height: 0;

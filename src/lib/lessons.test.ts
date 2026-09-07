@@ -5,7 +5,8 @@
  * próxima persona que añada una lección no pueda romperlas sin enterarse.
  */
 import { describe, it, expect } from 'vitest';
-import { alfabetoHasta, LESSONS } from './lessons';
+import { alfabetoHasta, generarTextoPractica, LESSONS, nivelDesbloqueado, normalizarTextoLibre, vocabularioHasta } from './lessons';
+import { buildIndex, ES_ISO } from './keyboard/layouts';
 
 describe('coherencia del temario', () => {
   it('los identificadores no se repiten', () => {
@@ -55,11 +56,15 @@ describe('coherencia del temario', () => {
 });
 
 describe('progresión', () => {
-  it('la cobertura solo sube', () => {
-    for (let i = 1; i < LESSONS.length; i++) {
+  it('la cobertura solo sube durante el alfabeto básico y se mantiene al 100% después', () => {
+    const iRaras = LESSONS.findIndex((l) => l.id === 'raras');
+    for (let i = 1; i <= iRaras; i++) {
       expect(LESSONS[i].cobertura,
         `"${LESSONS[i].title}" no aporta nada sobre "${LESSONS[i - 1].title}"`)
         .toBeGreaterThan(LESSONS[i - 1].cobertura);
+    }
+    for (let i = iRaras + 1; i < LESSONS.length; i++) {
+      expect(LESSONS[i].cobertura).toBe(100);
     }
   });
 
@@ -90,10 +95,11 @@ describe('progresión', () => {
     expect(LESSONS[1].cobertura).toBeGreaterThan(LESSONS[0].cobertura * 2);
   });
 
-  it('ninguna lección mete demasiadas teclas de golpe', () => {
+  it('ninguna lección mete demasiadas teclas de golpe en el alfabeto básico', () => {
     // El temario tradicional presenta las diez teclas de una fila a la vez.
     // Parece que avanza rápido, pero la carga por lección es enorme.
-    LESSONS.slice(1).forEach((l) => {
+    const iRaras = LESSONS.findIndex((l) => l.id === 'raras');
+    LESSONS.slice(1, iRaras + 1).forEach((l) => {
       expect(l.nuevas.length, `"${l.title}" estrena ${l.nuevas.length} teclas`)
         .toBeLessThanOrEqual(5);
     });
@@ -125,5 +131,80 @@ describe('los textos son español de verdad', () => {
     LESSONS.forEach((l) => {
       expect(l.text.length, `"${l.title}" es demasiado corta`).toBeGreaterThan(30);
     });
+  });
+});
+
+describe('temario ampliado: mayúsculas, puntuación y números (Issue #20)', () => {
+  const index = buildIndex(ES_ISO);
+
+  it('todos los caracteres nuevos de cada lección son escribibles según ES_ISO', () => {
+    for (const leccion of LESSONS) {
+      for (const ch of leccion.nuevas) {
+        expect(index.has(ch), `el carácter ${ch} estrenado en ${leccion.title} no está en ES_ISO`).toBe(true);
+      }
+    }
+  });
+
+  it('la lección de mayúsculas practica nombres propios e inicios de frase', () => {
+    const l = LESSONS.find((x) => x.id === 'mayusculas')!;
+    expect(l).toBeDefined();
+    expect(l.text).toContain('Madrid');
+    expect(l.text).toContain('Ana');
+    const mayusculasEnTexto = [...l.text].filter((c) => c >= 'A' && c <= 'Z');
+    expect(mayusculasEnTexto.length).toBeGreaterThan(5);
+  });
+
+  it('la lección de puntuación practica todos los signos requeridos', () => {
+    const l = LESSONS.find((x) => x.id === 'puntuacion')!;
+    expect(l).toBeDefined();
+    for (const signo of ['.', ',', '¿', '?', '¡', '!']) {
+      expect(l.text).toContain(signo);
+      expect(index.has(signo)).toBe(true);
+    }
+  });
+
+  it('la lección de números practica los diez dígitos', () => {
+    const l = LESSONS.find((x) => x.id === 'numeros')!;
+    expect(l).toBeDefined();
+    for (const digito of '0123456789') {
+      expect(l.text).toContain(digito);
+      expect(index.has(digito)).toBe(true);
+    }
+  });
+});
+
+describe('práctica continua y vocabulario desbloqueado (Issue #19)', () => {
+  it('vocabularioHasta solo usa caracteres permitidos', () => {
+    for (let i = 0; i < LESSONS.length; i++) {
+      const permitidas = alfabetoHasta(i);
+      const palabras = vocabularioHasta(i);
+      expect(palabras.length).toBeGreaterThan(0);
+      for (const p of palabras) {
+        for (const ch of p) {
+          expect(permitidas.has(ch), `palabra "${p}" usa "${ch}" no permitida en nivel ${i}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('generarTextoPractica genera texto válido para el nivel', () => {
+    for (let i = 0; i < 5; i++) {
+      const texto = generarTextoPractica(i, 10);
+      const permitidas = alfabetoHasta(i);
+      const intrusas = [...new Set([...texto])].filter((c) => c !== ' ' && !permitidas.has(c));
+      expect(intrusas).toEqual([]);
+    }
+  });
+
+  it('nivelDesbloqueado avanza según lecciones completadas', () => {
+    expect(nivelDesbloqueado([])).toBe(0);
+    expect(nivelDesbloqueado(['reposo'])).toBe(1);
+    expect(nivelDesbloqueado(['reposo', 'vocales-1'])).toBe(2);
+  });
+
+  it('normalizarTextoLibre filtra espacios y caracteres no permitidos', () => {
+    expect(normalizarTextoLibre('  hola   mundo  \n  prueba  ')).toBe('hola mundo prueba');
+    const permitidas = new Set(['h', 'o', 'l', 'a']);
+    expect(normalizarTextoLibre('hola mundo', permitidas)).toBe('hola o');
   });
 });

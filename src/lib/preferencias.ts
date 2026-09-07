@@ -40,6 +40,8 @@ export interface Preferencias {
   ayudaTeclado: 'auto' | 'siempre';
   /** Última lección seleccionada por el alumno para recordar por dónde iba. */
   ultimaLeccion?: string;
+  /** Identificador de la distribución seleccionada (p. ej. 'es-iso'). */
+  layout: string;
 }
 
 export const POR_DEFECTO: Preferencias = {
@@ -50,6 +52,7 @@ export const POR_DEFECTO: Preferencias = {
   tono: null,
   ayudaTeclado: 'auto',
   ultimaLeccion: LESSONS[0]?.id ?? 'reposo',
+  layout: 'es-iso',
 };
 
 const CLAVE = 'libretype.preferencias';
@@ -79,6 +82,7 @@ export function normalizar(crudo: unknown): Preferencias {
     tono: o.tono === 'juego' || o.tono === 'sobrio' ? o.tono : null,
     ayudaTeclado: unaDe(o.ayudaTeclado, ['auto', 'siempre'] as const, POR_DEFECTO.ayudaTeclado),
     ultimaLeccion: leccionValida ? (o.ultimaLeccion as string) : (POR_DEFECTO.ultimaLeccion ?? LESSONS[0].id),
+    layout: typeof o.layout === 'string' && o.layout.trim() ? o.layout.trim() : POR_DEFECTO.layout,
   };
 }
 

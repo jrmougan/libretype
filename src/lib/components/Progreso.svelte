@@ -225,8 +225,16 @@
         {#each retiradas as r (r.leccion)}
           <tr class="retirada">
             <th scope="row">
-              {tituloRetirada(r.leccion) ?? r.leccion}
-              <small>lección retirada</small>
+              {#if r.leccion === 'practica-continua'}
+                Práctica continua
+                <small>práctica libre</small>
+              {:else if r.leccion === 'texto-propio'}
+                Texto propio
+                <small>práctica libre</small>
+              {:else}
+                {tituloRetirada(r.leccion) ?? r.leccion}
+                <small>lección retirada</small>
+              {/if}
             </th>
             <td>{r.intentos}</td>
             <td>
@@ -244,7 +252,7 @@
       </table>
     </div>
 
-    {#if retiradas.length > 0}
+    {#if retiradas.some(r => r.leccion !== 'practica-continua' && r.leccion !== 'texto-propio')}
       <p class="nota">
         Las lecciones retiradas son de una versión anterior de LibreType. El
         temario cambió, pero lo que practicaste sigue contando aquí.

@@ -65,8 +65,77 @@ const K = (
   extra: Partial<KeyDef> = {},
 ): KeyDef => ({ code, base, finger, ...extra });
 
-/** QWERTY español, teclado físico ISO (el de 105 teclas con Ñ y Ç). */
-export const ES_ISO: Layout = {
+export type SistemaOperativo = 'mac' | 'windows' | 'linux';
+
+export function detectarSO(): SistemaOperativo {
+  if (typeof navigator !== 'undefined') {
+    const nav = navigator as { userAgentData?: { platform?: string }; platform?: string; userAgent?: string };
+    const plat = (nav.userAgentData?.platform || nav.platform || '').toLowerCase();
+    const ua = (nav.userAgent || '').toLowerCase();
+    if (plat.includes('mac') || ua.includes('macintosh') || ua.includes('mac os')) return 'mac';
+    if (plat.includes('win') || ua.includes('windows')) return 'windows';
+    if (plat.includes('linux') || ua.includes('linux')) return 'linux';
+  }
+  const proc = typeof globalThis !== 'undefined'
+    ? (globalThis as { process?: { platform?: string } }).process
+    : undefined;
+  if (proc?.platform) {
+    if (proc.platform === 'darwin') return 'mac';
+    if (proc.platform === 'win32') return 'windows';
+    if (proc.platform === 'linux') return 'linux';
+  }
+  return 'windows';
+}
+
+export function etiquetasModificadores(so: SistemaOperativo = detectarSO()): {
+  meta: string;
+  altLeft: string;
+  altRight: string;
+} {
+  if (so === 'mac') {
+    return {
+      meta: 'Cmd',
+      altLeft: 'Alt',
+      altRight: 'Opción',
+    };
+  }
+  if (so === 'linux') {
+    return {
+      meta: 'Super',
+      altLeft: 'Alt',
+      altRight: 'AltGr',
+    };
+  }
+  return {
+    meta: 'Win',
+    altLeft: 'Alt',
+    altRight: 'AltGr',
+  };
+}
+
+export function adaptarEtiquetasSO(layout: Layout, so: SistemaOperativo = detectarSO()): Layout {
+  const etiquetas = etiquetasModificadores(so);
+  return {
+    ...layout,
+    rows: layout.rows.map((row) =>
+      row.map((k) => {
+        if (k.code === 'MetaLeft' || k.code === 'MetaRight') {
+          return { ...k, label: etiquetas.meta };
+        }
+        if (k.code === 'AltLeft') {
+          return { ...k, label: etiquetas.altLeft };
+        }
+        if (k.code === 'AltRight') {
+          return { ...k, label: etiquetas.altRight };
+        }
+        return k;
+      }),
+    ),
+  };
+}
+
+/** Definición base de QWERTY español, teclado físico ISO (el de 105 teclas con Ñ y Ç). */
+const ES_ISO_BASE: Layout = {
   id: 'es-iso',
   name: 'Español (QWERTY, teclado ISO)',
   rows: [
@@ -159,7 +228,14 @@ export const ES_ISO: Layout = {
   },
 };
 
+export const ES_ISO: Layout = adaptarEtiquetasSO(ES_ISO_BASE, detectarSO());
+
 export const LAYOUTS: Layout[] = [ES_ISO];
+
+export function obtenerLayout(id = 'es-iso', so: SistemaOperativo = detectarSO()): Layout {
+  const base = LAYOUTS.find((l) => l.id === id) ?? ES_ISO_BASE;
+  return adaptarEtiquetasSO(base, so);
+}
 
 /** Índice carácter -> tecla y modificador, para saber qué hay que pulsar. */
 export interface KeyStep {

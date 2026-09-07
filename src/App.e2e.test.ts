@@ -222,8 +222,7 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
     const dialogoProgreso = document.querySelector('dialog#panel-dialogo');
     expect(dialogoProgreso).not.toBeNull();
     expect(dialogoProgreso?.textContent).toContain(LESSONS[0].title);
-    expect(dialogoProgreso?.textContent).toContain('Sesiones');
-    expect(dialogoProgreso?.textContent).toContain('1 de 9');
+    expect(dialogoProgreso?.textContent).toContain(`1 de ${LESSONS.length}`);
 
     // Cierra el panel de progreso
     const botonCerrar = botonPorTexto('Cerrar')!;

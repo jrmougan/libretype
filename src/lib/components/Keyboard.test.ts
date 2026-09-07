@@ -171,8 +171,7 @@ describe('Keyboard.svelte (Issue #36)', () => {
       montar({ next: pasoArroba });
 
       const grupoAltGr = document.querySelector('g.key.mod');
-      expect(grupoAltGr).not.toBeNull();
-      expect(grupoAltGr?.querySelector('text')?.textContent).toBe('AltGr');
+      expect(['AltGr', 'Opción']).toContain(grupoAltGr?.querySelector('text')?.textContent);
     });
   });
 

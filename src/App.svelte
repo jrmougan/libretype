@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import Drill from './lib/components/Drill.svelte';
   import LeccionCero from './lib/components/LeccionCero.svelte';
   import Progreso from './lib/components/Progreso.svelte';
@@ -31,6 +31,8 @@
   let lessonIx = $state(0);
   let drill = $state<ReturnType<typeof Drill> | null>(null);
   let result = $state<{ stats: Stats; record: boolean } | null>(null);
+  let dialogoResultado = $state<HTMLDialogElement | null>(null);
+  let dialogoPanel = $state<HTMLDialogElement | null>(null);
   /** Métricas en vivo, que ahora viven en la barra de arriba. */
   let ultimasStats = $state<Stats>(
     { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 },
@@ -124,7 +126,11 @@
     guardarPrefs(prefs);
   });
 
-  function pick(i: number): void {
+  async function pick(i: number): Promise<void> {
+    // Cerrar antes de sustituir la lección: WebKit restaura el foco del
+    // diálogo y, si el campo anterior ya no existe, lo manda al documento.
+    dialogoResultado?.close();
+    dialogoPanel?.close();
     lessonIx = i;
     result = null;
     vista = 'leccion';
@@ -132,12 +138,33 @@
     verProgreso = false;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     drill?.restart();
+    await tick();
+    drill?.enfocar();
   }
 
-  function again(): void {
+  async function again(): Promise<void> {
+    dialogoResultado?.close();
     result = null;
     drill?.restart();
+    await tick();
+    drill?.enfocar();
   }
+
+  // El diálogo nativo lleva el foco al primer control, mantiene Tab dentro y
+  // hace inerte el fondo. Al desmontarlo restaura el foco de quien lo abrió.
+  function abrirDialogo(dialogo: HTMLDialogElement): { destroy: () => void } {
+    dialogo.showModal();
+    return { destroy: () => dialogo.close() };
+  }
+
+  async function cerrarPanel(): Promise<void> {
+    dialogoPanel?.close();
+    settingsOpen = false;
+    verProgreso = false;
+    await tick();
+    if (vista === 'leccion') drill?.enfocar();
+  }
+
 </script>
 
 <!--
@@ -201,6 +228,7 @@
         <Drill
           bind:this={drill}
           {layout}
+          activo={!settingsOpen && !verProgreso && !result}
           target={lesson.text}
           titulo={lesson.title}
           explicacion={lesson.focus}
@@ -217,10 +245,11 @@
 
   <!-- Superpuesto: aparecer no puede mover el teclado de sitio. -->
   {#if result}
-    <div class="capa" role="presentation">
+    <dialog class="capa" bind:this={dialogoResultado} use:abrirDialogo aria-labelledby="resultado-titulo"
+            oncancel={(e) => { e.preventDefault(); again(); }}>
       <div class="resultado" class:record={result.record}
-           class:celebra={result.record && prefs.tono === 'juego'} role="status">
-        <strong>
+           class:celebra={result.record && prefs.tono === 'juego'}>
+        <strong id="resultado-titulo">
           {#if result.record}★ {voz.record}{:else}{voz.terminada}{/if}
         </strong>
         <span>{result.stats.wpm} palabras por minuto, {result.stats.accuracy}% de precisión.</span>
@@ -234,14 +263,15 @@
           {/if}
         </div>
       </div>
-    </div>
+    </dialog>
   {/if}
 
   {#if settingsOpen || verProgreso}
-    <aside class="panel" aria-label={settingsOpen ? 'Ajustes' : 'Progreso'}>
+    <dialog class="panel" bind:this={dialogoPanel} use:abrirDialogo aria-label={settingsOpen ? 'Ajustes' : 'Progreso'}
+            oncancel={(e) => { e.preventDefault(); cerrarPanel(); }}>
       <div class="panel-cab">
         <h2>{settingsOpen ? 'Ajustes' : voz.progreso}</h2>
-        <button onclick={() => { settingsOpen = false; verProgreso = false; }}>Cerrar</button>
+        <button onclick={cerrarPanel}>Cerrar</button>
       </div>
 
       <div class="panel-cuerpo">
@@ -329,7 +359,7 @@
           <Progreso {sesiones} lecciones={LESSONS} {tipoAlmacen} onBorrar={borrarProgreso} />
         {/if}
       </div>
-    </aside>
+    </dialog>
   {/if}
 </div>
 
@@ -396,10 +426,22 @@
   .centrado { align-self: center; justify-self: center; max-width: 72ch; }
 
   /* --- Superpuestos ------------------------------------------------------ */
-  .capa {
-    position: absolute; inset: 0;
-    display: grid; place-items: center;
+  dialog {
+    color: var(--fg);
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  dialog::backdrop {
     background: color-mix(in srgb, var(--bg) 78%, transparent);
+  }
+  .capa {
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    display: grid; place-items: center;
+    background: transparent;
     padding: var(--space-4);
   }
   .resultado {
@@ -426,7 +468,8 @@
   @media (prefers-reduced-motion: reduce) { .resultado.celebra { animation: none; } }
 
   .panel {
-    position: absolute; top: 0; right: 0; bottom: 0;
+    position: fixed; top: 0; right: 0; bottom: 0; left: auto;
+    height: 100%;
     width: min(30rem, 100%);
     display: grid;
     grid-template-rows: auto 1fr;

@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   esRecord, formatearDuracion, PCT_MINIMO_PARA_RECORD,
-  resumirGlobal, resumirLecciones, type Sesion,
+  resumirEvolucion, resumirGlobal, resumirLecciones, type Sesion,
 } from './progreso';
-import { AlmacenLocal, AlmacenMemoria } from './almacen';
+import { AlmacenLocal, AlmacenMemoria, AlmacenSqlite, type DbSql } from './almacen';
+import type { EstadoTecla } from '../keyboard/dominio';
 
 const sesion = (p: Partial<Sesion> = {}): Sesion => ({
   leccion: 'reposo',
@@ -187,6 +188,35 @@ describe('almacén local', () => {
     expect(todas).toHaveLength(500);
     expect(todas[todas.length - 1].ppm).toBe(519);
   });
+
+  it('guarda, actualiza y recupera el mapa de teclas íntegro (Issue #38)', async () => {
+    const a = new AlmacenLocal();
+    expect(await a.leerTeclas()).toEqual(new Map());
+
+    const teclas = new Map<string, EstadoTecla>([
+      ['KeyA', { intentos: 12, aciertos: 11, msTotal: 2400 }],
+      ['KeyS', { intentos: 15, aciertos: 15, msTotal: 3000 }],
+    ]);
+    await a.guardarTeclas(teclas);
+
+    const leidas = await a.leerTeclas();
+    expect(leidas).toEqual(teclas);
+
+    // Actualiza intento y tiempo
+    teclas.set('KeyA', { intentos: 20, aciertos: 19, msTotal: 3800 });
+    await a.guardarTeclas(teclas);
+    const leidas2 = await a.leerTeclas();
+    expect(leidas2.get('KeyA')).toEqual({ intentos: 20, aciertos: 19, msTotal: 3800 });
+
+    await a.borrarTodo();
+    expect(await a.leerTeclas()).toEqual(new Map());
+  });
+
+  it('soporta datos corruptos en libretype.teclas devolviendo un mapa vacío (Issue #38)', async () => {
+    const a = new AlmacenLocal();
+    localStorage.setItem('libretype.teclas', 'datos no serializables');
+    expect(await a.leerTeclas()).toEqual(new Map());
+  });
 });
 
 describe('almacén en memoria', () => {
@@ -205,5 +235,148 @@ describe('almacén en memoria', () => {
     await a.borrarTodo();
     expect(await a.leerTodas()).toEqual([]);
     expect(await a.leerTeclas()).toEqual(new Map());
+  });
+
+  it('guarda, actualiza y recupera teclas con copias defensivas independientes (Issue #38)', async () => {
+    const a = new AlmacenMemoria();
+    const teclas = new Map<string, EstadoTecla>([
+      ['KeyJ', { intentos: 14, aciertos: 14, msTotal: 2200 }],
+      ['KeyF', { intentos: 18, aciertos: 17, msTotal: 2900 }],
+    ]);
+    await a.guardarTeclas(teclas);
+
+    const recuperadas = await a.leerTeclas();
+    expect(recuperadas.get('KeyJ')).toEqual({ intentos: 14, aciertos: 14, msTotal: 2200 });
+
+    // Modificar la copia leída no debe afectar a una lectura posterior
+    recuperadas.set('KeyJ', { intentos: 99, aciertos: 0, msTotal: 0 });
+    expect((await a.leerTeclas()).get('KeyJ')?.intentos).toBe(14);
+
+    // Actualización oficial mediante guardarTeclas
+    teclas.set('KeyJ', { intentos: 25, aciertos: 25, msTotal: 3900 });
+    await a.guardarTeclas(teclas);
+    expect((await a.leerTeclas()).get('KeyJ')?.intentos).toBe(25);
+
+    await a.borrarTodo();
+    expect(await a.leerTeclas()).toEqual(new Map());
+  });
+});
+
+describe('almacén sqlite (Issue #38)', () => {
+  function crearDbMock(): DbSql {
+    const filasTeclas: { code: string; intentos: number; aciertos: number; ms_total: number }[] = [];
+    return {
+      async execute(sql: string, params?: unknown[]): Promise<unknown> {
+        if (sql.includes('DELETE FROM teclas')) {
+          filasTeclas.length = 0;
+        } else if (sql.includes('INSERT INTO teclas')) {
+          const code = params![0] as string;
+          const fila = {
+            code,
+            intentos: params![1] as number,
+            aciertos: params![2] as number,
+            ms_total: params![3] as number,
+          };
+          const ix = filasTeclas.findIndex((t) => t.code === code);
+          if (ix >= 0) filasTeclas[ix] = fila;
+          else filasTeclas.push(fila);
+        }
+        return {};
+      },
+      async select<T>(sql: string): Promise<T> {
+        if (sql.includes('FROM teclas')) {
+          return [...filasTeclas] as unknown as T;
+        }
+        return [] as unknown as T;
+      },
+    };
+  }
+
+  it('guarda, actualiza y recupera el mapa de teclas íntegro', async () => {
+    const db = crearDbMock();
+    const a = new AlmacenSqlite(db);
+
+    expect(await a.leerTeclas()).toEqual(new Map());
+
+    const teclas = new Map<string, EstadoTecla>([
+      ['KeyD', { intentos: 8, aciertos: 7, msTotal: 1600 }],
+      ['KeyK', { intentos: 12, aciertos: 12, msTotal: 2100 }],
+    ]);
+    await a.guardarTeclas(teclas);
+
+    const leidas = await a.leerTeclas();
+    expect(leidas.size).toBe(2);
+    expect(leidas.get('KeyD')).toEqual({ intentos: 8, aciertos: 7, msTotal: 1600 });
+    expect(leidas.get('KeyK')).toEqual({ intentos: 12, aciertos: 12, msTotal: 2100 });
+
+    // Actualización de tecla existente
+    teclas.set('KeyD', { intentos: 16, aciertos: 15, msTotal: 3000 });
+    await a.guardarTeclas(teclas);
+
+    const leidasActualizadas = await a.leerTeclas();
+    expect(leidasActualizadas.size).toBe(2);
+    expect(leidasActualizadas.get('KeyD')).toEqual({ intentos: 16, aciertos: 15, msTotal: 3000 });
+
+    // Borrado
+    await a.borrarTodo();
+    expect(await a.leerTeclas()).toEqual(new Map());
+  });
+});
+
+describe('resumen de evolución y racha', () => {
+  it('vacío da 0 días y racha 0', () => {
+    const e = resumirEvolucion([]);
+    expect(e).toEqual({
+      dias: [],
+      diasPracticados: 0,
+      rachaActual: 0,
+      rachaMax: 0,
+    });
+  });
+
+  it('agrupa sesiones del mismo día y calcula mejor ppm limpia', () => {
+    const s1 = sesion({ ppm: 25, pctAcierto: 95, ms: 30000, terminadaEn: '2026-09-01T10:00:00.000Z' });
+    const s2 = sesion({ ppm: 45, pctAcierto: 80, ms: 30000, terminadaEn: '2026-09-01T11:00:00.000Z' }); // sucia
+    const s3 = sesion({ ppm: 35, pctAcierto: 92, ms: 40000, terminadaEn: '2026-09-01T12:00:00.000Z' }); // limpia
+
+    const e = resumirEvolucion([s1, s2, s3], '2026-09-01');
+    expect(e.diasPracticados).toBe(1);
+    expect(e.rachaActual).toBe(1);
+    expect(e.rachaMax).toBe(1);
+    expect(e.dias).toHaveLength(1);
+    expect(e.dias[0]).toEqual({
+      fecha: '2026-09-01',
+      sesiones: 3,
+      mejorPpm: 35,
+      msTotales: 100000,
+      ppmMedia: 35,
+      pctMedio: 89,
+    });
+  });
+
+  it('calcula rachas consecutivas y racha máxima', () => {
+    const sesiones = [
+      sesion({ terminadaEn: '2026-09-01T10:00:00.000Z' }),
+      sesion({ terminadaEn: '2026-09-02T10:00:00.000Z' }),
+      sesion({ terminadaEn: '2026-09-03T10:00:00.000Z' }),
+      // Hueco
+      sesion({ terminadaEn: '2026-09-06T10:00:00.000Z' }),
+      sesion({ terminadaEn: '2026-09-07T10:00:00.000Z' }),
+    ];
+
+    // Hoy es 2026-09-07 (la racha actual es 2 días: 06 y 07; la racha max histórica es 3 días: 01, 02, 03)
+    const e = resumirEvolucion(sesiones, '2026-09-07');
+    expect(e.diasPracticados).toBe(5);
+    expect(e.rachaActual).toBe(2);
+    expect(e.rachaMax).toBe(3);
+
+    // Si hoy fuera 2026-09-08 (ayer practicó), la racha sigue activa
+    const eAyer = resumirEvolucion(sesiones, '2026-09-08');
+    expect(eAyer.rachaActual).toBe(2);
+
+    // Si hoy fuera 2026-09-10 (pasaron 3 días), la racha actual se rompió
+    const eRoto = resumirEvolucion(sesiones, '2026-09-10');
+    expect(eRoto.rachaActual).toBe(0);
+    expect(eRoto.rachaMax).toBe(3);
   });
 });

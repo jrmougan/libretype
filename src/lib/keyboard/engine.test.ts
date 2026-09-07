@@ -12,7 +12,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TypingEngine, computeStats, diffAgainstTarget } from './engine';
 import {
   ALL_TRACES, LINUX_ACUTE_A, MACOS_ACUTE_A, MACOS_ACUTE_CANCELLED,
-  MACOS_DIAERESIS_U, PLAIN_TYPING, replay, type Trace,
+  MACOS_DIAERESIS_U, PLAIN_TYPING, WINDOWS_ACUTE_A, WINDOWS_ACUTE_CANCELLED,
+  WINDOWS_DIAERESIS_U, WINDOWS_PLAIN_TYPING, replay, type Trace,
 } from './traces';
 
 let el: HTMLTextAreaElement;
@@ -93,6 +94,17 @@ describe('el acento a medias no cuenta como escrito', () => {
     expect(engine.committed).toBe('á');
   });
 
+  it('Windows / WebView2: lo confirmado no avanza hasta compositionend con orden estándar (Issue #39)', () => {
+    const snaps = run(WINDOWS_ACUTE_A);
+    const duranteComposicion = snaps.filter((s) => s.composing);
+    expect(duranteComposicion.length).toBeGreaterThan(0);
+    for (const s of duranteComposicion) {
+      expect(s.committed, `tras ${s.after}`).toBe('');
+    }
+    expect(snaps.some((s) => s.composing && s.text === '´')).toBe(true);
+    expect(engine.committed).toBe('á');
+  });
+
   it('a mitad de palabra solo avanza al confirmar', () => {
     const snaps = run(MACOS_ACUTE_A, 'pap');
     for (const s of snaps.filter((s) => s.composing)) {
@@ -124,7 +136,7 @@ describe('el compositionend fuerza el recálculo', () => {
   });
 });
 
-describe('acento cancelado', () => {
+describe('acento cancelado y composición avanzada', () => {
   it('´ + t da los dos caracteres, sin duplicar ni perder', () => {
     run(MACOS_ACUTE_CANCELLED);
     expect(engine.committed).toBe('´t');
@@ -133,6 +145,22 @@ describe('acento cancelado', () => {
   it('diéresis', () => {
     run(MACOS_DIAERESIS_U);
     expect(engine.committed).toBe('ü');
+  });
+
+  it('Windows / WebView2: acento cancelado (´ + t) emite ambos caracteres (Issue #39)', () => {
+    run(WINDOWS_ACUTE_CANCELLED);
+    expect(engine.committed).toBe('´t');
+  });
+
+  it('Windows / WebView2: diéresis con Shift (ü) (Issue #39)', () => {
+    run(WINDOWS_DIAERESIS_U);
+    expect(engine.committed).toBe('ü');
+  });
+
+  it('Windows / WebView2: pulsación directa avanza de forma inmediata sin composición (Issue #39)', () => {
+    const snaps = run(WINDOWS_PLAIN_TYPING);
+    expect(snaps.every((s) => !s.composing)).toBe(true);
+    expect(engine.committed).toBe('de');
   });
 });
 
@@ -204,6 +232,95 @@ describe('comparación con el objetivo', () => {
   });
 });
 
+describe('protección contra pegado (issue #4)', () => {
+  it('cancela el evento paste por defecto', () => {
+    const pasteEv = new Event('paste', { cancelable: true });
+    el.dispatchEvent(pasteEv);
+    expect(pasteEv.defaultPrevented).toBe(true);
+  });
+
+  it('cancela beforeinput de tipo insertFromPaste por defecto', () => {
+    const beforeInputEv = new InputEvent('beforeinput', {
+      inputType: 'insertFromPaste',
+      cancelable: true,
+    });
+    el.dispatchEvent(beforeInputEv);
+    expect(beforeInputEv.defaultPrevented).toBe(true);
+  });
+
+  it('no cancela beforeinput de inserción normal', () => {
+    const beforeInputEv = new InputEvent('beforeinput', {
+      inputType: 'insertText',
+      cancelable: true,
+    });
+    el.dispatchEvent(beforeInputEv);
+    expect(beforeInputEv.defaultPrevented).toBe(false);
+  });
+});
+
+describe('composición huérfana en blur (issue #5)', () => {
+  it('en blur resetea composing y compBase si había composición activa', () => {
+    el.dispatchEvent(new CompositionEvent('compositionstart'));
+    expect(engine.composing).toBe(true);
+
+    el.dispatchEvent(new FocusEvent('blur'));
+    expect(engine.composing).toBe(false);
+
+    // Tras recuperar el foco, el motor no se queda congelado
+    el.value = 'a';
+    el.dispatchEvent(new InputEvent('input', { data: 'a' }));
+    expect(engine.committed).toBe('a');
+  });
+});
+
+describe('cursor y sellos de tiempo (issue #6)', () => {
+  it('inserción en posición desplazada preserva los sellos correspondientes', () => {
+    const ev1 = new InputEvent('input');
+    Object.defineProperty(ev1, 'timeStamp', { value: 1000 });
+    el.value = 'ac';
+    el.dispatchEvent(ev1);
+    expect(engine.stamps).toEqual([1000, 1000]);
+
+    // Inserción de 'b' en medio a los 2000ms
+    const ev2 = new InputEvent('input');
+    Object.defineProperty(ev2, 'timeStamp', { value: 2000 });
+    el.value = 'abc';
+    el.dispatchEvent(ev2);
+    expect(engine.committed).toBe('abc');
+    expect(engine.stamps).toEqual([1000, 2000, 1000]);
+  });
+
+  it('borrado en el medio no desincroniza los sellos de caracteres posteriores', () => {
+    el.value = 'abc';
+    el.dispatchEvent(new InputEvent('input', { timeStamp: 1000 } as any));
+    // Se borra 'b'
+    el.value = 'ac';
+    el.dispatchEvent(new InputEvent('input', { timeStamp: 2000 } as any));
+    expect(engine.committed).toBe('ac');
+    expect(engine.stamps).toHaveLength(2);
+  });
+});
+
+describe('liberación de teclas retenidas en reset (issue #10)', () => {
+  it('emite down: false para cualquier tecla retenida en #held', () => {
+    const liberadas: string[] = [];
+    engine.destroy();
+    engine = new TypingEngine(el, {
+      physical: (k) => {
+        if (!k.down) liberadas.push(k.code);
+      },
+    });
+
+    el.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA' }));
+    el.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB' }));
+    expect(engine.heldCodes.size).toBe(2);
+
+    engine.reset();
+    expect(engine.heldCodes.size).toBe(0);
+    expect(liberadas).toEqual(['KeyA', 'KeyB']);
+  });
+});
+
 describe('métricas', () => {
   it('cuenta cinco caracteres por palabra sobre los aciertos', () => {
     const s = computeStats('papá café', 'papá café', [0, 60000]);
@@ -224,5 +341,33 @@ describe('métricas', () => {
 
   it('sin escribir nada la precisión es 100, no NaN', () => {
     expect(computeStats('', 'papá', []).accuracy).toBe(100);
+  });
+
+  it('descuenta pulsaciones erróneas corregidas con retroceso (issue #3)', () => {
+    // 4 caracteres correctos y 1 error corregido con retroceso = 4 / 5 = 80% precisión
+    const s = computeStats('hola', 'hola', [0, 1000, 2000, 3000], 1);
+    expect(s.correct).toBe(4);
+    expect(s.typed).toBe(5);
+    expect(s.accuracy).toBe(80);
+  });
+
+  it('con suficientes errores con retroceso la precisión cae bajo el 90% para evitar récord falso (issue #3)', () => {
+    // 10 correctos y 2 errores corregidos: 10 / 12 = 83% < 90%
+    const s = computeStats('abcdefghij', 'abcdefghij', [0, 1000], 2);
+    expect(s.accuracy).toBe(83);
+    expect(s.accuracy).toBeLessThan(90);
+  });
+
+  it('descuenta pausas largas de inactividad de elapsedMs (issue #8)', () => {
+    // 4 caracteres con una pausa de 5 minutos (300.000 ms) entre el segundo y tercer carácter
+    const stamps = [1000, 1500, 301500, 302000];
+    const s = computeStats('hola', 'hola', stamps);
+    // Con el tope de inactividad a 2000ms:
+    // delta 0->1: 500ms
+    // delta 1->2: 300.000ms -> acotado a 2000ms
+    // delta 2->3: 500ms
+    // Total: 3000ms
+    expect(s.elapsedMs).toBe(3000);
+    expect(s.wpm).toBeGreaterThan(0);
   });
 });

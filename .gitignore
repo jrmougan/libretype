@@ -25,9 +25,17 @@ dist-ssr
 
 # Build
 src-tauri/target/
+coverage/
 
 # Cobertura de tests
 coverage/
 
 # Corpus descargable, no versionado (ver investigacion/README.md)
 investigacion/es_50k.txt
+# Python cache
+__pycache__/
+*.pyc
+
+# Spike binaries
+spike-deadkeys/driver
+spike-deadkeys/wkhost

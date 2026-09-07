@@ -66,3 +66,181 @@ describe('foco de la lección', () => {
     expect(document.querySelector('.ch.current')?.textContent).toBe('s');
   });
 });
+
+describe('accesibilidad de la lección (#15, #16)', () => {
+  it('proporciona un aria-label descriptivo con el texto de la lección al textarea', () => {
+    const campo = montar();
+    expect(campo.getAttribute('aria-label')).toBe('Escribe el texto de la lección: ás');
+    const contenedor = campo.closest('label');
+    expect(contenedor?.getAttribute('aria-label')).toBe('Texto de la lección: ás');
+  });
+
+  it('mantiene elementos decorativos con aria-hidden para no inundar el lector de pantalla', () => {
+    montar();
+    const pista = document.querySelector('.hint');
+    expect(pista?.getAttribute('aria-hidden')).toBe('true');
+
+    const teclado = document.querySelector('.teclado');
+    expect(teclado?.getAttribute('aria-hidden')).toBe('true');
+
+    const enVivo = document.querySelector('.sr-only');
+    expect(enVivo?.getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('permite desactivar animaciones mediante las props de movimiento o animaciones', async () => {
+    if (componente) await unmount(componente);
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'ás', titulo: 'Tildes', animaciones: 'reducidas' },
+    });
+    flushSync();
+    expect(document.querySelector('.drill.sin-animaciones')).not.toBeNull();
+  });
+});
+
+describe('precisión y retroceso (issue #3)', () => {
+  it('registra errores corregidos con retroceso en las métricas de la lección', async () => {
+    let estadisticasFinales: any = null;
+    componente = mount(Drill, {
+      target: document.body,
+      props: {
+        layout: ES_ISO,
+        target: 'as',
+        titulo: 'Prueba',
+        onDone: (s) => {
+          estadisticasFinales = s;
+        },
+      },
+    });
+    flushSync();
+    const campo = document.querySelector('textarea')!;
+
+    // Escribe error 'x' en lugar de 'a'
+    campo.value = 'x';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+
+    // Borra con retroceso
+    campo.value = '';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+
+    // Escribe 'a' y luego 's' correctamente
+    campo.value = 'a';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+
+    campo.value = 'as';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+
+    expect(estadisticasFinales).not.toBeNull();
+    expect(estadisticasFinales.correct).toBe(2);
+    expect(estadisticasFinales.typed).toBe(3); // 2 correctos + 1 error corregido
+    expect(estadisticasFinales.accuracy).toBe(67);
+  });
+});
+
+describe('protección contra pegado en Drill (issue #4)', () => {
+  it('previene el evento de pegado en el textarea', () => {
+    const campo = montar();
+    const pasteEv = new Event('paste', { cancelable: true, bubbles: true });
+    campo.dispatchEvent(pasteEv);
+    expect(pasteEv.defaultPrevented).toBe(true);
+  });
+});
+
+describe('reporte de tiempos por tecla (issue #9)', () => {
+  it('la primera tecla no reporta 0ms artificialmente al escribir', async () => {
+    const reportes: { code: string; acierto: boolean; ms: number }[] = [];
+    componente = mount(Drill, {
+      target: document.body,
+      props: {
+        layout: ES_ISO,
+        target: 'as',
+        titulo: 'Prueba',
+        onTecla: (code, acierto, ms) => {
+          reportes.push({ code, acierto, ms });
+        },
+      },
+    });
+    flushSync();
+    const campo = document.querySelector('textarea')!;
+
+    const ev1 = new InputEvent('input', { bubbles: true });
+    Object.defineProperty(ev1, 'timeStamp', { value: 1000 });
+    campo.value = 'a';
+    campo.dispatchEvent(ev1);
+    flushSync();
+
+    const ev2 = new InputEvent('input', { bubbles: true });
+    Object.defineProperty(ev2, 'timeStamp', { value: 1350 });
+    campo.value = 'as';
+    campo.dispatchEvent(ev2);
+    flushSync();
+    await tick();
+
+    expect(reportes.length).toBeGreaterThanOrEqual(2);
+    for (const r of reportes) {
+      expect(r.ms).toBeGreaterThan(0);
+    }
+    expect(reportes[0].ms).toBe(350);
+  });
+});
+
+describe('reiniciar y pausar lección (issue #24)', () => {
+  it('el botón Empezar de nuevo reinicia el texto y las métricas', async () => {
+    let statsReportadas: any = null;
+    componente = mount(Drill, {
+      target: document.body,
+      props: {
+        layout: ES_ISO,
+        target: 'as',
+        titulo: 'Prueba',
+        onStats: (s) => { statsReportadas = s; },
+      },
+    });
+    flushSync();
+    const campo = document.querySelector('textarea')!;
+
+    campo.value = 'a';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    expect(campo.value).toBe('a');
+    expect(statsReportadas.typed).toBe(1);
+
+    const botonReiniciar = [...document.querySelectorAll('button')].find(
+      (b) => b.textContent?.includes('Empezar de nuevo'),
+    );
+    expect(botonReiniciar).not.toBeNull();
+
+    botonReiniciar?.click();
+    flushSync();
+    await tick();
+
+    expect(campo.value).toBe('');
+    expect(statsReportadas.typed).toBe(0);
+    expect(statsReportadas.correct).toBe(0);
+  });
+
+  it('cuando está pausado deshabilita el campo y muestra el cartel de pausa', async () => {
+    componente = mount(Drill, {
+      target: document.body,
+      props: {
+        layout: ES_ISO,
+        target: 'as',
+        titulo: 'Prueba',
+        pausado: true,
+      },
+    });
+    flushSync();
+
+    const campo = document.querySelector('textarea')!;
+    expect(campo.disabled).toBe(true);
+
+    const cartel = document.querySelector('.pausa-cartel');
+    expect(cartel).not.toBeNull();
+    expect(cartel?.textContent).toContain('Ejercicio pausado');
+  });
+});

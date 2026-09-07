@@ -27,10 +27,13 @@ describe('dominio de una tecla', () => {
 
   it('teclear rápido fallando no cuenta como dominar', () => {
     expect(dominioDe(est(50, 0.7, 150))).toBe(0);
-    // Justo por debajo del umbral: 44 de 50 es 0,88.
+    // Justo por debajo del 90% (44 de 50 = 0,88): dominio nulo.
     expect(dominioDe({ intentos: 50, aciertos: 44, msTotal: 50 * 150 })).toBe(0);
-    // Y justo en el umbral sí cuenta.
+    // En el umbral exacto del 90% (45 de 50 = 0,90): empieza a contar dominio.
     expect(dominioDe({ intentos: 50, aciertos: 45, msTotal: 50 * 150 })).toBeGreaterThan(0);
+    // Con 100 intentos: 89 aciertos (0,89) no cuenta, 90 aciertos (0,90) sí cuenta.
+    expect(dominioDe({ intentos: 100, aciertos: 89, msTotal: 100 * 150 })).toBe(0);
+    expect(dominioDe({ intentos: 100, aciertos: 90, msTotal: 100 * 150 })).toBeGreaterThan(0);
   });
 
   it('mucha precisión y buena velocidad es dominio alto', () => {
@@ -66,7 +69,9 @@ describe('opacidad de la letra', () => {
   });
 
   it('desaparece del todo al dominarla', () => {
+    expect(opacidadEtiqueta(0.84)).toBeGreaterThan(0);
     expect(opacidadEtiqueta(DOMINADA)).toBe(0);
+    expect(opacidadEtiqueta(0.85)).toBe(0);
     expect(opacidadEtiqueta(1)).toBe(0);
   });
 
@@ -75,7 +80,7 @@ describe('opacidad de la letra', () => {
     // O se lee, o no está.
     for (let d = 0.5; d < DOMINADA; d += 0.02) {
       const o = opacidadEtiqueta(d);
-      expect(o, `dominio ${d.toFixed(2)}`).toBeGreaterThanOrEqual(0.55);
+      expect(o, `dominio ${d.toFixed(2)}`).toBeGreaterThanOrEqual(0.65);
     }
   });
 

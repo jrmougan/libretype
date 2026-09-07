@@ -51,6 +51,7 @@ function completar(): void {
 
 describe('captura y paneles', () => {
   it.each(['Ajustes', 'Progreso'])('suspende la captura en %s y la restaura al cerrar', async (nombre) => {
+    expect(boton(nombre).getAttribute('aria-controls')).toBe('panel-dialogo');
     const captura = campo();
     captura.value = 'a';
     captura.dispatchEvent(new InputEvent('input', { bubbles: true }));
@@ -58,6 +59,7 @@ describe('captura y paneles', () => {
     await tick();
     const dialogo = document.querySelector('dialog')!;
     expect(dialogo.open).toBe(true);
+    expect(dialogo.id).toBe('panel-dialogo');
     expect(captura.disabled).toBe(true);
     expect(HTMLDialogElement.prototype.showModal).toHaveBeenCalled();
 
@@ -87,6 +89,10 @@ describe('captura y paneles', () => {
     const dialogo = document.querySelector('dialog')!;
     expect(dialogo.open).toBe(true);
     expect(dialogo.getAttribute('aria-labelledby')).toBe('resultado-titulo');
+    expect(dialogo.getAttribute('aria-describedby')).toBe('resultado-desc');
+    expect(dialogo.getAttribute('aria-live')).toBe('polite');
+    expect(dialogo.querySelector('#resultado-desc')).not.toBeNull();
+    expect(dialogo.querySelector('.resultado')?.getAttribute('aria-live')).toBe('polite');
     expect(campo().disabled).toBe(true);
     boton(accion).click();
     await tick();
@@ -125,5 +131,131 @@ describe('captura y paneles', () => {
     expect(cerradoAntesDeSustituir).toBe(true);
     expect(campo()).not.toBe(anterior);
     expect(document.activeElement).toBe(campo());
+  });
+  it('preserva el estado de dominio al abandonar la lección antes de terminar (issue #9)', async () => {
+    const captura = campo();
+    captura.value = 'a';
+    captura.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    await tick();
+
+    // Cambia de lección sin haber completado la actual
+    const selector = document.querySelector('select')!;
+    selector.value = '1';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    // La lección se ha reiniciado sin persistir intentos incompletos
+    expect(campo().value).toBe('');
+    expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
+  });
+  it('permite acceder al modo de práctica continua (Issue #19)', async () => {
+    const selector = document.querySelector('select')!;
+    selector.value = 'continua';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    expect(document.querySelector('h2')?.textContent).toBe('Práctica continua');
+    expect(campo()).not.toBeNull();
+  });
+
+  it('permite introducir texto propio para práctica libre (Issue #19)', async () => {
+    const selector = document.querySelector('select')!;
+    selector.value = 'propio';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    expect(document.querySelector('h2')?.textContent).toContain('texto propio');
+    const inputTexto = document.querySelector('textarea.input-texto-propio') as HTMLTextAreaElement;
+    expect(inputTexto).not.toBeNull();
+    inputTexto.value = 'hola mundo';
+    inputTexto.dispatchEvent(new Event('input', { bubbles: true }));
+
+    boton('Empezar a teclear').click();
+    await tick();
+
+    expect(document.querySelector('h2')?.textContent).toBe('Texto propio');
+    expect(campo()).not.toBeNull();
+  });
+
+  it('persiste la distribución seleccionada en preferencias (Issue #25)', async () => {
+    boton('Ajustes').click();
+    await tick();
+
+    const selectorLayout = document.querySelector('select#layout') as HTMLSelectElement;
+    expect(selectorLayout).not.toBeNull();
+    selectorLayout.value = 'es-iso';
+    selectorLayout.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    const raw = localStorage.getItem('libretype.preferencias');
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw!);
+    expect(parsed.layout).toBe('es-iso');
+  });
+});
+
+describe('experiencia de producto (#21, #23, #24)', () => {
+  it('actualiza la ultimaLeccion en preferencias al cambiar de lección (#21)', async () => {
+    const selector = document.querySelector('select')!;
+    selector.value = '2';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+
+    const guardado = JSON.parse(localStorage.getItem('libretype.preferencias')!);
+    expect(guardado.ultimaLeccion).toBe(LESSONS[2].id);
+  });
+
+  it('criterio de superación dinámico: accuracy < 90% hace que Repetir sea primario (#23)', async () => {
+    // Escribimos texto con muchos fallos
+    const target = LESSONS[0].text;
+    let err = '';
+    for (let i = 0; i < target.length; i++) {
+      err += i % 2 === 0 ? 'x' : target[i];
+    }
+    campo().value = err;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+
+    const dialogo = document.querySelector('dialog#dialogo-resultado');
+    expect(dialogo).not.toBeNull();
+    const btnPrimario = dialogo?.querySelector('button.primario');
+    expect(btnPrimario?.textContent).toContain('Repetir');
+  });
+
+  it('criterio de superación dinámico: accuracy >= 90% hace que Siguiente sea primario (#23)', async () => {
+    completar();
+    await tick();
+
+    const dialogo = document.querySelector('dialog#dialogo-resultado');
+    expect(dialogo).not.toBeNull();
+    const btnPrimario = dialogo?.querySelector('button.primario');
+    expect(btnPrimario?.textContent).toContain('Siguiente');
+  });
+
+  it('permite reiniciar el intento en marcha desde la barra superior (#24)', async () => {
+    campo().value = 'la';
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    expect(campo().value).toBe('la');
+
+    boton('Reiniciar').click();
+    await tick();
+
+    expect(campo().value).toBe('');
+  });
+
+  it('permite pausar y reanudar el ejercicio (#24)', async () => {
+    boton('Pausar').click();
+    await tick();
+
+    expect(campo().disabled).toBe(true);
+    expect(document.querySelector('.pausa-cartel')).not.toBeNull();
+
+    boton('Reanudar').click();
+    await tick();
+
+    expect(campo().disabled).toBe(false);
+    expect(document.querySelector('.pausa-cartel')).toBeNull();
   });
 });

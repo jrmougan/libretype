@@ -41,6 +41,23 @@ export interface ResumenGlobal {
   mejorPpm: number;
 }
 
+export interface ResumenDia {
+  /** Fecha en formato AAAA-MM-DD. */
+  fecha: string;
+  sesiones: number;
+  mejorPpm: number;
+  msTotales: number;
+  ppmMedia: number;
+  pctMedio: number;
+}
+
+export interface EvolucionTemporal {
+  dias: ResumenDia[];
+  diasPracticados: number;
+  rachaActual: number;
+  rachaMax: number;
+}
+
 /**
  * Un intento con muchos fallos puede dar palabras por minuto altísimas: se
  * teclea rápido y mal. Contarlo como récord enseñaría lo contrario de lo que
@@ -106,6 +123,98 @@ export function esRecord(previo: ResumenLeccion | undefined, s: Sesion): boolean
   if (s.pctAcierto < PCT_MINIMO_PARA_RECORD) return false;
   if (!previo) return true;
   return s.ppm > previo.mejorPpm;
+}
+
+function diasEntre(fechaA: string, fechaB: string): number {
+  const msPorDia = 86400000;
+  const tA = Date.UTC(+fechaA.slice(0, 4), +fechaA.slice(5, 7) - 1, +fechaA.slice(8, 10));
+  const tB = Date.UTC(+fechaB.slice(0, 4), +fechaB.slice(5, 7) - 1, +fechaB.slice(8, 10));
+  return Math.round((tB - tA) / msPorDia);
+}
+
+/**
+ * Agrega las sesiones por fecha, calculando días practicados, evolución y rachas.
+ */
+export function resumirEvolucion(
+  sesiones: readonly Sesion[],
+  hoyISO?: string,
+): EvolucionTemporal {
+  if (sesiones.length === 0) {
+    return { dias: [], diasPracticados: 0, rachaActual: 0, rachaMax: 0 };
+  }
+
+  const mapaDias = new Map<string, {
+    sesiones: number;
+    mejorPpm: number;
+    msTotales: number;
+    sumaPpm: number;
+    sumaPct: number;
+  }>();
+
+  for (const s of sesiones) {
+    const dia = s.terminadaEn.slice(0, 10);
+    const previo = mapaDias.get(dia);
+    const cuenta = s.pctAcierto >= PCT_MINIMO_PARA_RECORD;
+    const mejor = cuenta ? s.ppm : 0;
+
+    if (!previo) {
+      mapaDias.set(dia, {
+        sesiones: 1,
+        mejorPpm: mejor,
+        msTotales: s.ms,
+        sumaPpm: s.ppm,
+        sumaPct: s.pctAcierto,
+      });
+    } else {
+      previo.sesiones++;
+      if (cuenta && s.ppm > previo.mejorPpm) previo.mejorPpm = s.ppm;
+      previo.msTotales += s.ms;
+      previo.sumaPpm += s.ppm;
+      previo.sumaPct += s.pctAcierto;
+    }
+  }
+
+  const fechasOrdenadas = [...mapaDias.keys()].sort();
+  const dias: ResumenDia[] = fechasOrdenadas.map((fecha) => {
+    const d = mapaDias.get(fecha)!;
+    return {
+      fecha,
+      sesiones: d.sesiones,
+      mejorPpm: d.mejorPpm,
+      msTotales: d.msTotales,
+      ppmMedia: Math.round(d.sumaPpm / d.sesiones),
+      pctMedio: Math.round(d.sumaPct / d.sesiones),
+    };
+  });
+
+  let rachaMax = 1;
+  let rachaAcum = 1;
+
+  for (let i = 1; i < fechasOrdenadas.length; i++) {
+    const diff = diasEntre(fechasOrdenadas[i - 1], fechasOrdenadas[i]);
+    if (diff === 1) {
+      rachaAcum++;
+      if (rachaAcum > rachaMax) rachaMax = rachaAcum;
+    } else if (diff > 1) {
+      rachaAcum = 1;
+    }
+  }
+
+  const hoyStr = (hoyISO ?? new Date().toISOString()).slice(0, 10);
+  const ultimaFecha = fechasOrdenadas[fechasOrdenadas.length - 1];
+  const diffHoy = diasEntre(ultimaFecha, hoyStr);
+
+  let rachaActual = 0;
+  if (diffHoy === 0 || diffHoy === 1) {
+    rachaActual = rachaAcum;
+  }
+
+  return {
+    dias,
+    diasPracticados: dias.length,
+    rachaActual,
+    rachaMax,
+  };
 }
 
 /** "12 min", "1 h 05 min". Para el panel de progreso. */

@@ -163,8 +163,8 @@ Reglas que están ahí por algo y no son parámetros que tocar a ojo:
 - **Ni por debajo del 90% de precisión**, por buena que sea la velocidad.
   Teclear rápido fallando no es dominar, ni aquí ni en las marcas.
 - **La opacidad no baja gradualmente hasta un gris ilegible**: se mantiene por
-  encima de 0,55 y luego desaparece del todo. Una letra al 20% incumpliría el
-  contraste y parecería un error.
+  encima de 0,65 y luego desaparece del todo. Una letra por debajo de 0,65
+  incumpliría el contraste (4,5:1) y parecería un error.
 - Hay ajuste para dejarlas **siempre visibles**. Quien necesite la ayuda no
   puede perderla porque una heurística crea que ya no le hace falta.
 

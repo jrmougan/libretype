@@ -26,6 +26,8 @@
  */
 export type Tono = 'juego' | 'sobrio';
 
+import { LESSONS } from './lessons';
+
 export interface Preferencias {
   /** Escala del texto, de 1 a 2. */
   escala: number;
@@ -36,6 +38,10 @@ export interface Preferencias {
   tono: Tono | null;
   /** Si el teclado en pantalla retira las letras dominadas. */
   ayudaTeclado: 'auto' | 'siempre';
+  /** Última lección seleccionada por el alumno para recordar por dónde iba. */
+  ultimaLeccion?: string;
+  /** Identificador de la distribución seleccionada (p. ej. 'es-iso'). */
+  layout: string;
 }
 
 export const POR_DEFECTO: Preferencias = {
@@ -45,6 +51,8 @@ export const POR_DEFECTO: Preferencias = {
   fuente: 'normal',
   tono: null,
   ayudaTeclado: 'auto',
+  ultimaLeccion: LESSONS[0]?.id ?? 'reposo',
+  layout: 'es-iso',
 };
 
 const CLAVE = 'libretype.preferencias';
@@ -61,13 +69,20 @@ const unaDe = <T extends string>(v: unknown, opciones: readonly T[], sino: T): T
  */
 export function normalizar(crudo: unknown): Preferencias {
   const o = (typeof crudo === 'object' && crudo !== null ? crudo : {}) as Record<string, unknown>;
+  const movimientoCrudo = o.movimiento ?? (o.animaciones === 'reducidas' ? 'reducido' : undefined);
+  const leccionValida =
+    typeof o.ultimaLeccion === 'string' &&
+    LESSONS.some((l) => l.id === o.ultimaLeccion);
+
   return {
     escala: enRango(o.escala, 1, 2, POR_DEFECTO.escala),
     tema: unaDe(o.tema, ['auto', 'claro', 'oscuro'] as const, POR_DEFECTO.tema),
-    movimiento: unaDe(o.movimiento, ['auto', 'reducido'] as const, POR_DEFECTO.movimiento),
+    movimiento: unaDe(movimientoCrudo, ['auto', 'reducido'] as const, POR_DEFECTO.movimiento),
     fuente: unaDe(o.fuente, ['normal', 'dislexia'] as const, POR_DEFECTO.fuente),
     tono: o.tono === 'juego' || o.tono === 'sobrio' ? o.tono : null,
     ayudaTeclado: unaDe(o.ayudaTeclado, ['auto', 'siempre'] as const, POR_DEFECTO.ayudaTeclado),
+    ultimaLeccion: leccionValida ? (o.ultimaLeccion as string) : (POR_DEFECTO.ultimaLeccion ?? LESSONS[0].id),
+    layout: typeof o.layout === 'string' && o.layout.trim() ? o.layout.trim() : POR_DEFECTO.layout,
   };
 }
 
@@ -94,7 +109,8 @@ export function aplicar(p: Preferencias, raiz: HTMLElement): void {
     valor === null ? raiz.removeAttribute(nombre) : raiz.setAttribute(nombre, valor);
 
   atributo('data-theme', p.tema === 'auto' ? null : p.tema === 'claro' ? 'light' : 'dark');
-  atributo('data-motion', p.movimiento === 'reducido' ? 'reducido' : null);
+  const reducido = p.movimiento === 'reducido' || (p as unknown as Record<string, unknown>).animaciones === 'reducidas';
+  atributo('data-motion', reducido ? 'reducido' : null);
   atributo('data-font', p.fuente === 'dislexia' ? 'dyslexic' : null);
   atributo('data-tono', p.tono);
 }

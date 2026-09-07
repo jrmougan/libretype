@@ -11,7 +11,7 @@
    * texto explicativo generoso, porque al contrario que el tópico del
    * onboarding, las personas mayores sí leen las instrucciones.
    */
-  import { tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import Keyboard from './Keyboard.svelte';
   import { ES_ISO, FINGER_NAMES, type Layout } from '../keyboard/layouts';
   import { PASOS } from '../leccion-cero';
@@ -59,6 +59,15 @@
     pulsadas = s;
   }
 
+  function alPerderFoco(): void {
+    pulsadas = new Set();
+  }
+
+  onMount(() => {
+    window.addEventListener('blur', alPerderFoco);
+    return () => window.removeEventListener('blur', alPerderFoco);
+  });
+
   async function ir(n: number): Promise<void> {
     i = Math.max(0, Math.min(PASOS.length - 1, n));
     hechas = new Set();
@@ -102,6 +111,7 @@
         aria-label="Zona de prueba: pulsa las teclas que se te indiquen"
         onkeydown={alPulsar}
         onkeyup={soltar}
+        onblur={alPerderFoco}
       ></textarea>
 
       {#if listo}
@@ -262,10 +272,27 @@
   .puntos li.hecho { background: var(--border-strong); }
   .puntos li.actual { background: var(--accent); border-color: var(--accent); transform: scale(1.3); }
 
-  .saltar { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
+  .saltar {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex-wrap: wrap;
+    min-height: var(--target-min);
+  }
   .enlace {
-    background: none; border: none; padding: 0; min-height: 0;
-    color: var(--accent); text-decoration: underline; cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0 var(--space-1);
+    min-height: var(--target-min);
+    min-width: var(--target-min);
+    display: inline-flex;
+    align-items: center;
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
     font-size: inherit;
   }
 </style>

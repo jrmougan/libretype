@@ -10,9 +10,9 @@
    */
   import { onMount } from 'svelte';
   import Keyboard from './Keyboard.svelte';
-  import { TypingEngine, computeStats, diffAgainstTarget, type CharState, type Stats }
+  import { TypingEngine, computeStats, diffAgainstTarget, UMBRAL_PAUSA_MS, type CharState, type Stats }
     from '../keyboard/engine';
-  import type { MapaDominio } from '../keyboard/dominio';
+  import { MS_RAPIDO, type MapaDominio } from '../keyboard/dominio';
   import { buildIndex, FINGER_NAMES, type KeyStep, type Layout }
     from '../keyboard/layouts';
 
@@ -44,12 +44,22 @@
      * quien conoce la escala elegida, no el componente.
      */
     espacioJusto?: boolean;
+    /** Permite forzar animaciones reducidas en la lección. */
+    movimiento?: 'auto' | 'reducido';
+    animaciones?: 'normales' | 'reducidas' | 'auto';
+    /** Indica si el ejercicio está pausado. */
+    pausado?: boolean;
+    /** Callback para reanudar desde el cartel de pausa. */
+    onReanudar?: () => void;
   }
 
   let {
     layout, target, activo = true, onDone, onTecla, dominios, onStats,
     titulo = '', explicacion = '', cobertura = '', espacioJusto = false,
+    movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar,
   }: Props = $props();
+
+  const sinAnimaciones = $derived(movimiento === 'reducido' || animaciones === 'reducidas');
 
   let field = $state<HTMLTextAreaElement | null>(null);
   let engine: TypingEngine | null = null;
@@ -58,10 +68,29 @@
   let composing = $state(false);
   let held = $state<Set<string>>(new Set());
   let stamps = $state<readonly number[]>([]);
+  let errores = $state(0);
+  let pendienteTecla0: { code: string; acierto: boolean }[] | null = null;
+
+  let pausadoEn: number | null = null;
+  let tiempoDescontado = $state(0);
+
+  $effect(() => {
+    if (pausado) {
+      pausadoEn = performance.now();
+    } else if (pausadoEn !== null) {
+      tiempoDescontado += performance.now() - pausadoEn;
+      pausadoEn = null;
+    }
+  });
 
   const index = $derived(buildIndex(layout));
   const states = $derived<CharState[]>(diffAgainstTarget(typed, target));
-  const stats = $derived(computeStats(typed, target, stamps));
+  const stampsEfectivos = $derived(
+    tiempoDescontado > 0
+      ? stamps.map((st, idx) => (idx === 0 ? st : Math.max(stamps[0], st - tiempoDescontado)))
+      : stamps,
+  );
+  const stats = $derived(computeStats(typed, target, stampsEfectivos, errores));
   const finished = $derived(typed.length >= target.length);
 
   /** Carácter que toca escribir ahora. */
@@ -128,11 +157,22 @@
         // medias el campo muestra `´` pero la posición de la lección no debe
         // avanzar, o la pista pediría la letra siguiente en vez de la vocal
         // que completa la tilde.
-        const antes = typed.length;
-        typed = s.committed.slice(0, target.length);
+        const antes = typed;
+        const nuevoTyped = s.committed.slice(0, target.length);
+        if (nuevoTyped.length < antes.length) {
+          // El alumno ha borrado caracteres: contabilizar errores corregidos
+          for (let i = nuevoTyped.length; i < antes.length; i++) {
+            if (antes[i] !== target[i]) {
+              errores++;
+            }
+          }
+        }
+        typed = nuevoTyped;
         composing = s.composing;
         stamps = [...engine!.stamps];
-        if (typed.length > antes) reportarTeclas(antes, typed.length);
+        if (nuevoTyped.length > antes.length) {
+          reportarTeclas(antes.length, nuevoTyped.length);
+        }
       },
     });
     return () => engine?.destroy();
@@ -141,11 +181,11 @@
   // Solo al entrar en la lección o volver de un panel. Perder el foco nunca
   // lo recupera: Tab y Mayús+Tab tienen que poder llegar a los demás controles.
   $effect(() => {
-    if (activo) field?.focus();
+    if (activo && !pausado) field?.focus();
   });
 
   export function enfocar(): void {
-    if (activo) field?.focus();
+    if (activo && !pausado) field?.focus();
   }
 
   /**
@@ -156,13 +196,35 @@
    */
   function reportarTeclas(desde: number, hasta: number): void {
     if (!onTecla) return;
+
+    // Si teníamos la primera tecla pendiente y ahora tenemos al menos 2 sellos
+    if (pendienteTecla0 && stamps.length >= 2) {
+      const ms0 = Math.min(Math.max(0, stamps[1] - stamps[0]), UMBRAL_PAUSA_MS);
+      for (const p of pendienteTecla0) {
+        onTecla(p.code, p.acierto, ms0);
+      }
+      pendienteTecla0 = null;
+    }
+
     for (let i = desde; i < hasta; i++) {
       const esperado = target[i];
       if (esperado === undefined) continue;
       const pasos = index.get(esperado);
       if (!pasos) continue;
-      const ms = i > 0 && stamps[i] && stamps[i - 1] ? stamps[i] - stamps[i - 1] : 0;
       const acierto = typed[i] === esperado;
+
+      if (i === 0) {
+        if (stamps.length >= 2) {
+          const ms = Math.min(Math.max(0, stamps[1] - stamps[0]), UMBRAL_PAUSA_MS);
+          for (const paso of pasos) onTecla(paso.code, acierto, ms);
+        } else {
+          pendienteTecla0 = pasos.map((p) => ({ code: p.code, acierto }));
+        }
+        continue;
+      }
+
+      const delta = stamps[i] && stamps[i - 1] ? stamps[i] - stamps[i - 1] : 0;
+      const ms = Math.min(Math.max(0, delta), UMBRAL_PAUSA_MS);
       for (const paso of pasos) onTecla(paso.code, acierto, ms);
     }
   }
@@ -174,6 +236,12 @@
   $effect(() => {
     if (finished && !composing && !avisado) {
       avisado = true;
+      if (pendienteTecla0) {
+        for (const p of pendienteTecla0) {
+          onTecla?.(p.code, p.acierto, MS_RAPIDO);
+        }
+        pendienteTecla0 = null;
+      }
       onDone?.(stats);
     }
   });
@@ -183,11 +251,15 @@
     engine?.reset();
     typed = '';
     stamps = [];
+    errores = 0;
+    pendienteTecla0 = null;
     avisado = false;
+    tiempoDescontado = 0;
+    pausadoEn = null;
   }
 </script>
 
-<div class="drill">
+<div class="drill" class:sin-animaciones={sinAnimaciones}>
   <header class="cab">
     <h2>{titulo}</h2>
     {#if cobertura}
@@ -202,7 +274,10 @@
         {explicacionAbierta ? 'Ocultar' : '¿Qué se practica?'}
       </button>
     {/if}
-    <button onclick={enfocar} disabled={!activo}>Seguir escribiendo</button>
+    <button onclick={enfocar} disabled={!activo || pausado}>Seguir escribiendo</button>
+    <button type="button" class="reiniciar" onclick={restart} aria-label="Empezar de nuevo esta lección">
+      Empezar de nuevo
+    </button>
   </header>
 
   {#if explicacionAbierta && explicacion}
@@ -211,15 +286,31 @@
 
   <!-- La etiqueta devuelve el foco al pulsar el texto sin interceptar teclas.
        El campo real conserva la composición del método de entrada del sistema. -->
-  <label class="text">
+  <label class="text" aria-label={`Texto de la lección: ${target}`}>
+    {#if pausado}
+      <div class="pausa-cartel" role="status" aria-live="polite">
+        <span>Ejercicio pausado</span>
+        {#if onReanudar}
+          <button type="button" class="btn-reanudar" onclick={onReanudar}>
+            Reanudar
+          </button>
+        {/if}
+      </div>
+    {/if}
     <textarea
       bind:this={field}
       class="capture"
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"
-      disabled={!activo}
-      aria-label="Escribe aquí el texto de la lección"
+      disabled={!activo || pausado}
+      aria-label={`Escribe el texto de la lección: ${target}`}
+      onpaste={(e) => e.preventDefault()}
+      onbeforeinput={(e) => {
+        if ((e as InputEvent).inputType === 'insertFromPaste') {
+          e.preventDefault();
+        }
+      }}
     ></textarea>
     <span aria-hidden="true">
       {#each [...target] as ch, i (i)}
@@ -232,7 +323,7 @@
        pista sí tiene que ser audible, y el progreso legible. -->
   <p class="sr-only" aria-live="polite">{hint}</p>
 
-  <p class="hint">
+  <p class="hint" aria-hidden="true">
     {#if nextStep}
       <span class="swatch" style="background: var(--finger-{nextStep.finger})"
             aria-hidden="true"></span>{hint}
@@ -241,12 +332,39 @@
     {/if}
   </p>
 
-  <div class="teclado">
+  <div class="teclado" aria-hidden="true">
     <Keyboard {layout} {held} next={nextStep} {lastWrong} {dominios} />
   </div>
 </div>
 
 <style>
+  .pausa-cartel {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    z-index: 5;
+    border-radius: var(--radius);
+    font-size: var(--text-lg);
+    font-weight: 500;
+  }
+
+  .btn-reanudar {
+    min-height: var(--target-min);
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 0 var(--space-4);
+    font-size: var(--text-base);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
   /* El teclado se lleva el espacio que sobre; todo lo demás ocupa lo justo.
      `min-height: 0` es lo que permite que la rejilla encoja de verdad en vez
      de desbordar. */
@@ -270,7 +388,7 @@
        recibir el foco de verdad para que llegue el texto compuesto. */
   }
 
-  .cab { grid-area: cabecera; display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+  .cab { grid-area: cabecera; display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
   .cab h2 { margin: 0; font-size: var(--text-lg); }
 
   .cobertura {
@@ -284,8 +402,12 @@
   }
   .explica {
     margin-left: auto;
-    min-height: 0;
-    padding: 2px var(--space-2);
+    min-height: var(--target-min);
+    min-width: var(--target-min);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2) var(--space-3);
     font-size: var(--text-sm);
   }
 
@@ -331,12 +453,24 @@
     background: var(--accent);
     color: var(--accent-fg);
     border-radius: 3px;
-    animation: pulse 1.1s var(--ease) infinite;
+    animation: blink 1.1s var(--ease) infinite;
   }
 
+  @keyframes blink { 50% { opacity: 0.62; } }
   @keyframes pulse { 50% { opacity: 0.62; } }
   @media (prefers-reduced-motion: reduce) {
-    .ch.current { animation: none; outline: 2px solid var(--fg); }
+    .ch.current {
+      animation: none;
+      opacity: 1;
+      outline: 2px solid var(--fg);
+    }
+  }
+  :global(:root[data-motion="reducido"]) .ch.current,
+  :global(:root[data-motion="reduced"]) .ch.current,
+  .sin-animaciones .ch.current {
+    animation: none;
+    opacity: 1;
+    outline: 2px solid var(--fg);
   }
 
   .hint {

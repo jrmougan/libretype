@@ -151,6 +151,20 @@ Reglas del tono, que no son negociables sin rehacer el razonamiento:
 - **Por defecto se usa el sobrio** mientras no haya elegido: es más fácil
   perdonar que una app te hable seria de más que al revés.
 - Ninguna de las dos voces reprende al fallar. Hay test.
+- **El objetivo de precisión nunca se muestra como número suelto.**
+  `PCT_OBJETIVO` decide qué lecciones se desbloquean, pero enseñarlo aislado
+  activa una meta de *rendimiento* («¿llego o no llego?») en vez de una de
+  *maestría* («estoy mejorando»). En un público con ansiedad frente a la
+  tecnología ese marco de amenaza pesa más que el beneficio pedagógico del
+  umbral: es el *design disqualification* de más arriba, dicho con un número.
+  Así que el umbral solo se comunica con las frases de `storage/objetivos.ts`,
+  que llevan la cifra y el lenguaje que quita presión juntos —«a tu ritmo», «sin
+  prisa», «sin velocidad mínima»—, y ninguna vista puede interpolar
+  `PCT_OBJETIVO` por su cuenta. En la etiqueta corta de cada fila del panel no va
+  número: ya está explicado en la nota de encima, y repetirlo fila a fila
+  convertiría cada lección en un examen. Lo vigilan `objetivos.test.ts`, que
+  recorre `src/` buscando quién interpola el umbral, y los tests de `App` y
+  `Progreso` que recorren el DOM montado.
 
 ## Retirada de la ayuda visual
 

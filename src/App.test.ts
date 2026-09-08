@@ -3,6 +3,7 @@ import { flushSync, mount, tick, unmount } from 'svelte';
 import App from './App.svelte';
 import { LESSONS } from './lib/lessons';
 import { guardar, POR_DEFECTO } from './lib/preferencias';
+import { PCT_OBJETIVO, SIN_PRESION } from './lib/storage/objetivos';
 
 let app: ReturnType<typeof App>;
 
@@ -281,5 +282,51 @@ describe('experiencia de producto (#21, #23, #24)', () => {
 
     expect(campo().disabled).toBe(false);
     expect(document.querySelector('.pausa-cartel')).toBeNull();
+  });
+});
+
+describe('el objetivo de precisión nunca es un número aislado (#54)', () => {
+  const RE_UMBRAL = new RegExp(`\\b${PCT_OBJETIVO}\\s*%`);
+  const RE_SIN_PRESION = new RegExp(SIN_PRESION.join('|'), 'i');
+
+  /**
+   * Recorre el DOM montado en vez de mirar solo los sitios conocidos: si una
+   * vista nueva habla del objetivo y suelta la cifra, falla aquí. Los
+   * porcentajes en vivo de las métricas no cuentan, porque no son el objetivo.
+   */
+  function ningunaCifraSuelta(): void {
+    const menciones = [...document.querySelectorAll<HTMLElement>('body *')]
+      .filter((el) => /objetivo/i.test(el.textContent ?? ''));
+    expect(menciones.length).toBeGreaterThan(0);
+    for (const el of menciones) {
+      const texto = el.textContent ?? '';
+      if (!RE_UMBRAL.test(texto)) continue;
+      expect(texto, `<${el.tagName.toLowerCase()}> enseña el umbral sin quitar presión`)
+        .toMatch(RE_SIN_PRESION);
+    }
+  }
+
+  it('la pista de la lección en curso une el umbral a lo que se practica', () => {
+    const pista = document.querySelector('p.focus');
+    expect(pista?.textContent).toContain(`${PCT_OBJETIVO}% de precisión`);
+    expect(pista?.textContent).toMatch(RE_SIN_PRESION);
+    expect(pista?.textContent).toContain(LESSONS[0].focus);
+    ningunaCifraSuelta();
+  });
+
+  it('tras un intento por debajo del umbral dice cómo seguir, no cuánto falta', async () => {
+    const objetivo = LESSONS[0].text;
+    let conFallos = '';
+    for (let i = 0; i < objetivo.length; i++) conFallos += i % 2 === 0 ? 'x' : objetivo[i];
+    campo().value = conFallos;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+
+    const nota = document.querySelector('dialog#dialogo-resultado p.note');
+    expect(nota?.textContent).toContain(`${PCT_OBJETIVO}% de precisión`);
+    expect(nota?.textContent).toMatch(RE_SIN_PRESION);
+    expect(nota?.textContent).toContain('desbloquear la siguiente lección');
+    ningunaCifraSuelta();
   });
 });

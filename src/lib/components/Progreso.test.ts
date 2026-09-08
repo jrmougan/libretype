@@ -3,6 +3,7 @@ import { flushSync, mount, tick, unmount } from "svelte";
 import Progreso from "./Progreso.svelte";
 import { LESSONS } from "../lessons";
 import { AlmacenMemoria } from "../storage/almacen";
+import { FILA_DISPONIBLE, PCT_OBJETIVO, SIN_PRESION } from "../storage/objetivos";
 import type { Sesion } from "../storage/progreso";
 
 let componente: ReturnType<typeof Progreso> | undefined;
@@ -315,5 +316,67 @@ describe("Progreso.svelte - Evolución temporal (Issue #26) y Teclas flojas (Iss
     const arg = onPracticarRefuerzo.mock.calls[0][0];
     expect(arg.id).toBe("refuerzo");
     expect(arg.teclasFlojas).toContain("p");
+  });
+});
+
+describe("Progreso.svelte - El umbral nunca se muestra como número aislado (Issue #54)", () => {
+  const RE_UMBRAL = new RegExp(`\\b${PCT_OBJETIVO}\\s*%`);
+  const RE_SIN_PRESION = new RegExp(SIN_PRESION.join("|"), "i");
+
+  function montar(sesiones: readonly Sesion[]): void {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones, lecciones: LESSONS, tipoAlmacen: "sqlite", onBorrar: () => {} },
+    });
+    flushSync();
+  }
+
+  /**
+   * Recorre el DOM montado en vez de mirar solo los sitios conocidos: si una
+   * vista nueva habla del objetivo y suelta la cifra, falla aquí. Las marcas de
+   * la tabla no cuentan, porque un porcentaje conseguido no es el objetivo.
+   */
+  function ningunaCifraSuelta(): void {
+    const menciones = [...document.querySelectorAll<HTMLElement>("body *")]
+      .filter((el) => /objetivo/i.test(el.textContent ?? ""));
+    expect(menciones.length).toBeGreaterThan(0);
+    for (const el of menciones) {
+      const texto = el.textContent ?? "";
+      if (!RE_UMBRAL.test(texto)) continue;
+      expect(texto, `<${el.tagName.toLowerCase()}> enseña el umbral sin quitar presión`)
+        .toMatch(RE_SIN_PRESION);
+    }
+  }
+
+  it("sin lecciones superadas anuncia el umbral una sola vez y sin velocidad mínima", () => {
+    montar([]);
+
+    const nota = document.querySelector("p.nota");
+    expect(nota?.textContent).toContain(`${PCT_OBJETIVO}% de precisión`);
+    expect(nota?.textContent).toMatch(RE_SIN_PRESION);
+    expect(document.querySelectorAll("tbody th small")).toHaveLength(0);
+    ningunaCifraSuelta();
+  });
+
+  it("con lecciones superadas no repite el umbral en ninguna fila de la tabla", () => {
+    montar([sesionPrueba]);
+
+    const etiquetas = [...document.querySelectorAll("tbody th small")]
+      .map((small) => small.textContent ?? "");
+    expect(etiquetas).toContain("Superada");
+    expect(etiquetas).toContain(FILA_DISPONIBLE);
+    for (const etiqueta of etiquetas) {
+      expect(etiqueta, `«${etiqueta}» mete una cifra en la fila`).not.toMatch(/\d/);
+    }
+    ningunaCifraSuelta();
+  });
+
+  it("una marca clavada en el umbral no se confunde con el objetivo", () => {
+    montar([{ ...sesionPrueba, pctAcierto: 90, aciertos: 36 }]);
+
+    const fila = document.querySelector("tbody tr");
+    expect(fila?.textContent).toContain("90%");
+    expect(fila?.textContent).not.toMatch(/objetivo/i);
+    ningunaCifraSuelta();
   });
 });

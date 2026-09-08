@@ -3,7 +3,9 @@
     formatearDuracion, resumirEvolucion, resumirGlobal, resumirLecciones, type Sesion,
   } from "../storage/progreso";
   import { tituloRetirada } from "../storage/equivalencias";
-  import { leccionesSuperadas, nivelDisponible, PCT_OBJETIVO } from "../storage/objetivos";
+  import {
+    FILA_DISPONIBLE, leccionesSuperadas, nivelDisponible, OBJETIVO_PANEL,
+  } from "../storage/objetivos";
   import type { Lesson } from "../lessons";
   import type { Almacen } from "../storage/almacen";
   import type { EstadoTecla } from "../keyboard/dominio";
@@ -178,7 +180,7 @@
 
 <section class="progreso" aria-label="Tu progreso">
   <h2>Tu progreso</h2>
-  <p class="nota">{superadas.size} de {lecciones.length} lecciones superadas. Objetivo: terminar cada lección con al menos un {PCT_OBJETIVO}% de precisión para desbloquear la siguiente. Sin velocidad mínima.</p>
+  <p class="nota">{superadas.size} de {lecciones.length} lecciones superadas. {OBJETIVO_PANEL}</p>
 
   {#if global.sesiones === 0}
     <p class="vacio">
@@ -213,7 +215,7 @@
         {#each lecciones as l, i (l.id)}
           {@const r = porLeccion.get(l.id)}
           <tr class:sin-hacer={!r}>
-            <th scope="row">{l.title}<small>{i > nivel ? 'Bloqueada · supera las anteriores' : superadas.has(l.id) ? 'Superada' : 'Disponible · objetivo 90%'}</small></th>
+            <th scope="row">{l.title}<small>{i > nivel ? 'Bloqueada · supera las anteriores' : superadas.has(l.id) ? 'Superada' : FILA_DISPONIBLE}</small></th>
             <td>{r ? r.intentos : "—"}</td>
             <td>
               {#if r && r.mejorPpm > 0}

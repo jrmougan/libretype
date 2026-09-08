@@ -18,7 +18,9 @@
   } from './lib/keyboard/dominio';
   import { abrirAlmacen, type Almacen } from './lib/storage/almacen';
   import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
-  import { leccionesSuperadas, nivelDisponible, PCT_OBJETIVO } from './lib/storage/objetivos';
+  import {
+    leccionesSuperadas, nivelDisponible, OBJETIVO_PENDIENTE, objetivoLeccion,
+  } from './lib/storage/objetivos';
   import {
     aplicar, cargar, guardar as guardarPrefs, POR_DEFECTO,
     type Preferencias, type Tono,
@@ -609,7 +611,7 @@
           onReanudar={() => { pausado = false; tick().then(() => drill?.enfocar()); }}
           target={lesson.text}
           titulo={lesson.title}
-          explicacion={leccionPersonalizada ? lesson.focus : `Objetivo: termina con al menos un ${PCT_OBJETIVO}% de precisión. ${lesson.focus}`}
+          explicacion={leccionPersonalizada ? lesson.focus : objetivoLeccion(lesson.focus)}
           cobertura={pct(lesson.cobertura)}
           espacioJusto={prefs.escala >= 1.4}
           movimiento={prefs.movimiento}
@@ -655,7 +657,7 @@
             {#if superadas.has(lesson.id)}
               Lección superada.{lessonIx === LESSONS.length - 1 ? ' Has completado el temario.' : ' Puedes pasar a la siguiente lección.'}
             {:else}
-              Objetivo: {PCT_OBJETIVO}% de precisión. Puedes repetir a tu ritmo para desbloquear la siguiente lección.
+              {OBJETIVO_PENDIENTE}
             {/if}
           </p>
         {/if}

@@ -1,0 +1,10 @@
+Desbloquear lecciones por objetivo de precisión, no por terminarlas
+
+Terminar una lección ya daba acceso a la siguiente aunque el intento
+estuviera lleno de fallos, que es justo lo que la app no quiere premiar.
+Ahora una lección se supera al alcanzar el 90% de precisión, sin velocidad
+mínima, y el nivel siguiente queda bloqueado hasta entonces.
+
+El recorte del respaldo en localStorage conservaba solo las últimas
+sesiones y podía volver a bloquear una lección ya superada; conservarLogros
+reserva el intento que acredita cada logro antes de recortar.

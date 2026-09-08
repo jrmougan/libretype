@@ -2,7 +2,11 @@
   import {
     formatearDuracion, resumirEvolucion, resumirGlobal, resumirLecciones, type Sesion,
   } from "../storage/progreso";
+  import { resumirDificultad } from "../storage/dificultad";
   import { tituloRetirada } from "../storage/equivalencias";
+  import {
+    FILA_DISPONIBLE, leccionesSuperadas, nivelDisponible, OBJETIVO_PANEL,
+  } from "../storage/objetivos";
   import type { Lesson } from "../lessons";
   import type { Almacen } from "../storage/almacen";
   import type { EstadoTecla } from "../keyboard/dominio";
@@ -40,6 +44,10 @@
 
   const esDegradado = $derived(errorAlmacen || Boolean(almacen?.errorAlmacen));
   const porLeccion = $derived(resumirLecciones(sesiones));
+  /** Cuánto costó superar cada lección, sin el repaso posterior a lograrlo. */
+  const dificultad = $derived(resumirDificultad(sesiones));
+  const superadas = $derived(leccionesSuperadas(sesiones));
+  const nivel = $derived(nivelDisponible(sesiones));
   const global = $derived(resumirGlobal(sesiones));
   const evolucion = $derived(resumirEvolucion(sesiones));
   const listaTeclas = $derived(teclas ? obtenerTeclasOrdenadas(teclas) : []);
@@ -175,6 +183,7 @@
 
 <section class="progreso" aria-label="Tu progreso">
   <h2>Tu progreso</h2>
+  <p class="nota">{superadas.size} de {lecciones.length} lecciones superadas. {OBJETIVO_PANEL}</p>
 
   {#if global.sesiones === 0}
     <p class="vacio">
@@ -191,7 +200,7 @@
       <div><dt>Mejor marca</dt><dd>{global.mejorPpm} <small>ppm</small></dd></div>
     </dl>
 
-    <!-- Al 200% las cinco columnas no caben en el panel. Que se desplace la
+    <!-- Al 200% las seis columnas no caben en el panel. Que se desplace la
          tabla dentro de su caja, no que se recorten la marca y la fecha. -->
     <div class="tabla">
       <table>
@@ -200,17 +209,24 @@
         <tr>
           <th scope="col">Lección</th>
           <th scope="col">Intentos</th>
+          <th scope="col">Hasta superar</th>
           <th scope="col">Mejor</th>
           <th scope="col">Última</th>
           <th scope="col">Cuándo</th>
         </tr>
       </thead>
       <tbody>
-        {#each lecciones as l (l.id)}
+        {#each lecciones as l, i (l.id)}
           {@const r = porLeccion.get(l.id)}
+          {@const d = dificultad.get(l.id)}
           <tr class:sin-hacer={!r}>
-            <th scope="row">{l.title}</th>
+            <th scope="row">{l.title}<small>{i > nivel ? 'Bloqueada · supera las anteriores' : superadas.has(l.id) ? 'Superada' : FILA_DISPONIBLE}</small></th>
             <td>{r ? r.intentos : "—"}</td>
+            <td>
+              {#if d}
+                {d.intentosHastaSuperar}{#if !d.superada} <span class="nota">sin superar</span>{/if}
+              {:else}—{/if}
+            </td>
             <td>
               {#if r && r.mejorPpm > 0}
                 <strong>{r.mejorPpm}</strong> ppm · {r.mejorPct}%
@@ -237,6 +253,9 @@
               {/if}
             </th>
             <td>{r.intentos}</td>
+            <!-- Ni la práctica libre ni las retiradas tienen objetivo que
+                 superar; el porqué está en `storage/dificultad.ts`. -->
+            <td>—</td>
             <td>
               {#if r.mejorPpm > 0}
                 <strong>{r.mejorPpm}</strong> ppm · {r.mejorPct}%
@@ -262,6 +281,13 @@
     <p class="nota">
       Solo cuentan para la marca los intentos con 90% de acierto o más: ir
       rápido fallando no es escribir mejor.
+    </p>
+
+    <p class="nota">
+      «Hasta superar» cuenta los intentos que costó llegar al objetivo la
+      primera vez: seguir practicando una lección ya superada no suma ahí. Es lo
+      que permite ver cuál está costando más que las demás. Si faltan sesiones
+      antiguas en el historial, el recuento puede ser menor que el real.
     </p>
 
     {#if evolucion.dias.length > 0}

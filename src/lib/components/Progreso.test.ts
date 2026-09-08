@@ -3,6 +3,7 @@ import { flushSync, mount, tick, unmount } from "svelte";
 import Progreso from "./Progreso.svelte";
 import { LESSONS } from "../lessons";
 import { AlmacenMemoria } from "../storage/almacen";
+import { FILA_DISPONIBLE, PCT_OBJETIVO, SIN_PRESION } from "../storage/objetivos";
 import type { Sesion } from "../storage/progreso";
 
 let componente: ReturnType<typeof Progreso> | undefined;
@@ -315,5 +316,125 @@ describe("Progreso.svelte - Evolución temporal (Issue #26) y Teclas flojas (Iss
     const arg = onPracticarRefuerzo.mock.calls[0][0];
     expect(arg.id).toBe("refuerzo");
     expect(arg.teclasFlojas).toContain("p");
+  });
+});
+
+describe("Progreso.svelte - El umbral nunca se muestra como número aislado (Issue #54)", () => {
+  const RE_UMBRAL = new RegExp(`\\b${PCT_OBJETIVO}\\s*%`);
+  const RE_SIN_PRESION = new RegExp(SIN_PRESION.join("|"), "i");
+
+  function montar(sesiones: readonly Sesion[]): void {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones, lecciones: LESSONS, tipoAlmacen: "sqlite", onBorrar: () => {} },
+    });
+    flushSync();
+  }
+
+  /**
+   * Recorre el DOM montado en vez de mirar solo los sitios conocidos: si una
+   * vista nueva habla del objetivo y suelta la cifra, falla aquí. Las marcas de
+   * la tabla no cuentan, porque un porcentaje conseguido no es el objetivo.
+   */
+  function ningunaCifraSuelta(): void {
+    const menciones = [...document.querySelectorAll<HTMLElement>("body *")]
+      .filter((el) => /objetivo/i.test(el.textContent ?? ""));
+    expect(menciones.length).toBeGreaterThan(0);
+    for (const el of menciones) {
+      const texto = el.textContent ?? "";
+      if (!RE_UMBRAL.test(texto)) continue;
+      expect(texto, `<${el.tagName.toLowerCase()}> enseña el umbral sin quitar presión`)
+        .toMatch(RE_SIN_PRESION);
+    }
+  }
+
+  it("sin lecciones superadas anuncia el umbral una sola vez y sin velocidad mínima", () => {
+    montar([]);
+
+    const nota = document.querySelector("p.nota");
+    expect(nota?.textContent).toContain(`${PCT_OBJETIVO}% de precisión`);
+    expect(nota?.textContent).toMatch(RE_SIN_PRESION);
+    expect(document.querySelectorAll("tbody th small")).toHaveLength(0);
+    ningunaCifraSuelta();
+  });
+
+  it("con lecciones superadas no repite el umbral en ninguna fila de la tabla", () => {
+    montar([sesionPrueba]);
+
+    const etiquetas = [...document.querySelectorAll("tbody th small")]
+      .map((small) => small.textContent ?? "");
+    expect(etiquetas).toContain("Superada");
+    expect(etiquetas).toContain(FILA_DISPONIBLE);
+    for (const etiqueta of etiquetas) {
+      expect(etiqueta, `«${etiqueta}» mete una cifra en la fila`).not.toMatch(/\d/);
+    }
+    ningunaCifraSuelta();
+  });
+
+  it("una marca clavada en el umbral no se confunde con el objetivo", () => {
+    montar([{ ...sesionPrueba, pctAcierto: 90, aciertos: 36 }]);
+
+    const fila = document.querySelector("tbody tr");
+    expect(fila?.textContent).toContain("90%");
+    expect(fila?.textContent).not.toMatch(/objetivo/i);
+    ningunaCifraSuelta();
+  });
+});
+
+describe("Progreso.svelte - Intentos hasta superar (Issue #53)", () => {
+  function montar(sesiones: readonly Sesion[]): void {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: {
+        sesiones,
+        lecciones: LESSONS,
+        tipoAlmacen: "sqlite",
+        onBorrar: () => {},
+      },
+    });
+    flushSync();
+  }
+
+  /** La columna se busca por su cabecera: no depende de cuántas haya ni de dónde. */
+  function columnaHastaSuperar(): number {
+    return [...document.querySelectorAll("thead th")]
+      .findIndex((th) => th.textContent?.trim() === "Hasta superar");
+  }
+
+  function celdaDe(titulo: string, columna: number): string | undefined {
+    const fila = [...document.querySelectorAll("tbody tr")]
+      .find((tr) => tr.querySelector("th")?.textContent?.includes(titulo));
+    return fila?.children[columna]?.textContent?.replace(/\s+/g, " ").trim();
+  }
+
+  it("enseña lo que costó superar cada lección, sin el repaso posterior", () => {
+    const dia = (n: number) => `2026-09-0${n}T12:00:00.000Z`;
+    montar([
+      { ...sesionPrueba, pctAcierto: 60, aciertos: 24, terminadaEn: dia(1) },
+      { ...sesionPrueba, pctAcierto: 75, aciertos: 30, terminadaEn: dia(2) },
+      { ...sesionPrueba, pctAcierto: 95, terminadaEn: dia(3) },
+      // Repaso de una lección ya superada: suma en «Intentos» y no debe sumar
+      // aquí, que es justo por lo que esa columna no sirve para comparar.
+      { ...sesionPrueba, pctAcierto: 100, aciertos: 40, terminadaEn: dia(4) },
+      { ...sesionPrueba, leccion: "tildes", pctAcierto: 50, aciertos: 20, terminadaEn: dia(5) },
+    ]);
+
+    const col = columnaHastaSuperar();
+    expect(col).toBeGreaterThan(0);
+    expect(celdaDe("Fila de reposo", col)).toBe("3");
+    expect(celdaDe("Fila de reposo", col - 1)).toBe("4");
+    expect(celdaDe("Tildes", col)).toContain("1");
+    expect(celdaDe("Tildes", col)).toContain("sin superar");
+  });
+
+  it("lo que no es una lección del temario no tiene nada que superar", () => {
+    montar([
+      sesionPrueba,
+      { ...sesionPrueba, leccion: "practica-continua", terminadaEn: "2026-09-02T12:00:00.000Z" },
+    ]);
+
+    const col = columnaHastaSuperar();
+    expect(celdaDe("Práctica continua", col)).toBe("—");
+    expect(celdaDe("Las vocales que mandan", col)).toBe("—");
   });
 });

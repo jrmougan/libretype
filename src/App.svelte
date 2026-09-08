@@ -8,7 +8,6 @@
   import {
     generarTextoPractica,
     LESSONS,
-    nivelDesbloqueado,
     normalizarTextoLibre,
     type Lesson,
   } from './lib/lessons';
@@ -18,7 +17,11 @@
     contarDominadas, mapaDeDominio, registrar, type EstadoTecla,
   } from './lib/keyboard/dominio';
   import { abrirAlmacen, type Almacen } from './lib/storage/almacen';
+  import { leccionesOxidadas } from './lib/storage/repaso';
   import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
+  import {
+    leccionesSuperadas, nivelDisponible, OBJETIVO_PENDIENTE, objetivoLeccion,
+  } from './lib/storage/objetivos';
   import {
     aplicar, cargar, guardar as guardarPrefs, POR_DEFECTO,
     type Preferencias, type Tono,
@@ -39,7 +42,9 @@
 
   let layout = $state(obtenerLayout(prefsIniciales.layout));
   const ixGuardada = LESSONS.findIndex((l) => l.id === prefs.ultimaLeccion);
-  let lessonIx = $state(ixGuardada >= 0 ? ixGuardada : 0);
+  let lessonIx = $state(0);
+  let progresoCargado = $state(false);
+  let errorGuardado = $state(false);
   let leccionPersonalizada = $state<Lesson | null>(null);
   let pausado = $state(false);
   let drill = $state<ReturnType<typeof Drill> | null>(null);
@@ -102,7 +107,8 @@
   );
 
   const porLeccion = $derived(resumirLecciones(sesiones));
-  const maxDesbloqueado = $derived(nivelDesbloqueado(sesiones.map((s) => s.leccion)));
+  const superadas = $derived(leccionesSuperadas(sesiones));
+  const maxDesbloqueado = $derived(nivelDisponible(sesiones));
 
   const voz = $derived(vozDe(prefs.tono));
   const lesson = $derived(leccionPersonalizada ?? LESSONS[lessonIx]);
@@ -115,6 +121,7 @@
     tipoAlmacen = almacen.tipo;
     errorAlmacen = Boolean(almacen.errorAlmacen);
     sesiones = await almacen.leerTodas();
+    lessonIx = Math.min(Math.max(ixGuardada, 0), nivelDisponible(sesiones));
     teclas = await almacen.leerTeclas();
     teclasBase = new Map(teclas);
 
@@ -124,8 +131,9 @@
     else if (sesiones.length === 0) vista = 'cero';
     else {
       const ix = LESSONS.findIndex((l) => l.id === prefs.ultimaLeccion);
-      if (ix >= 0) lessonIx = ix;
+      if (ix >= 0) lessonIx = Math.min(ix, nivelDisponible(sesiones));
     }
+    progresoCargado = true;
 
   });
 
@@ -186,6 +194,8 @@
 
     // Se calcula antes de guardar: después, la propia sesión ya sería la marca.
     const record = esRecord(porLeccion.get(idLeccion), sesion);
+    errorGuardado = false;
+    sesiones = [...sesiones, sesion];
     result = { stats, record };
 
     // Que falle el guardado no puede tumbar la práctica.
@@ -194,10 +204,10 @@
     // aporta nada y se nota.
     try {
       await almacen?.guardar(sesion);
-      sesiones = [...sesiones, sesion];
       await almacen?.guardarTeclas(teclas);
       teclasBase = new Map(teclas);
     } catch (err) {
+      errorGuardado = true;
       console.warn('[libretype] no se pudo guardar la sesión:', err);
     }
   }
@@ -212,6 +222,8 @@
     await almacen.importar(json);
     sesiones = await almacen.leerTodas();
     teclas = await almacen.leerTeclas();
+    teclasBase = new Map(teclas);
+    await pick(Math.min(lessonIx, nivelDisponible(sesiones)));
   }
 
   async function borrarProgreso(): Promise<void> {
@@ -219,6 +231,7 @@
     sesiones = [];
     teclas = new Map();
     teclasBase = new Map();
+    await pick(0);
   }
 
   // Aplicar y guardar van juntos: un ajuste que no sobrevive a cerrar la app
@@ -229,6 +242,7 @@
   });
 
   async function pick(i: number): Promise<void> {
+    if (!progresoCargado || !Number.isInteger(i) || i < 0 || i > maxDesbloqueado) return;
     // Cerrar antes de sustituir la lección: WebKit restaura el foco del
     // diálogo y, si el campo anterior ya no existe, lo manda al documento.
     dialogoResultado?.close();
@@ -276,7 +290,7 @@
     if (!result) {
       teclas = new Map(teclasBase);
     }
-    nivelPractica = nivel;
+    nivelPractica = Math.min(Math.max(nivel, 0), maxDesbloqueado);
     textoContinua = generarTextoPractica(nivelPractica);
     continuaKey++;
     result = null;
@@ -404,6 +418,7 @@
     <label class="selector">
       <span class="sr-only">Lección o modo de práctica</span>
       <select
+        disabled={!progresoCargado}
         value={vista === 'leccion' ? (leccionPersonalizada ? 'refuerzo' : String(lessonIx)) : vista}
         onchange={(e) => {
           const v = e.currentTarget.value;
@@ -421,8 +436,8 @@
         {#each LESSONS as l, i (l.id)}
           {@const marca = porLeccion.get(l.id)}
           {@const esUltima = l.id === prefs.ultimaLeccion && sesiones.length > 0}
-          <option value={String(i)}>
-            {i + 1}. {l.title}{marca && marca.mejorPpm > 0 ? ` · ${marca.mejorPpm} ppm` : ''}{esUltima ? ' · Seguías por aquí' : ''}
+          <option value={String(i)} disabled={i > maxDesbloqueado}>
+            {i + 1}. {l.title}{i > maxDesbloqueado ? ' · Bloqueada' : superadas.has(l.id) ? ' · Superada' : ' · Disponible'}{marca && marca.mejorPpm > 0 ? ` · ${marca.mejorPpm} ppm` : ''}{esUltima ? ' · Seguías por aquí' : ''}
           </option>
         {/each}
         <option value="continua">Práctica continua · vocabulario acumulado</option>
@@ -504,7 +519,9 @@
   </header>
 
   <main class="escena">
-    {#if vista === 'tono'}
+    {#if !progresoCargado}
+      <p class="note" role="status">Cargando progreso…</p>
+    {:else if vista === 'tono'}
       <div class="centrado"><SelectorTono onElegir={elegirTono} /></div>
     {:else if vista === 'cero'}
       <LeccionCero {layout} onTerminar={() => pick(0)} />
@@ -516,7 +533,7 @@
           bind:value={nivelPractica}
           onchange={() => nuevaContinua(nivelPractica)}
         >
-          {#each LESSONS.slice(0, Math.max(nivelPractica, maxDesbloqueado) + 1) as l, i}
+          {#each LESSONS.slice(0, maxDesbloqueado + 1) as l, i}
             <option value={i}>{i + 1}. {l.title}</option>
           {/each}
         </select>
@@ -595,7 +612,7 @@
           onReanudar={() => { pausado = false; tick().then(() => drill?.enfocar()); }}
           target={lesson.text}
           titulo={lesson.title}
-          explicacion={lesson.focus}
+          explicacion={leccionPersonalizada ? lesson.focus : objetivoLeccion(lesson.focus)}
           cobertura={pct(lesson.cobertura)}
           espacioJusto={prefs.escala >= 1.4}
           movimiento={prefs.movimiento}
@@ -636,6 +653,18 @@
             {result.stats.accuracy < 90 ? voz.animoBajo : (result.stats.accuracy >= PRECISION_ALTA ? voz.animoAlto : voz.animoAlto)}
           </span>
         </div>
+        {#if vista === 'leccion' && !leccionPersonalizada}
+          <p class="note">
+            {#if superadas.has(lesson.id)}
+              Lección superada.{lessonIx === LESSONS.length - 1 ? ' Has completado el temario.' : ' Puedes pasar a la siguiente lección.'}
+            {:else}
+              {OBJETIVO_PENDIENTE}
+            {/if}
+          </p>
+        {/if}
+        {#if errorGuardado}
+          <p class="note" role="status">No se pudo guardar el resultado. El avance de este intento solo estará disponible durante esta sesión.</p>
+        {/if}
         <div class="botones">
           {#if result.stats.accuracy < 90}
             <button class="primario" onclick={again}>{voz.repetir}</button>
@@ -643,7 +672,7 @@
               <button onclick={() => nuevaContinua()}>Nuevo texto</button>
             {:else if vista === 'propio'}
               <button onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
-            {:else if lessonIx < LESSONS.length - 1}
+            {:else if !leccionPersonalizada && lessonIx < maxDesbloqueado}
               <button onclick={() => pick(lessonIx + 1)}>{voz.siguiente}</button>
             {/if}
           {:else}
@@ -652,11 +681,15 @@
               <button class="primario" onclick={() => nuevaContinua()}>Nuevo texto</button>
             {:else if vista === 'propio'}
               <button class="primario" onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
-            {:else if lessonIx < LESSONS.length - 1}
+            {:else if !leccionPersonalizada && lessonIx < maxDesbloqueado}
               <button class="primario" onclick={() => pick(lessonIx + 1)}>{voz.siguiente}</button>
             {/if}
           {/if}
         </div>
+        {#if vista === 'leccion' && !leccionPersonalizada && leccionesOxidadas(sesiones, undefined, lesson.id).length > 0}
+          <p class="note">{voz.repaso} Puedes practicar a tu ritmo con vocabulario conocido.</p>
+          <button onclick={() => { vista = 'continua'; nuevaContinua(maxDesbloqueado); }}>Repasar con práctica continua</button>
+        {/if}
       </div>
     </dialog>
   {/if}
@@ -946,6 +979,9 @@
   }
   .resultado {
     display: grid; gap: var(--space-2);
+    min-height: 0;
+    max-height: 100%;
+    overflow-y: auto;
     max-width: 46ch;
     padding: var(--space-6);
     background: var(--surface);

@@ -3,6 +3,7 @@ import { flushSync, mount, tick, unmount } from 'svelte';
 import App from './App.svelte';
 import { LESSONS } from './lib/lessons';
 import { guardar, POR_DEFECTO } from './lib/preferencias';
+import { PCT_OBJETIVO, SIN_PRESION } from './lib/storage/objetivos';
 
 let app: ReturnType<typeof App>;
 
@@ -50,6 +51,35 @@ function completar(): void {
 }
 
 describe('captura y paneles', () => {
+  it.each([true, false])('ofrece repaso accionable solo con lecciones antiguas: %s', async (antigua) => {
+    await unmount(app);
+    const ahora = Date.now();
+    const sesiones = [0, 1, 1, 1].map((indice, i) => ({
+      leccion: LESSONS[indice].id, pctAcierto: 95, ppm: 10,
+      aciertos: 95, escritos: 100, ms: 60000,
+      terminadaEn: new Date(ahora - (i === 0 && antigua ? 20 : 4 - i) * 86400000).toISOString(),
+    }));
+    localStorage.setItem('libretype.sesiones', JSON.stringify(sesiones));
+    guardar({ ...POR_DEFECTO, tono: 'sobrio', ultimaLeccion: LESSONS[1].id });
+    app = mount(App, { target: document.body });
+    await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title));
+    campo().value = LESSONS[1].text;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    const repasar = boton('Repasar con práctica continua');
+    expect(Boolean(repasar)).toBe(antigua);
+    expect(boton('Siguiente lección')).toBeDefined();
+    if (antigua) {
+      repasar.click();
+      await tick();
+      expect(document.querySelector('h2')?.textContent).toBe('Práctica continua');
+      expect(document.querySelector('#dialogo-resultado')).toBeNull();
+      expect(campo().disabled).toBe(false);
+      expect(document.querySelector<HTMLSelectElement>('main select')?.value).toBe('2');
+    }
+  });
+
   it.each(['Ajustes', 'Progreso'])('suspende la captura en %s y la restaura al cerrar', async (nombre) => {
     expect(boton(nombre).getAttribute('aria-controls')).toBe('panel-dialogo');
     const captura = campo();
@@ -138,15 +168,15 @@ describe('captura y paneles', () => {
     captura.dispatchEvent(new InputEvent('input', { bubbles: true }));
     await tick();
 
-    // Cambia de lección sin haber completado la actual
+    // Vuelve a empezar la lección disponible sin haber completado el intento.
     const selector = document.querySelector('select')!;
-    selector.value = '1';
+    selector.value = '0';
     selector.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
 
     // La lección se ha reiniciado sin persistir intentos incompletos
     expect(campo().value).toBe('');
-    expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
+    expect(document.querySelector('h2')?.textContent).toBe(LESSONS[0].title);
   });
   it('permite acceder al modo de práctica continua (Issue #19)', async () => {
     const selector = document.querySelector('select')!;
@@ -195,14 +225,36 @@ describe('captura y paneles', () => {
 });
 
 describe('experiencia de producto (#21, #23, #24)', () => {
-  it('actualiza la ultimaLeccion en preferencias al cambiar de lección (#21)', async () => {
+  it('impide saltarse una lección bloqueada incluso mediante un cambio programático', async () => {
     const selector = document.querySelector('select')!;
-    selector.value = '2';
+    expect(selector.querySelector<HTMLOptionElement>('option[value="1"]')?.disabled).toBe(true);
+    selector.value = '1';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    expect(document.querySelector('h2')?.textContent).toBe(LESSONS[0].title);
+  });
+
+  it('recupera los desbloqueos al abrir de nuevo y limita una preferencia adelantada', async () => {
+    completar();
+    await vi.waitFor(() => expect(localStorage.getItem('libretype.sesiones')).toContain('reposo'));
+    await unmount(app);
+    guardar({ ...POR_DEFECTO, tono: 'sobrio', ultimaLeccion: LESSONS[5].id });
+    app = mount(App, { target: document.body });
+    await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title));
+    expect(document.querySelector<HTMLOptionElement>('header option[value="1"]')?.disabled).toBe(false);
+    expect(document.querySelector<HTMLOptionElement>('header option[value="2"]')?.disabled).toBe(true);
+  });
+
+  it('actualiza la ultimaLeccion en preferencias al cambiar de lección (#21)', async () => {
+    completar();
+    await tick();
+    const selector = document.querySelector('select')!;
+    selector.value = '1';
     selector.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
 
     const guardado = JSON.parse(localStorage.getItem('libretype.preferencias')!);
-    expect(guardado.ultimaLeccion).toBe(LESSONS[2].id);
+    expect(guardado.ultimaLeccion).toBe(LESSONS[1].id);
   });
 
   it('criterio de superación dinámico: accuracy < 90% hace que Repetir sea primario (#23)', async () => {
@@ -221,6 +273,8 @@ describe('experiencia de producto (#21, #23, #24)', () => {
     expect(dialogo).not.toBeNull();
     const btnPrimario = dialogo?.querySelector('button.primario');
     expect(btnPrimario?.textContent).toContain('Repetir');
+    expect(boton('Siguiente lección')).toBeUndefined();
+    expect(document.querySelector<HTMLOptionElement>('header option[value="1"]')?.disabled).toBe(true);
   });
 
   it('criterio de superación dinámico: accuracy >= 90% hace que Siguiente sea primario (#23)', async () => {
@@ -257,5 +311,51 @@ describe('experiencia de producto (#21, #23, #24)', () => {
 
     expect(campo().disabled).toBe(false);
     expect(document.querySelector('.pausa-cartel')).toBeNull();
+  });
+});
+
+describe('el objetivo de precisión nunca es un número aislado (#54)', () => {
+  const RE_UMBRAL = new RegExp(`\\b${PCT_OBJETIVO}\\s*%`);
+  const RE_SIN_PRESION = new RegExp(SIN_PRESION.join('|'), 'i');
+
+  /**
+   * Recorre el DOM montado en vez de mirar solo los sitios conocidos: si una
+   * vista nueva habla del objetivo y suelta la cifra, falla aquí. Los
+   * porcentajes en vivo de las métricas no cuentan, porque no son el objetivo.
+   */
+  function ningunaCifraSuelta(): void {
+    const menciones = [...document.querySelectorAll<HTMLElement>('body *')]
+      .filter((el) => /objetivo/i.test(el.textContent ?? ''));
+    expect(menciones.length).toBeGreaterThan(0);
+    for (const el of menciones) {
+      const texto = el.textContent ?? '';
+      if (!RE_UMBRAL.test(texto)) continue;
+      expect(texto, `<${el.tagName.toLowerCase()}> enseña el umbral sin quitar presión`)
+        .toMatch(RE_SIN_PRESION);
+    }
+  }
+
+  it('la pista de la lección en curso une el umbral a lo que se practica', () => {
+    const pista = document.querySelector('p.focus');
+    expect(pista?.textContent).toContain(`${PCT_OBJETIVO}% de precisión`);
+    expect(pista?.textContent).toMatch(RE_SIN_PRESION);
+    expect(pista?.textContent).toContain(LESSONS[0].focus);
+    ningunaCifraSuelta();
+  });
+
+  it('tras un intento por debajo del umbral dice cómo seguir, no cuánto falta', async () => {
+    const objetivo = LESSONS[0].text;
+    let conFallos = '';
+    for (let i = 0; i < objetivo.length; i++) conFallos += i % 2 === 0 ? 'x' : objetivo[i];
+    campo().value = conFallos;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+
+    const nota = document.querySelector('dialog#dialogo-resultado p.note');
+    expect(nota?.textContent).toContain(`${PCT_OBJETIVO}% de precisión`);
+    expect(nota?.textContent).toMatch(RE_SIN_PRESION);
+    expect(nota?.textContent).toContain('desbloquear la siguiente lección');
+    ningunaCifraSuelta();
   });
 });

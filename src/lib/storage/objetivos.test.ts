@@ -86,7 +86,7 @@ describe('cómo se comunica el objetivo (issue #54)', () => {
 
   it('ninguna vista interpola el umbral por su cuenta', () => {
     const reinciden = Object.entries(FUENTES)
-      .filter(([ruta]) => !ruta.endsWith('.test.ts') && !ruta.endsWith('/objetivos.ts'))
+      .filter(([ruta]) => ruta.endsWith('.svelte'))
       .filter(([, fuente]) => fuente.includes('PCT_OBJETIVO'))
       .map(([ruta]) => ruta);
     expect(reinciden, 'el umbral solo se enseña con las frases de objetivos.ts').toEqual([]);

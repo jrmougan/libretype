@@ -279,6 +279,18 @@
 
 html { color-scheme: light dark; }
 
+/* Los controles nativos deben seguir el tema elegido en la app, incluso
+ * cuando no coincide con el del sistema. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+/* Algunos motores dibujan las opciones en una superficie propia: declaramos
+ * ambos colores para mantener el contraste también al desplegar el menú. */
+select option {
+  background: var(--surface);
+  color: var(--fg);
+}
+
 body {
   margin: 0;
   background: var(--bg);

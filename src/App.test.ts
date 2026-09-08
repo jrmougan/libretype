@@ -51,6 +51,35 @@ function completar(): void {
 }
 
 describe('captura y paneles', () => {
+  it.each([true, false])('ofrece repaso accionable solo con lecciones antiguas: %s', async (antigua) => {
+    await unmount(app);
+    const ahora = Date.now();
+    const sesiones = [0, 1, 1, 1].map((indice, i) => ({
+      leccion: LESSONS[indice].id, pctAcierto: 95, ppm: 10,
+      aciertos: 95, escritos: 100, ms: 60000,
+      terminadaEn: new Date(ahora - (i === 0 && antigua ? 20 : 4 - i) * 86400000).toISOString(),
+    }));
+    localStorage.setItem('libretype.sesiones', JSON.stringify(sesiones));
+    guardar({ ...POR_DEFECTO, tono: 'sobrio', ultimaLeccion: LESSONS[1].id });
+    app = mount(App, { target: document.body });
+    await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title));
+    campo().value = LESSONS[1].text;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    const repasar = boton('Repasar con práctica continua');
+    expect(Boolean(repasar)).toBe(antigua);
+    expect(boton('Siguiente lección')).toBeDefined();
+    if (antigua) {
+      repasar.click();
+      await tick();
+      expect(document.querySelector('h2')?.textContent).toBe('Práctica continua');
+      expect(document.querySelector('#dialogo-resultado')).toBeNull();
+      expect(campo().disabled).toBe(false);
+      expect(document.querySelector<HTMLSelectElement>('main select')?.value).toBe('2');
+    }
+  });
+
   it.each(['Ajustes', 'Progreso'])('suspende la captura en %s y la restaura al cerrar', async (nombre) => {
     expect(boton(nombre).getAttribute('aria-controls')).toBe('panel-dialogo');
     const captura = campo();

@@ -21,6 +21,12 @@ export interface Voz {
   siguiente: string;
   /** Encabeza el panel de progreso. */
   progreso: string;
+  /**
+   * Invitación a repasar teclas que se superaron hace tiempo. El sujeto son las
+   * teclas y no la persona: decir «llevas dos semanas sin practicar» sería
+   * reprender, y eso está prohibido en los dos tonos.
+   */
+  repaso: string;
 }
 
 const JUEGO: Voz = {
@@ -31,6 +37,7 @@ const JUEGO: Voz = {
   repetir: 'Otra vez',
   siguiente: '¡Siguiente!',
   progreso: 'Lo que llevas conseguido',
+  repaso: '¡A repasar! Hay teclas ganadas que piden otra vuelta.',
 };
 
 const SOBRIO: Voz = {
@@ -41,6 +48,7 @@ const SOBRIO: Voz = {
   repetir: 'Repetir',
   siguiente: 'Siguiente lección',
   progreso: 'Tu progreso',
+  repaso: 'Hay teclas ya superadas que llevan un tiempo sin salir.',
 };
 
 export const VOCES: Record<Tono, Voz> = { juego: JUEGO, sobrio: SOBRIO };

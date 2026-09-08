@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { VOCES, vozDe, type Voz } from './voz';
 
 const CLAVES: (keyof Voz)[] = [
-  'terminada', 'record', 'animoAlto', 'animoBajo', 'repetir', 'siguiente', 'progreso',
+  'terminada', 'record', 'animoAlto', 'animoBajo', 'repetir', 'siguiente', 'progreso', 'repaso',
 ];
 
 describe('voces', () => {

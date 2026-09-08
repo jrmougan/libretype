@@ -17,6 +17,7 @@
     contarDominadas, mapaDeDominio, registrar, type EstadoTecla,
   } from './lib/keyboard/dominio';
   import { abrirAlmacen, type Almacen } from './lib/storage/almacen';
+  import { leccionesOxidadas } from './lib/storage/repaso';
   import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
   import {
     leccionesSuperadas, nivelDisponible, OBJETIVO_PENDIENTE, objetivoLeccion,
@@ -665,6 +666,10 @@
           <p class="note" role="status">No se pudo guardar el resultado. El avance de este intento solo estará disponible durante esta sesión.</p>
         {/if}
         <div class="botones">
+          {#if vista === 'leccion' && !leccionPersonalizada && leccionesOxidadas(sesiones, undefined, lesson.id).length > 0}
+            <p class="note">{voz.repaso} Puedes practicar a tu ritmo con vocabulario conocido.</p>
+            <button onclick={() => { vista = 'continua'; nuevaContinua(maxDesbloqueado); }}>Repasar con práctica continua</button>
+          {/if}
           {#if result.stats.accuracy < 90}
             <button class="primario" onclick={again}>{voz.repetir}</button>
             {#if vista === 'continua'}

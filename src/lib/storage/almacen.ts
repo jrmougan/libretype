@@ -10,6 +10,7 @@
  */
 import type { EstadoTecla } from "../keyboard/dominio";
 import type { Sesion } from "./progreso";
+import { conservarLogros } from "./objetivos";
 
 export interface Almacen {
   readonly tipo: "sqlite" | "local";
@@ -281,7 +282,7 @@ export class AlmacenLocal implements Almacen {
   }
 
   async guardar(s: Sesion): Promise<void> {
-    const todas = [...this.#leer(), s].slice(-TOPE_LOCAL);
+    const todas = conservarLogros([...this.#leer(), s], TOPE_LOCAL);
     try {
       localStorage.setItem(CLAVE_LOCAL, JSON.stringify(todas));
     } catch {
@@ -337,14 +338,14 @@ export class AlmacenLocal implements Almacen {
 
     if (reemplazar) {
       try {
-        localStorage.setItem(CLAVE_LOCAL, JSON.stringify(sesiones.slice(-TOPE_LOCAL)));
+        localStorage.setItem(CLAVE_LOCAL, JSON.stringify(conservarLogros(sesiones, TOPE_LOCAL)));
         localStorage.setItem(CLAVE_TECLAS, JSON.stringify([...teclas]));
       } catch { /* modo privado o cuota llena */ }
     } else {
       const existentes = this.#leer();
       const claves = new Set(existentes.map((s) => `${s.terminadaEn}|${s.leccion}`));
       const aAnadir = sesiones.filter((s) => !claves.has(`${s.terminadaEn}|${s.leccion}`));
-      const unidas = [...existentes, ...aAnadir].slice(-TOPE_LOCAL);
+      const unidas = conservarLogros([...existentes, ...aAnadir], TOPE_LOCAL);
 
       const teclasExistentes = await this.leerTeclas();
       for (const [code, val] of teclas) {

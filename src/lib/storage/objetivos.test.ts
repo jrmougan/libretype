@@ -1,0 +1,50 @@
+import { describe, expect, it } from 'vitest';
+import { LESSONS } from '../lessons';
+import type { Sesion } from './progreso';
+import { conservarLogros, leccionesSuperadas, nivelDisponible } from './objetivos';
+
+function sesion(leccion = 'reposo', pctAcierto = 90): Sesion {
+  return { leccion, pctAcierto, ppm: 1, aciertos: 90, escritos: 100, ms: 60000, terminadaEn: '2026-09-08T12:00:00Z' };
+}
+
+describe('objetivos de las lecciones', () => {
+  it('mantiene los logros antiguos al recortar el historial del navegador', () => {
+    const historial = [sesion('home'), ...Array.from({ length: 500 }, () => sesion('reposo', 40))];
+    const recortado = conservarLogros(historial, 500);
+    expect(recortado).toHaveLength(500);
+    expect(nivelDisponible(recortado)).toBe(1);
+    expect(recortado.at(-1)).toBe(historial.at(-1));
+  });
+  it('empieza por la primera y exige el 90% sin velocidad mínima', () => {
+    expect(nivelDisponible([])).toBe(0);
+    expect(nivelDisponible([sesion('reposo', 89)])).toBe(0);
+    expect(nivelDisponible([sesion()])).toBe(1);
+  });
+
+  it('conserva los logros al repetir con menos precisión', () => {
+    expect(nivelDisponible([sesion(), sesion('reposo', 30)])).toBe(1);
+  });
+
+  it('no permite saltar huecos del temario en históricos importados', () => {
+    expect(nivelDisponible([sesion('vocales-1')])).toBe(0);
+    expect(nivelDisponible([sesion('vocales-1'), sesion()])).toBe(2);
+  });
+
+  it('reconoce equivalencias honestas y excluye práctica libre y retiradas', () => {
+    expect(nivelDisponible([sesion('home')])).toBe(1);
+    expect(leccionesSuperadas(['top', 'texto-propio', 'practica-continua', 'refuerzo'].map((id) => sesion(id))).size).toBe(0);
+  });
+
+  it('descarta resultados vacíos y porcentajes inválidos', () => {
+    expect(leccionesSuperadas([
+      { ...sesion(), escritos: 0 }, sesion('reposo', NaN),
+      sesion('reposo', Infinity), sesion('reposo', 101),
+    ]).size).toBe(0);
+  });
+
+  it('termina en la última lección al superar todo el temario', () => {
+    const sesiones = LESSONS.map((l) => sesion(l.id));
+    expect(nivelDisponible(sesiones)).toBe(LESSONS.length - 1);
+    expect(leccionesSuperadas(sesiones).size).toBe(LESSONS.length);
+  });
+});

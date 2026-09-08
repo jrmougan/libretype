@@ -138,15 +138,15 @@ describe('captura y paneles', () => {
     captura.dispatchEvent(new InputEvent('input', { bubbles: true }));
     await tick();
 
-    // Cambia de lección sin haber completado la actual
+    // Vuelve a empezar la lección disponible sin haber completado el intento.
     const selector = document.querySelector('select')!;
-    selector.value = '1';
+    selector.value = '0';
     selector.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
 
     // La lección se ha reiniciado sin persistir intentos incompletos
     expect(campo().value).toBe('');
-    expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
+    expect(document.querySelector('h2')?.textContent).toBe(LESSONS[0].title);
   });
   it('permite acceder al modo de práctica continua (Issue #19)', async () => {
     const selector = document.querySelector('select')!;
@@ -195,14 +195,36 @@ describe('captura y paneles', () => {
 });
 
 describe('experiencia de producto (#21, #23, #24)', () => {
-  it('actualiza la ultimaLeccion en preferencias al cambiar de lección (#21)', async () => {
+  it('impide saltarse una lección bloqueada incluso mediante un cambio programático', async () => {
     const selector = document.querySelector('select')!;
-    selector.value = '2';
+    expect(selector.querySelector<HTMLOptionElement>('option[value="1"]')?.disabled).toBe(true);
+    selector.value = '1';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    expect(document.querySelector('h2')?.textContent).toBe(LESSONS[0].title);
+  });
+
+  it('recupera los desbloqueos al abrir de nuevo y limita una preferencia adelantada', async () => {
+    completar();
+    await vi.waitFor(() => expect(localStorage.getItem('libretype.sesiones')).toContain('reposo'));
+    await unmount(app);
+    guardar({ ...POR_DEFECTO, tono: 'sobrio', ultimaLeccion: LESSONS[5].id });
+    app = mount(App, { target: document.body });
+    await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title));
+    expect(document.querySelector<HTMLOptionElement>('header option[value="1"]')?.disabled).toBe(false);
+    expect(document.querySelector<HTMLOptionElement>('header option[value="2"]')?.disabled).toBe(true);
+  });
+
+  it('actualiza la ultimaLeccion en preferencias al cambiar de lección (#21)', async () => {
+    completar();
+    await tick();
+    const selector = document.querySelector('select')!;
+    selector.value = '1';
     selector.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
 
     const guardado = JSON.parse(localStorage.getItem('libretype.preferencias')!);
-    expect(guardado.ultimaLeccion).toBe(LESSONS[2].id);
+    expect(guardado.ultimaLeccion).toBe(LESSONS[1].id);
   });
 
   it('criterio de superación dinámico: accuracy < 90% hace que Repetir sea primario (#23)', async () => {
@@ -221,6 +243,8 @@ describe('experiencia de producto (#21, #23, #24)', () => {
     expect(dialogo).not.toBeNull();
     const btnPrimario = dialogo?.querySelector('button.primario');
     expect(btnPrimario?.textContent).toContain('Repetir');
+    expect(boton('Siguiente lección')).toBeUndefined();
+    expect(document.querySelector<HTMLOptionElement>('header option[value="1"]')?.disabled).toBe(true);
   });
 
   it('criterio de superación dinámico: accuracy >= 90% hace que Siguiente sea primario (#23)', async () => {

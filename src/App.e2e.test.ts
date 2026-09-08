@@ -159,7 +159,7 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
     localStorage.setItem('libretype.preferencias', JSON.stringify({ tono: 'sobrio' }));
     app = mount(App, { target: document.body });
 
-    await vi.waitFor(() => expect(document.querySelector('select')).not.toBeNull());
+    await vi.waitFor(() => expect(document.querySelector('select')?.disabled).toBe(false));
     const selector = document.querySelector('select')!;
     selector.value = '0';
     selector.dispatchEvent(new Event('change', { bubbles: true }));
@@ -194,7 +194,7 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
     localStorage.setItem('libretype.preferencias', JSON.stringify({ tono: 'sobrio' }));
     app = mount(App, { target: document.body });
 
-    await vi.waitFor(() => expect(document.querySelector('select')).not.toBeNull());
+    await vi.waitFor(() => expect(document.querySelector('select')?.disabled).toBe(false));
     const selector = document.querySelector('select')!;
     selector.value = '0';
     selector.dispatchEvent(new Event('change', { bubbles: true }));

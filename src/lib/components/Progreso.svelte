@@ -3,6 +3,7 @@
     formatearDuracion, resumirEvolucion, resumirGlobal, resumirLecciones, type Sesion,
   } from "../storage/progreso";
   import { tituloRetirada } from "../storage/equivalencias";
+  import { leccionesSuperadas, nivelDisponible, PCT_OBJETIVO } from "../storage/objetivos";
   import type { Lesson } from "../lessons";
   import type { Almacen } from "../storage/almacen";
   import type { EstadoTecla } from "../keyboard/dominio";
@@ -40,6 +41,8 @@
 
   const esDegradado = $derived(errorAlmacen || Boolean(almacen?.errorAlmacen));
   const porLeccion = $derived(resumirLecciones(sesiones));
+  const superadas = $derived(leccionesSuperadas(sesiones));
+  const nivel = $derived(nivelDisponible(sesiones));
   const global = $derived(resumirGlobal(sesiones));
   const evolucion = $derived(resumirEvolucion(sesiones));
   const listaTeclas = $derived(teclas ? obtenerTeclasOrdenadas(teclas) : []);
@@ -175,6 +178,7 @@
 
 <section class="progreso" aria-label="Tu progreso">
   <h2>Tu progreso</h2>
+  <p class="nota">{superadas.size} de {lecciones.length} lecciones superadas. Objetivo: terminar cada lección con al menos un {PCT_OBJETIVO}% de precisión para desbloquear la siguiente. Sin velocidad mínima.</p>
 
   {#if global.sesiones === 0}
     <p class="vacio">
@@ -206,10 +210,10 @@
         </tr>
       </thead>
       <tbody>
-        {#each lecciones as l (l.id)}
+        {#each lecciones as l, i (l.id)}
           {@const r = porLeccion.get(l.id)}
           <tr class:sin-hacer={!r}>
-            <th scope="row">{l.title}</th>
+            <th scope="row">{l.title}<small>{i > nivel ? 'Bloqueada · supera las anteriores' : superadas.has(l.id) ? 'Superada' : 'Disponible · objetivo 90%'}</small></th>
             <td>{r ? r.intentos : "—"}</td>
             <td>
               {#if r && r.mejorPpm > 0}

@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.2.0"
+version = "0.2.1"
 description = "Tutor de mecanografia multiplataforma, visual y accesible"
 authors = ["Jesus Romeo"]
 license = "MIT"

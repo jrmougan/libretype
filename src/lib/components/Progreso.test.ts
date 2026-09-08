@@ -380,3 +380,61 @@ describe("Progreso.svelte - El umbral nunca se muestra como número aislado (Iss
     ningunaCifraSuelta();
   });
 });
+
+describe("Progreso.svelte - Intentos hasta superar (Issue #53)", () => {
+  function montar(sesiones: readonly Sesion[]): void {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: {
+        sesiones,
+        lecciones: LESSONS,
+        tipoAlmacen: "sqlite",
+        onBorrar: () => {},
+      },
+    });
+    flushSync();
+  }
+
+  /** La columna se busca por su cabecera: no depende de cuántas haya ni de dónde. */
+  function columnaHastaSuperar(): number {
+    return [...document.querySelectorAll("thead th")]
+      .findIndex((th) => th.textContent?.trim() === "Hasta superar");
+  }
+
+  function celdaDe(titulo: string, columna: number): string | undefined {
+    const fila = [...document.querySelectorAll("tbody tr")]
+      .find((tr) => tr.querySelector("th")?.textContent?.includes(titulo));
+    return fila?.children[columna]?.textContent?.replace(/\s+/g, " ").trim();
+  }
+
+  it("enseña lo que costó superar cada lección, sin el repaso posterior", () => {
+    const dia = (n: number) => `2026-09-0${n}T12:00:00.000Z`;
+    montar([
+      { ...sesionPrueba, pctAcierto: 60, aciertos: 24, terminadaEn: dia(1) },
+      { ...sesionPrueba, pctAcierto: 75, aciertos: 30, terminadaEn: dia(2) },
+      { ...sesionPrueba, pctAcierto: 95, terminadaEn: dia(3) },
+      // Repaso de una lección ya superada: suma en «Intentos» y no debe sumar
+      // aquí, que es justo por lo que esa columna no sirve para comparar.
+      { ...sesionPrueba, pctAcierto: 100, aciertos: 40, terminadaEn: dia(4) },
+      { ...sesionPrueba, leccion: "tildes", pctAcierto: 50, aciertos: 20, terminadaEn: dia(5) },
+    ]);
+
+    const col = columnaHastaSuperar();
+    expect(col).toBeGreaterThan(0);
+    expect(celdaDe("Fila de reposo", col)).toBe("3");
+    expect(celdaDe("Fila de reposo", col - 1)).toBe("4");
+    expect(celdaDe("Tildes", col)).toContain("1");
+    expect(celdaDe("Tildes", col)).toContain("sin superar");
+  });
+
+  it("lo que no es una lección del temario no tiene nada que superar", () => {
+    montar([
+      sesionPrueba,
+      { ...sesionPrueba, leccion: "practica-continua", terminadaEn: "2026-09-02T12:00:00.000Z" },
+    ]);
+
+    const col = columnaHastaSuperar();
+    expect(celdaDe("Práctica continua", col)).toBe("—");
+    expect(celdaDe("Las vocales que mandan", col)).toBe("—");
+  });
+});

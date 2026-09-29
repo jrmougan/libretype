@@ -9,6 +9,22 @@ están en español; mantenlo así.
 
 ## Comandos
 
+Las versiones de Node, pnpm y Rust están fijadas en `mise.toml`, y CI usa esas
+mismas. Con mise:
+
+    mise install
+    mise run setup     # pnpm install --frozen-lockfile
+    mise run dev       # frontend en el navegador (localhost:5173)
+    mise run tauri:dev # la app de escritorio completa
+    mise run check     # lint + tests de frontend y Rust, como CI
+    mise run lint      # svelte-check + tsc, cargo fmt --check, clippy -D warnings
+    mise run test      # vitest con cobertura + cargo test
+    mise run build     # bundle del frontend + cargo build --locked
+
+`clippy`, `cargo test` y `cargo build` necesitan en Linux las dependencias del
+sistema de Tauri (webkit2gtk 4.1 y compañía, ver `ci.yml`). Los scripts de pnpm
+siguen siendo los de siempre:
+
     pnpm install
     pnpm dev           # frontend en el navegador (localhost:5173)
     pnpm tauri:dev     # la app de escritorio completa

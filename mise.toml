@@ -1,0 +1,47 @@
+[tools]
+node = "24.21.0" # CI y releases usan Node 24; el lockfile exige ^22.13 || >=24.
+pnpm = "11.11.0" # Igual que packageManager en package.json.
+rust = { version = "1.98.1", components = "rustfmt,clippy", profile = "minimal" }
+
+[tasks.setup]
+description = "Instalar las dependencias bloqueadas del frontend"
+run = "pnpm install --frozen-lockfile"
+
+[tasks.dev]
+description = "Frontend en el navegador (localhost:5173, puerto fijo)"
+run = "pnpm dev"
+
+[tasks."tauri:dev"]
+description = "App de escritorio completa con Tauri"
+run = "pnpm tauri:dev"
+
+[tasks.lint]
+description = "svelte-check + tsc, formato Rust y clippy"
+run = [
+  "pnpm lint",
+  "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+  "cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings",
+]
+
+[tasks.test]
+description = "Tests de Vitest (con cobertura) y de Rust, sin watch"
+run = [
+  "pnpm test:coverage",
+  "cargo test --manifest-path src-tauri/Cargo.toml",
+]
+
+[tasks.check]
+description = "Lint y tests del frontend y de Rust en una pasada (como CI)"
+depends = ["lint"]
+run = "mise run test"
+
+[tasks.build]
+description = "Bundle del frontend y backend Rust"
+run = [
+  "pnpm build",
+  "cargo build --manifest-path src-tauri/Cargo.toml --locked",
+]
+
+[tasks."tauri:build"]
+description = "Binario empaquetado e instaladores (necesita las dependencias del sistema de Tauri)"
+run = "pnpm tauri:build"

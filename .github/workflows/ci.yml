@@ -18,12 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
       - name: Dependencias del sistema para Tauri
         run: |
           sudo apt-get update
@@ -32,35 +26,40 @@ jobs:
             libayatana-appindicator3-dev librsvg2-dev patchelf \
             libxdo-dev libssl-dev build-essential file
 
-      - uses: dtolnay/rust-toolchain@stable
+      # Node, pnpm y Rust (con rustfmt y clippy) salen de mise.toml: las mismas
+      # versiones exactas que en local.
+      - name: Herramientas de desarrollo
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
-          components: rustfmt, clippy
+          version: 2026.9.17
+
+      - name: Ruta del almacén de pnpm
+        id: pnpm-store
+        run: echo "ruta=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.ruta }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
 
-      - run: pnpm install --frozen-lockfile
+      - name: Dependencias
+        run: mise run setup
 
-      - name: Lint y tipos
-        run: pnpm lint
+      # svelte-check + tsc, cargo fmt --check y clippy -D warnings.
+      - name: Lint, tipos y formato
+        run: mise run lint
 
-      - name: Tests con cobertura
-        run: pnpm test:coverage
+      # Vitest con cobertura y cargo test.
+      - name: Tests
+        run: mise run test
 
-      - name: Bundle del frontend
-        run: pnpm build
-
-      - name: Formato Rust
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-
-      - name: Clippy Rust
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
-
-      - name: Tests Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml
-
-      - name: Backend Rust
-        run: cargo build --manifest-path src-tauri/Cargo.toml --locked
+      # Bundle del frontend y cargo build --locked del backend.
+      - name: Compilación
+        run: mise run build
 
   repo-apt:
     name: Repositorio apt

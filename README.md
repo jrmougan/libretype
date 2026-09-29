@@ -46,12 +46,43 @@ La aplicación incluye la **Lección Cero** (`src/lib/components/LeccionCero.sve
 
 ## Requisitos previos
 
-- [Node.js](https://nodejs.org/) (versión 20 o superior)
-- [pnpm](https://pnpm.io/) (versión 10 o 11)
-- [Rust](https://www.rust-lang.org/) (versión 1.77.2 o superior)
-- Dependencias del sistema para Tauri (ver [guía de requisitos de Tauri](https://v2.tauri.app/start/prerequisites/))
+- [mise](https://mise.jdx.dev/getting-started.html), que instala las versiones exactas
+  fijadas en `mise.toml`: Node 24.21.0, pnpm 11.11.0 (la de `packageManager`) y
+  Rust 1.98.1 con `rustfmt` y `clippy`.
+- Dependencias del sistema para Tauri (ver [guía de requisitos de Tauri](https://v2.tauri.app/start/prerequisites/)).
+  En Linux hacen falta también para `clippy`, `cargo test` y `cargo build`, no solo
+  para empaquetar.
+
+Sin mise sigue funcionando con Node 24, pnpm 11 y Rust 1.77.2 o superior, pero
+son las versiones de `mise.toml` las que usa CI.
 
 ---
+
+## Entorno con mise
+
+```bash
+mise trust
+mise install
+mise run setup   # pnpm install --frozen-lockfile; repetirlo no cambia nada
+mise run dev     # frontend en el navegador (localhost:5173)
+```
+
+| Comando | Acción |
+| --- | --- |
+| `mise run setup` | Instalar las dependencias bloqueadas del frontend |
+| `mise run dev` | Frontend en el navegador (puerto fijo 5173) |
+| `mise run tauri:dev` | Aplicación de escritorio completa |
+| `mise run lint` | `svelte-check` + `tsc`, `cargo fmt --check` y `clippy -D warnings` |
+| `mise run test` | Vitest con cobertura y `cargo test`, sin watch |
+| `mise run check` | `lint` y `test` en una pasada, lo mismo que el job de CI |
+| `mise run build` | Bundle del frontend y `cargo build --locked` |
+| `mise run tauri:build` | Binario empaquetado e instaladores |
+
+No hay `.env`, base de datos ni servicios. El servidor de desarrollo usa el
+puerto 5173 de forma estricta porque Tauri apunta a él (`devUrl`): en varios
+worktrees a la vez, solo uno puede tener `dev` o `tauri:dev` arrancado. `check`,
+`test` y `build` sí pueden ejecutarse en paralelo. Los scripts de pnpm de abajo
+siguen disponibles, también como `mise exec -- pnpm …`.
 
 ## Comandos de desarrollo
 

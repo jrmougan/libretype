@@ -8,6 +8,11 @@
     FILA_DISPONIBLE, leccionesSuperadas, nivelDisponible, NOTA_MARCA, OBJETIVO_PANEL,
   } from "../storage/objetivos";
   import type { Lesson } from "../lessons";
+  import { ES_ISO, type Layout } from "../keyboard/layouts";
+  import {
+    comparacionPropia, fraseResumen, serieGrafica, teclasSinMirar,
+  } from "../storage/comparacion";
+  import GraficaEvolucion from "./GraficaEvolucion.svelte";
   import type { Almacen } from "../storage/almacen";
   import type { EstadoTecla } from "../keyboard/dominio";
   import {
@@ -27,6 +32,8 @@
     onExportar?: () => Promise<string> | string;
     onImportar?: (json: string) => Promise<void> | void;
     onPracticarRefuerzo?: (ejercicio: EjercicioRefuerzo) => void;
+    /** Para saber qué teclas pide el temario; ES-ISO si no se dice. */
+    layout?: Layout;
   }
 
   let {
@@ -40,6 +47,7 @@
     onExportar,
     onImportar,
     onPracticarRefuerzo,
+    layout = ES_ISO,
   }: Props = $props();
 
   const esDegradado = $derived(errorAlmacen || Boolean(almacen?.errorAlmacen));
@@ -53,6 +61,9 @@
   const listaTeclas = $derived(teclas ? obtenerTeclasOrdenadas(teclas) : []);
   const teclasFlojas = $derived(listaTeclas.filter((t) => t.esFloja));
   const idsActuales = $derived(new Set(lecciones.map((l) => l.id)));
+  const sinMirar = $derived(teclasSinMirar(teclas ?? new Map(), nivel, layout));
+  /** Contra medias y contra los comienzos, nunca contra la última sesión. */
+  const comparacion = $derived(comparacionPropia(sesiones));
 
   /**
    * Lo practicado en versiones anteriores en lecciones que ya no existen. Se
@@ -64,10 +75,7 @@
       .filter((r) => !idsActuales.has(r.leccion))
       .sort((a, b) => (a.ultimaEn < b.ultimaEn ? 1 : -1)),
   );
-  /** El denominador es el temario de ahora, así que el numerador también. */
-  const tocadasActuales = $derived(
-    [...porLeccion.keys()].filter((id) => idsActuales.has(id)).length,
-  );
+
 
   let confirmando = $state(false);
   let inputArchivo = $state<HTMLInputElement | null>(null);
@@ -181,24 +189,84 @@
   }
 </script>
 
+<!-- Sin <h2> propio: el panel ya lo pone en su cabecera, y repetido se
+     anunciaba dos veces. -->
 <section class="progreso" aria-label="Tu progreso">
-  <h2>Tu progreso</h2>
-  <p class="nota">{superadas.size} de {lecciones.length} lecciones superadas. {OBJETIVO_PANEL}</p>
-
   {#if global.sesiones === 0}
+    <p class="nota">{superadas.size} de {lecciones.length} lecciones superadas. {OBJETIVO_PANEL}</p>
     <p class="vacio">
       Todavía no has terminado ninguna lección. En cuanto acabes una, aquí
-      aparecerá tu marca.
+      aparecerá cómo vas.
     </p>
   {:else}
+    <!-- Lo primero, en una frase: cuatro cifras sueltas no dicen si vas bien. -->
+    <p class="resumen">{fraseResumen({
+      superadas: superadas.size, lecciones: lecciones.length, sinMirar,
+      diasEstaSemana: evolucion.diasEstaSemana,
+    })}</p>
+
     <dl class="global">
-      <div><dt>Lecciones practicadas</dt><dd>{tocadasActuales} <small>de {lecciones.length}</small></dd></div>
-      <div><dt>Sesiones</dt><dd>{global.sesiones}</dd></div>
+      <div><dt>Teclas que ya escribes sin mirar</dt><dd>{sinMirar.dominadas} <small>de {sinMirar.total}</small></dd></div>
       <div><dt>Esta semana</dt><dd>{evolucion.diasEstaSemana} <small>{evolucion.diasEstaSemana === 1 ? 'día' : 'días'}</small></dd></div>
       <div><dt>Días practicados</dt><dd>{evolucion.diasPracticados}</dd></div>
       <div><dt>Tiempo total</dt><dd>{formatearDuracion(global.msTotales)}</dd></div>
-      <div><dt>Mejor marca</dt><dd>{global.mejorPpm} <small>ppm</small></dd></div>
     </dl>
+
+    {#if comparacion.length > 0}
+      <section class="seccion-bloque" aria-labelledby="titulo-comparacion">
+        <h3 id="titulo-comparacion">Frente a tus comienzos</h3>
+        <ul class="comparacion">
+          {#each comparacion as frase (frase)}<li>{frase}</li>{/each}
+        </ul>
+      </section>
+    {/if}
+
+    {#if evolucion.dias.length > 0}
+      <section class="seccion-bloque" aria-labelledby="titulo-evolucion">
+        <h3 id="titulo-evolucion">Evolución temporal</h3>
+        <GraficaEvolucion dias={serieGrafica(evolucion.dias)} />
+        <!-- La misma información en tabla: la alternativa textual de la gráfica
+             y el detalle para quien lo quiera. -->
+        <details>
+          <summary>Ver los datos de cada día</summary>
+        <div class="tabla">
+          <table>
+            <caption class="sr-only">Evolución de velocidad y práctica por día</caption>
+            <thead>
+              <tr>
+                <th scope="col">Fecha</th>
+                <th scope="col">Sesiones</th>
+                <th scope="col">Mejor</th>
+                <th scope="col">Media</th>
+                <th scope="col">Tiempo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each [...evolucion.dias].reverse() as d (d.fecha)}
+                <tr>
+                  <th scope="row">{fecha(d.fecha)}</th>
+                  <td>{d.sesiones}</td>
+                  <td>
+                    {#if d.mejorPpm > 0}
+                      <strong>{d.mejorPpm}</strong> ppm
+                    {:else}
+                      <span class="nota">sin marca limpia</span>
+                    {/if}
+                  </td>
+                  <td>{d.ppmMedia} ppm · {d.pctMedio}%</td>
+                  <td>{formatearDuracion(d.msTotales)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+        </details>
+      </section>
+    {/if}
+
+    <section class="seccion-bloque" aria-labelledby="titulo-lecciones">
+      <h3 id="titulo-lecciones">Lecciones</h3>
+      <p class="nota">{superadas.size} de {lecciones.length} lecciones superadas. {OBJETIVO_PANEL}</p>
 
     <!-- Al 200% las seis columnas no caben en el panel. Que se desplace la
          tabla dentro de su caja, no que se recorten la marca y la fecha. -->
@@ -286,43 +354,8 @@
       que permite ver cuál está costando más que las demás. Si faltan sesiones
       antiguas en el historial, el recuento puede ser menor que el real.
     </p>
+    </section>
 
-    {#if evolucion.dias.length > 0}
-      <section class="seccion-bloque" aria-labelledby="titulo-evolucion">
-        <h3 id="titulo-evolucion">Evolución temporal</h3>
-        <div class="tabla">
-          <table>
-            <caption class="sr-only">Evolución de velocidad y práctica por día</caption>
-            <thead>
-              <tr>
-                <th scope="col">Fecha</th>
-                <th scope="col">Sesiones</th>
-                <th scope="col">Mejor</th>
-                <th scope="col">Media</th>
-                <th scope="col">Tiempo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each [...evolucion.dias].reverse() as d (d.fecha)}
-                <tr>
-                  <th scope="row">{fecha(d.fecha)}</th>
-                  <td>{d.sesiones}</td>
-                  <td>
-                    {#if d.mejorPpm > 0}
-                      <strong>{d.mejorPpm}</strong> ppm
-                    {:else}
-                      <span class="nota">sin marca limpia</span>
-                    {/if}
-                  </td>
-                  <td>{d.ppmMedia} ppm · {d.pctMedio}%</td>
-                  <td>{formatearDuracion(d.msTotales)}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    {/if}
   {/if}
 
   {#if listaTeclas.length > 0}
@@ -443,7 +476,9 @@
     display: grid;
     gap: var(--space-4);
   }
-  h2 { font-size: var(--text-lg); margin: 0; }
+  .resumen { margin: 0; font-size: var(--text-lg); line-height: 1.4; }
+  .comparacion { margin: 0; padding-left: var(--space-4); display: grid; gap: var(--space-1); }
+  details summary { cursor: pointer; min-height: var(--target-min); display: flex; align-items: center; }
   .vacio { margin: 0; color: var(--fg-muted); }
 
   .global { display: flex; flex-wrap: wrap; gap: var(--space-6); margin: 0; }

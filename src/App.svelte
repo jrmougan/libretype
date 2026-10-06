@@ -22,6 +22,7 @@
     contarDominadas, mapaDeDominio, registrar, type EstadoTecla,
   } from './lib/keyboard/dominio';
   import { abrirAlmacen, type Almacen } from './lib/storage/almacen';
+  import { recienDominadas } from './lib/storage/comparacion';
   import { leccionesOxidadas } from './lib/storage/repaso';
   import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
   import {
@@ -53,7 +54,8 @@
   let leccionPersonalizada = $state<Lesson | null>(null);
   let pausado = $state(false);
   let drill = $state<ReturnType<typeof Drill> | null>(null);
-  let result = $state<{ stats: Stats; record: boolean } | null>(null);
+  /** `sinMirar`: teclas que este intento ha retirado del teclado en pantalla. */
+  let result = $state<{ stats: Stats; record: boolean; sinMirar?: string[] } | null>(null);
   let dialogoResultado = $state<HTMLDialogElement | null>(null);
   let dialogoPanel = $state<HTMLDialogElement | null>(null);
   /** Métricas en vivo, que ahora viven en la barra de arriba. */
@@ -219,7 +221,9 @@
     const record = esRecord(porLeccion.get(idLeccion), sesion);
     errorGuardado = false;
     sesiones = [...sesiones, sesion];
-    result = { stats, record };
+    // Se compara con lo persistido antes de este intento: lo que cambia es lo
+    // que acaba de conseguir, y se cuenta como logro (2.4).
+    result = { stats, record, sinMirar: recienDominadas(teclasBase, teclas, layout) };
 
     // Que falle el guardado no puede tumbar la práctica.
     // El dominio por tecla se persiste al terminar la lección, no en cada
@@ -723,6 +727,14 @@
             {/if}
           </p>
         {/if}
+        {#if result.sinMirar && result.sinMirar.length > 0}
+          <p class="note logro">
+            {result.sinMirar.length === 1 ? 'Ya escribes sin mirar la tecla' : 'Ya escribes sin mirar las teclas'}
+            {result.sinMirar.map((c) => `«${c}»`).join(', ')}{prefs.ayudaTeclado === 'auto'
+              ? (result.sinMirar.length === 1 ? ': su letra deja el teclado de la pantalla.' : ': sus letras dejan el teclado de la pantalla.')
+              : '.'}
+          </p>
+        {/if}
         {#if errorGuardado}
           <p class="note" role="status">No se pudo guardar el resultado. El avance de este intento solo estará disponible durante esta sesión.</p>
         {/if}
@@ -992,6 +1004,7 @@
             {errorAlmacen}
             {almacen}
             {teclas}
+            {layout}
             onBorrar={borrarProgreso}
             onExportar={exportarProgreso}
             onImportar={importarProgreso}
@@ -1147,6 +1160,8 @@
     box-shadow: 0 12px 40px rgb(0 0 0 / 0.28);
   }
   #resultado-desc { display: grid; gap: var(--space-1); }
+  /* El logro se distingue por el texto y el borde, no solo por el color. */
+  .logro { color: var(--fg); border-left: 4px solid var(--ok); padding-left: var(--space-2); }
   .resultado strong { font-size: var(--text-lg); }
   .resultado .animo { color: var(--fg-muted); }
   .botones { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }

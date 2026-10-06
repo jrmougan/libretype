@@ -454,3 +454,38 @@ describe('fase de fluidez (2.5)', () => {
     expect(document.activeElement).toBe(campo());
   });
 });
+
+describe('prueba de colocación (2.9)', () => {
+  function escribirTramo(conFallos = false): void {
+    const texto = [...document.querySelectorAll('.drill .ch')].map((c) => c.textContent).join('').replace(/ /g, ' ');
+    campo().value = conFallos ? [...texto].map((c, i) => (i % 2 ? 'x' : c)).join('') : texto;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+  }
+
+  it('se elige desde el temario, abre lo demostrado y se para sin reproches', async () => {
+    await elegirModo('colocacion');
+    boton('Empezar la prueba').click();
+    await tick();
+    expect(document.querySelector('h2')?.textContent).toContain(LESSONS[0].title);
+
+    escribirTramo();
+    await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toContain(LESSONS[1].title));
+    // Sin diálogo de resultado entre tramos: la prueba sigue sola.
+    expect(document.querySelector('#dialogo-resultado')).toBeNull();
+
+    escribirTramo(true);
+    await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toBe('Prueba terminada'));
+    const fin = document.querySelector('main')!.textContent!;
+    expect(fin).toContain('Se ha abierto una lección');
+    expect(fin).not.toMatch(/\d+\s*%/);
+
+    // El desbloqueo es el de siempre: una sesión normal de la lección.
+    const guardadas = JSON.parse(localStorage.getItem('libretype.sesiones')!);
+    expect(guardadas.map((s: { leccion: string }) => s.leccion)).toEqual([LESSONS[0].id, LESSONS[1].id]);
+
+    boton(`Ir a «${LESSONS[1].title}»`).click();
+    await tick();
+    expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
+  });
+});

@@ -5,6 +5,7 @@
   import Progreso from './lib/components/Progreso.svelte';
   import SelectorTono from './lib/components/SelectorTono.svelte';
   import TamanoTexto from './lib/components/TamanoTexto.svelte';
+  import PruebaColocacion from './lib/components/PruebaColocacion.svelte';
   import RecordatorioPausa from './lib/components/RecordatorioPausa.svelte';
   import Temario, { type Modo } from './lib/components/Temario.svelte';
   import { escucharAtajosTamano } from './lib/tamano';
@@ -75,7 +76,9 @@
   /** Cualquiera de los tres paneles superpuestos suspende la captura. */
   const panelAbierto = $derived(settingsOpen || verProgreso || verTemario);
   /** 'tono' solo aparece la primera vez; 'cero' es la colocación de manos; 'continua' y 'propio' son práctica libre. */
-  let vista = $state<'tono' | 'cero' | 'leccion' | 'continua' | 'propio' | 'fluidez'>('leccion');
+  let vista = $state<'tono' | 'cero' | 'leccion' | 'continua' | 'propio' | 'fluidez' | 'colocacion'>('leccion');
+  /** Para rehacer la prueba de colocación desde el principio si se vuelve a elegir. */
+  let colocacionKey = $state(0);
 
   /** Tandas de fluidez (2.5): texto, clave para rehacer el Drill y su meta. */
   let textoFluidez = $state('');
@@ -250,6 +253,23 @@
     } catch (err) {
       errorGuardado = true;
       console.warn('[libretype] no se pudo guardar la sesión:', err);
+    }
+  }
+
+  /**
+   * Un tramo de la prueba de colocación: se guarda como una sesión normal de
+   * su lección, sin diálogo de resultado (la prueba sigue sola al siguiente).
+   */
+  async function guardarTramo(sesion: Sesion): Promise<void> {
+    errorGuardado = false;
+    sesiones = [...sesiones, sesion];
+    try {
+      await almacen?.guardar(sesion);
+      await almacen?.guardarTeclas(teclas);
+      teclasBase = new Map(teclas);
+    } catch (err) {
+      errorGuardado = true;
+      console.warn('[libretype] no se pudo guardar el tramo:', err);
     }
   }
 
@@ -487,6 +507,7 @@
       : vista === 'cero' ? 'Antes de empezar'
       : vista === 'continua' ? 'Práctica continua'
       : vista === 'fluidez' ? 'Fluidez'
+      : vista === 'colocacion' ? 'Prueba de colocación'
       : vista === 'propio' ? 'Texto propio'
       : '',
   );
@@ -495,6 +516,18 @@
     if (modo === 'continua') return activarContinua();
     if (modo === 'propio') return activarPropio();
     if (modo === 'fluidez') return nuevaFluidez();
+    if (modo === 'colocacion') {
+      dialogoPanel?.close();
+      if (!result) teclas = new Map(teclasBase);
+      result = null;
+      pausado = false;
+      settingsOpen = false;
+      verProgreso = false;
+      verTemario = false;
+      colocacionKey++;
+      vista = 'colocacion';
+      return;
+    }
     if (modo === 'cero') {
       dialogoPanel?.close();
       if (!result) teclas = new Map(teclasBase);
@@ -654,6 +687,26 @@
           animaciones={prefs.movimiento === 'reducido' ? 'reducidas' : 'normales'}
           {dominios}
           onDone={terminada}
+          onTecla={anotarTecla}
+          onStats={(s) => (ultimasStats = s)}
+        />
+      {/key}
+    {:else if vista === 'colocacion'}
+      {#key colocacionKey}
+        <PruebaColocacion
+          lecciones={LESSONS}
+          desde={maxDesbloqueado}
+          {layout}
+          onTramo={guardarTramo}
+          onSeguir={(i) => void pick(i)}
+          activo={!panelAbierto && !result}
+          {pausado}
+          onPausar={pausar}
+          onReanudar={reanudar}
+          {dominios}
+          espacioJusto={prefs.escala >= 1.4}
+          movimiento={prefs.movimiento}
+          ignorarRepeticion={prefs.ignorarRepeticion}
           onTecla={anotarTecla}
           onStats={(s) => (ultimasStats = s)}
         />
@@ -842,7 +895,7 @@
 
   <RecordatorioPausa
     minutos={prefs.recordatorioPausa}
-    practicando={enPractica && !pausado && !panelAbierto && !result}
+    practicando={(enPractica || vista === 'colocacion') && !pausado && !panelAbierto && !result}
   />
 
   {#if panelAbierto}

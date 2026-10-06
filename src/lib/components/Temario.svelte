@@ -135,6 +135,27 @@
     </ul>
   </section>
 
+
+  <!-- Se ofrece a quien lo elija, nunca por edad: no hay pregunta sobre quién
+       eres, solo sobre lo que ya sabes hacer. -->
+  <section aria-labelledby="temario-colocacion">
+    <h3 id="temario-colocacion">¿Ya escribes algo?</h3>
+    <button
+      type="button"
+      class="tarjeta"
+      data-modo="colocacion"
+      aria-current={modo === 'colocacion' ? 'true' : undefined}
+      onclick={() => onModo('colocacion')}
+    >
+      <span class="titulo">Prueba de colocación</span>
+      <span class="detalle">
+        Unos tramos cortos, de lección en lección, para abrir de una vez las que
+        ya dominas. Se para en cuanto una cueste, sin nota ni prisa, y lo que ya
+        tengas abierto no se cierra.
+      </span>
+      {#if modo === 'colocacion'}<span class="aqui">Estás aquí</span>{/if}
+    </button>
+  </section>
 </div>
 
 <style>

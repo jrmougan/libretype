@@ -190,7 +190,7 @@ describe('reporte de tiempos por tecla (issue #9)', () => {
 });
 
 describe('reiniciar y pausar lección (issue #24)', () => {
-  it('el botón Empezar de nuevo reinicia el texto y las métricas', async () => {
+  it('restart() reinicia el texto y las métricas', async () => {
     let statsReportadas: any = null;
     componente = mount(Drill, {
       target: document.body,
@@ -210,12 +210,12 @@ describe('reiniciar y pausar lección (issue #24)', () => {
     expect(campo.value).toBe('a');
     expect(statsReportadas.typed).toBe(1);
 
-    const botonReiniciar = [...document.querySelectorAll('button')].find(
+    // El botón vive en la barra de la aplicación (2.6: había tres); la lección
+    // solo expone la operación.
+    expect([...document.querySelectorAll('button')].some(
       (b) => b.textContent?.includes('Empezar de nuevo'),
-    );
-    expect(botonReiniciar).not.toBeNull();
-
-    botonReiniciar?.click();
+    )).toBe(false);
+    componente!.restart();
     flushSync();
     await tick();
 
@@ -242,5 +242,56 @@ describe('reiniciar y pausar lección (issue #24)', () => {
     const cartel = document.querySelector('.pausa-cartel');
     expect(cartel).not.toBeNull();
     expect(cartel?.textContent).toContain('Ejercicio pausado');
+  });
+});
+
+describe('Esc pausa desde el campo (2.6)', () => {
+  function montarConPausa() {
+    const onPausar = vi.fn();
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'ás', titulo: 'Tildes', onPausar },
+    });
+    flushSync();
+    return { campo: document.querySelector('textarea')!, onPausar };
+  }
+
+  const esc = (init: KeyboardEventInit = {}) =>
+    new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true, ...init });
+
+  it('Esc en el campo pide la pausa y no deja que el motor haga nada más', () => {
+    const { campo, onPausar } = montarConPausa();
+    const ev = esc();
+    campo.dispatchEvent(ev);
+    expect(onPausar).toHaveBeenCalledTimes(1);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it('a mitad de un acento, Esc es del método de entrada y no pausa', () => {
+    const { campo, onPausar } = montarConPausa();
+    campo.dispatchEvent(esc({ isComposing: true }));
+    campo.dispatchEvent(esc({ keyCode: 229 }));
+    // Composición en curso según el propio motor (el ´ ya está en el campo).
+    campo.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    campo.value = '´';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+    flushSync();
+    campo.dispatchEvent(esc());
+    expect(onPausar).not.toHaveBeenCalled();
+  });
+
+  it('Esc fuera del campo no lo escucha nadie: no hay manejador global', () => {
+    const { onPausar } = montarConPausa();
+    document.body.dispatchEvent(esc());
+    window.dispatchEvent(esc());
+    expect(onPausar).not.toHaveBeenCalled();
+  });
+
+  it('las demás teclas pasan sin tocar', () => {
+    const { campo, onPausar } = montarConPausa();
+    const ev = new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', bubbles: true, cancelable: true });
+    campo.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    expect(onPausar).not.toHaveBeenCalled();
   });
 });

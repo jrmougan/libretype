@@ -306,7 +306,7 @@ describe('experiencia de producto (#21, #23, #24)', () => {
     flushSync();
     expect(campo().value).toBe('la');
 
-    boton('Reiniciar').click();
+    boton('Empezar de nuevo').click();
     await tick();
 
     expect(campo().value).toBe('');
@@ -398,5 +398,36 @@ describe('temario y selectores operables con teclado (0.3)', () => {
     boton('Nuevo texto').click();
     await tick();
     expect(document.querySelector<HTMLSelectElement>('#selector-nivel-practica')!.value).toBe('0');
+  });
+});
+
+describe('pausa y un solo «Empezar de nuevo» (2.6)', () => {
+  it.each(['leccion', 'continua'])('Esc en el campo pausa también en %s', async (modo) => {
+    if (modo === 'continua') await elegirModo('continua');
+    campo().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await tick();
+    expect(document.querySelector('.pausa-cartel')).not.toBeNull();
+    expect(campo().disabled).toBe(true);
+    expect(boton('Reanudar')).toBeDefined();
+    document.querySelector<HTMLButtonElement>('.btn-reanudar')!.click();
+    await tick();
+    expect(campo().disabled).toBe(false);
+  });
+
+  it('solo hay un «Empezar de nuevo» en pantalla, también en Texto propio', async () => {
+    const cuantos = () => [...document.querySelectorAll('button')]
+      .filter((b) => /empezar de nuevo|reiniciar/i.test(b.textContent ?? '')).length;
+    expect(cuantos()).toBe(1);
+    await elegirModo('propio');
+    const entrada = document.querySelector<HTMLTextAreaElement>('textarea.input-texto-propio')!;
+    entrada.value = '“Hola” — mundo';
+    entrada.dispatchEvent(new Event('input', { bubbles: true }));
+    boton('Empezar a teclear').click();
+    await tick();
+    expect(cuantos()).toBe(1);
+    // Y avisa de lo que quitó, en vez de comérselo en silencio.
+    const aviso = document.querySelector('.aviso-quitados');
+    expect(aviso?.getAttribute('role')).toBe('status');
+    expect(aviso?.textContent).toContain('«“» «”» «—»');
   });
 });

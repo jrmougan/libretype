@@ -7,6 +7,7 @@
   import TamanoTexto from './lib/components/TamanoTexto.svelte';
   import Temario, { type Modo } from './lib/components/Temario.svelte';
   import { escucharAtajosTamano } from './lib/tamano';
+  import { avisoQuitados, caracteresQuitados } from './lib/texto-propio';
   import { buildIndex, LAYOUTS, obtenerLayout } from './lib/keyboard/layouts';
   import {
     generarTextoPractica,
@@ -86,6 +87,8 @@
   let textoPropioActivo = $state('');
   let enEdicionPropio = $state(true);
   let errorTextoPropio = $state('');
+  /** Qué caracteres se quitaron al empezar, para que no parezca un fallo. */
+  let avisoTextoPropio = $state('');
   let propioKey = $state(0);
 
   /** Intentos acumulados por tecla, que deciden cuánta ayuda visual retirar. */
@@ -297,6 +300,7 @@
     textoContinua = generarTextoPractica(nivelPractica);
     continuaKey++;
     result = null;
+    pausado = false;
     vista = 'continua';
     settingsOpen = false;
     verProgreso = false;
@@ -317,6 +321,7 @@
     textoContinua = generarTextoPractica(nivelPractica);
     continuaKey++;
     result = null;
+    pausado = false;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     await tick();
     drill?.restart();
@@ -330,6 +335,7 @@
       teclas = new Map(teclasBase);
     }
     result = null;
+    pausado = false;
     settingsOpen = false;
     verProgreso = false;
     verTemario = false;
@@ -354,7 +360,9 @@
       return;
     }
     textoPropioActivo = limpio;
+    avisoTextoPropio = avisoQuitados(caracteresQuitados(textoPropio, permitido));
     enEdicionPropio = false;
+    pausado = false;
     propioKey++;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     await tick();
@@ -380,6 +388,13 @@
     drill?.restart();
     await tick();
     drill?.enfocar();
+  }
+
+  function pausar(): void { pausado = true; }
+
+  function reanudar(): void {
+    pausado = false;
+    tick().then(() => drill?.enfocar());
   }
 
   function alternarPausa(): void {
@@ -484,20 +499,17 @@
     {#if vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio)}
       {@const textoObjetivo = vista === 'continua' ? textoContinua : vista === 'propio' ? textoPropioActivo : lesson.text}
       <div class="controles-intento">
-        <button
-          type="button"
-          class="btn-intento"
-          onclick={reiniciarLeccion}
-          aria-label="Empezar de nuevo esta lección"
-        >
-          Reiniciar
+        <!-- El único «Empezar de nuevo»: había otro en la cabecera de la
+             lección y un tercero en Texto propio. -->
+        <button type="button" class="btn-intento" onclick={reiniciarLeccion}>
+          Empezar de nuevo
         </button>
         <button
           type="button"
           class="btn-intento"
           onclick={alternarPausa}
-          aria-label={pausado ? 'Reanudar lección' : 'Pausar lección'}
           aria-pressed={pausado}
+          title="También con Esc mientras escribes"
         >
           {pausado ? 'Reanudar' : 'Pausar'}
         </button>
@@ -580,6 +592,9 @@
           bind:this={drill}
           {layout}
           activo={!panelAbierto && !result}
+          {pausado}
+          onPausar={pausar}
+          onReanudar={reanudar}
           target={textoContinua}
           titulo="Práctica continua"
           explicacion={`Vocabulario acumulado hasta la lección ${nivelPractica + 1}: ${LESSONS[nivelPractica].title}.`}
@@ -617,13 +632,18 @@
         <div class="barra-practica">
           <span>Practicando tu propio texto ({textoPropioActivo.length} caracteres)</span>
           <button onclick={() => { enEdicionPropio = true; }}>Cambiar texto</button>
-          <button onclick={again}>Reiniciar</button>
+          {#if avisoTextoPropio}
+            <p class="aviso-quitados" role="status">{avisoTextoPropio}</p>
+          {/if}
         </div>
         {#key propioKey}
           <Drill
             bind:this={drill}
             {layout}
             activo={!panelAbierto && !result}
+            {pausado}
+            onPausar={pausar}
+            onReanudar={reanudar}
             target={textoPropioActivo}
             titulo="Texto propio"
             explicacion="Práctica libre con texto personalizado."
@@ -645,7 +665,8 @@
           {layout}
           activo={!panelAbierto && !result}
           {pausado}
-          onReanudar={() => { pausado = false; tick().then(() => drill?.enfocar()); }}
+          onPausar={pausar}
+          onReanudar={reanudar}
           target={lesson.text}
           titulo={lesson.title}
           explicacion={leccionPersonalizada ? lesson.focus : objetivoLeccion(lesson.focus)}
@@ -1151,6 +1172,15 @@
   }
   .barra-practica button {
     min-height: var(--target-min);
+  }
+  .aviso-quitados {
+    flex-basis: 100%;
+    margin: 0;
+    padding: var(--space-1) var(--space-3);
+    background: var(--pending-bg);
+    color: var(--pending);
+    border-left: 4px solid var(--pending);
+    border-radius: 0 var(--radius) var(--radius) 0;
   }
   .editor-propio {
     display: grid;

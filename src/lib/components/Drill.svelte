@@ -14,6 +14,7 @@
     from '../keyboard/engine';
   import { MS_RAPIDO, type MapaDominio } from '../keyboard/dominio';
   import { crearFiltroTemblor } from '../keyboard/temblor';
+  import { desplazamientoLectura, trocearEnPalabras } from '../keyboard/lectura';
   import { buildIndex, FINGER_NAMES, type KeyStep, type Layout }
     from '../keyboard/layouts';
 
@@ -100,6 +101,9 @@
   });
 
   const index = $derived(buildIndex(layout));
+  /** El texto por palabras, para que el salto de línea no parta ninguna. */
+  const palabras = $derived(trocearEnPalabras(target));
+  let caja = $state<HTMLElement | null>(null);
   const states = $derived<CharState[]>(diffAgainstTarget(typed, target));
   const stampsEfectivos = $derived(
     tiempoDescontado > 0
@@ -140,6 +144,24 @@
   );
 
   $effect(() => { onStats?.(stats); });
+
+  // Al avanzar, la línea del cursor sube a lo alto de la caja: lo que se ve
+  // debajo es lo que viene, que es lo que hay que poder leer por delante. Sin
+  // esto, al 200% el cursor se salía por abajo (ver keyboard/lectura.ts).
+  $effect(() => {
+    void typed.length;
+    if (!caja) return;
+    const primero = caja.querySelector<HTMLElement>('.ch');
+    const cursor = caja.querySelector<HTMLElement>('.ch.current');
+    if (!primero || !cursor) return;
+    const nuevo = desplazamientoLectura({
+      scrollTop: caja.scrollTop,
+      primeroTop: primero.getBoundingClientRect().top,
+      cursorTop: cursor.getBoundingClientRect().top,
+      cabeEntero: caja.scrollHeight <= caja.clientHeight,
+    });
+    if (nuevo !== null) caja.scrollTop = nuevo;
+  });
 
   const lastWrong = $derived(
     typed.length > 0 && typed[typed.length - 1] !== target[typed.length - 1],
@@ -301,7 +323,7 @@
 
   <!-- La etiqueta devuelve el foco al pulsar el texto sin interceptar teclas.
        El campo real conserva la composición del método de entrada del sistema. -->
-  <label class="text" aria-label={`Texto de la lección: ${target}`}>
+  <label class="text" bind:this={caja} aria-label={`Texto de la lección: ${target}`}>
     {#if pausado}
       <div class="pausa-cartel" role="status" aria-live="polite">
         <span>Ejercicio pausado</span>
@@ -344,8 +366,9 @@
       }}
     ></textarea>
     <span aria-hidden="true">
-      {#each [...target] as ch, i (i)}
-        <span class="ch {states[i]}">{ch === ' ' ? '\u00a0' : ch}</span>
+      {#each palabras as p (p.inicio)}
+        <span class="palabra">{#each [...p.texto] as ch, k (k)}<span
+          class="ch {states[p.inicio + k]}">{ch === ' ' ? '\u00a0' : ch}</span>{/each}</span><wbr />
       {/each}
     </span>
   </label>
@@ -455,12 +478,20 @@
     border-radius: var(--radius);
     padding: var(--space-3) var(--space-4);
     margin: 0;
-    word-break: break-word;
+    overflow-wrap: anywhere;
     /* Si el texto es largo o la letra muy grande, se desplaza aquí dentro y no
        arrastra a la página entera. */
     overflow-y: auto;
-    max-height: 30vh;
+    /* Al menos dos líneas a la vista, la del cursor y la siguiente, también al
+       200% en una ventana baja: con una sola, a final de línea no se ve nada
+       de lo que viene (2.8). Lo que gana aquí lo cede el teclado, que es el
+       siguiente en el orden de sacrificio. */
+    max-height: max(30vh, calc(2 * 1.7em + 2 * var(--space-3) + 2px));
   }
+
+  /* Cada palabra es un bloque que no se parte, salvo que no quepa entera en
+     una línea (overflow-wrap). Entre palabras, <wbr> deja saltar de línea. */
+  .palabra { display: inline-block; }
 
   .text:has(.capture:focus-visible) {
     outline: 3px solid var(--accent);

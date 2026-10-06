@@ -326,3 +326,42 @@ describe('filtro de temblor en el campo (2.7)', () => {
     expect(escribe(campo, 'a', 1010)).toBe(false);
   });
 });
+
+describe('leer por delante al 200% (2.8)', () => {
+  it('agrupa por palabras para que el salto de línea no parta ninguna', () => {
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'uno dos tres', titulo: 'Prueba' },
+    });
+    flushSync();
+    const palabras = [...document.querySelectorAll('.palabra')].map((p) => p.textContent);
+    expect(palabras).toEqual(['uno ', 'dos ', 'tres']);
+    // Cada carácter sigue siendo suyo, con su estado.
+    expect(document.querySelectorAll('.ch')).toHaveLength('uno dos tres'.length);
+  });
+
+  it('al avanzar de línea, sube la caja para que se vea lo que viene', () => {
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'uno dos tres cua', titulo: 'Prueba' },
+    });
+    flushSync();
+    const caja = document.querySelector<HTMLElement>('label.text')!;
+    Object.defineProperty(caja, 'scrollHeight', { configurable: true, value: 300 });
+    Object.defineProperty(caja, 'clientHeight', { configurable: true, value: 120 });
+    // Maquetación simulada: cuatro caracteres por línea, 50 px por línea, y
+    // lo que se ve se mueve con el scroll como en un navegador.
+    const chs = [...document.querySelectorAll<HTMLElement>('.ch')];
+    chs.forEach((ch, i) => {
+      ch.getBoundingClientRect = () =>
+        ({ top: 100 + 50 * Math.floor(i / 4) - caja.scrollTop } as DOMRect);
+    });
+
+    const campo = document.querySelector('textarea')!;
+    campo.value = 'uno dos ';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    // El cursor está en el carácter 8, tercera línea: la caja sube dos líneas.
+    expect(caja.scrollTop).toBe(100);
+  });
+});

@@ -74,7 +74,7 @@ describe('texto nuevo en cada intento (1.1)', () => {
     const permitidas = alfabetoHasta(0);
     expect([...nuevo].filter((c) => c !== ' ' && !permitidas.has(c))).toEqual([]);
     // Las métricas de la barra miden contra el texto nuevo, no contra el fijo.
-    expect(document.querySelector('dl.metricas')?.textContent).toContain(`0/${nuevo.length}`);
+    expect(document.querySelector('dl.metricas')?.textContent).toContain(`0 de ${nuevo.length}`);
   });
 
   it('reiniciar a medias también trae texto nuevo en una lección ya practicada', async () => {

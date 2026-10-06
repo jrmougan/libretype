@@ -8,7 +8,7 @@
    * a nivel de documento y reconstruir el texto sería justamente el error que
    * los spikes descartaron.
    */
-  import { onMount } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import Keyboard from './Keyboard.svelte';
   import { TypingEngine, computeStats, diffAgainstTarget, UMBRAL_PAUSA_MS, type CharState, type Stats }
     from '../keyboard/engine';
@@ -40,6 +40,17 @@
     explicacion?: string;
     cobertura?: string;
     /**
+     * Qué precede a la cobertura en su chip. En una lección es lo que se gana
+     * al terminarla; en la práctica continua, lo que ya cubre el vocabulario.
+     */
+    coberturaRotulo?: string;
+    /**
+     * Controles propios del modo (el vocabulario de la práctica continua, el
+     * «Cambiar texto» del texto propio). Van en la cabecera y no en una fila
+     * aparte encima: esa fila se la comía al teclado.
+     */
+    controles?: Snippet;
+    /**
      * Con la letra muy grande no cabe todo. El orden de sacrificio es
      * explícito: primero se pliega la explicación, luego el texto se desplaza
      * dentro de su caja, y el teclado nunca baja de legible. Esto lo decide
@@ -69,7 +80,8 @@
 
   let {
     layout, target, activo = true, onDone, onTecla, dominios, onStats,
-    titulo = '', explicacion = '', cobertura = '', espacioJusto = false,
+    titulo = '', explicacion = '', cobertura = '', coberturaRotulo = 'Al terminarla:',
+    controles, espacioJusto = false,
     movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar, onPausar,
     ignorarRepeticion = false,
   }: Props = $props();
@@ -114,6 +126,8 @@
   );
   const stats = $derived(computeStats(typed, target, stampsEfectivos, errores));
   const finished = $derived(typed.length >= target.length);
+  /** Fracción escrita, para la barra de avance del pie de la tarjeta. */
+  const avance = $derived(target.length ? Math.min(1, typed.length / target.length) : 0);
 
   /** Carácter que toca escribir ahora. */
   const nextChar = $derived(typed.length < target.length ? target[typed.length] : null);
@@ -303,19 +317,23 @@
 <div class="drill" class:sin-animaciones={sinAnimaciones} class:justo={espacioJusto}>
   <header class="cab">
     <h2>{titulo}</h2>
+    <!-- La frase va en el texto y no en un aria-label, que en un <span> no lo
+         anuncian todos los lectores. Con la letra grande el rótulo se queda
+         solo para el lector: a la vista, la cabecera tiene que caber en una
+         fila o el teclado pierde ese alto. -->
     {#if cobertura}
-      <span class="cobertura"
-            aria-label="Al terminarla podrás escribir el {cobertura}% de las palabras del español">
-        {cobertura}% del español
-      </span>
+      <span class="chip cobertura"><span class:sr-only={espacioJusto}>{coberturaRotulo} </span>{cobertura} % del español</span>
     {/if}
-    {#if explicacion}
-      <button class="explica" aria-expanded={explicacionAbierta}
-              onclick={() => (decisionManual = !explicacionAbierta)}>
-        {explicacionAbierta ? 'Ocultar' : '¿Qué se practica?'}
-      </button>
-    {/if}
-    <button onclick={enfocar} disabled={!activo || pausado}>Seguir escribiendo</button>
+    {@render controles?.()}
+    <span class="cab-fin">
+      {#if explicacion}
+        <button class="enlace explica" aria-expanded={explicacionAbierta}
+                onclick={() => (decisionManual = !explicacionAbierta)}>
+          {explicacionAbierta ? 'Ocultar' : '¿Qué se practica?'}
+        </button>
+      {/if}
+      <button class="btn-barra seguir" onclick={enfocar} disabled={!activo || pausado}>Seguir escribiendo</button>
+    </span>
     <!-- «Empezar de nuevo» vive solo en la barra de arriba: había tres. -->
   </header>
 
@@ -331,7 +349,7 @@
       <div class="pausa-cartel" role="status" aria-live="polite">
         <span>Ejercicio pausado</span>
         {#if onReanudar}
-          <button type="button" class="btn-reanudar" onclick={onReanudar}>
+          <button type="button" class="primario btn-reanudar" onclick={onReanudar}>
             Reanudar
           </button>
         {/if}
@@ -379,6 +397,11 @@
         {/each}
       </span>
     </label>
+    <!-- El avance ya se lee en la barra de arriba (Avance «10 de 53»): esto es
+         el mismo dato a golpe de vista, y por eso no se anuncia. -->
+    <div class="avance" aria-hidden="true">
+      <span style:transform="scaleX({avance})"></span>
+    </div>
   </div>
 
   <!-- Para lector de pantalla: el bucle de práctica es visual y motor, pero la
@@ -408,29 +431,21 @@
   .pausa-cartel {
     position: absolute;
     inset: 0;
-    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    /* En fila: con una sola línea de texto la tarjeta mide menos que el
+       rótulo y el botón uno encima del otro. */
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: var(--space-3);
+    gap: var(--space-2) var(--space-4);
     z-index: 5;
-    border-radius: var(--radius);
+    border-radius: var(--radius-card);
     font-size: var(--text-lg);
-    font-weight: 500;
+    font-weight: 700;
   }
-
-  .btn-reanudar {
-    min-height: var(--target-min);
-    background: var(--accent);
-    color: var(--accent-fg);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius);
-    padding: 0 var(--space-4);
-    font-size: var(--text-base);
-    font-weight: 500;
-    cursor: pointer;
-  }
+  /* El estilo es el del botón principal (base.css); aquí solo el tamaño. */
+  .btn-reanudar { font-size: var(--text-base); }
 
   /* El teclado se lleva el espacio que sobre; todo lo demás ocupa lo justo.
      `min-height: 0` es lo que permite que la rejilla encoja de verdad en vez
@@ -440,8 +455,11 @@
     grid-template-areas: 'cabecera' 'explicacion' 'texto' 'pista' 'teclado';
     /* Los mínimos también van en las filas: si solo los tienen los hijos,
        la rejilla puede encogerlas hasta que texto y teclado se solapen. */
+    /* El suelo de la fila del texto es una línea entera: el interlineado, el
+       relleno de la tarjeta (arriba --space-3; abajo, además, los 4px de la
+       barra de avance) y el borde. */
     grid-template-rows: auto auto
-      minmax(calc(1.7 * var(--text-drill) + 2 * var(--space-3) + 2px), auto)
+      minmax(calc(1.7 * var(--text-drill) + 2 * var(--space-3) + 4px + 2px), auto)
       auto minmax(min(34vh, 230px), 1fr);
     gap: var(--space-2);
     min-height: 0;
@@ -454,7 +472,7 @@
      interlineado baja algo para que las dos líneas quepan en ese 30vh. */
   .drill.justo {
     grid-template-rows: auto auto
-      minmax(min(calc(2 * 1.5 * var(--text-drill) + 2 * var(--space-3) + 2px), 30vh), auto)
+      minmax(min(calc(2 * 1.5 * var(--text-drill) + 2 * var(--space-3) + 4px + 2px), 30vh), auto)
       auto minmax(min(34vh, 230px), 1fr);
   }
   .justo .text { line-height: 1.5; }
@@ -467,30 +485,35 @@
        recibir el foco de verdad para que llegue el texto compuesto. */
   }
 
-  .cab { grid-area: cabecera; display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-  .cab h2 { margin: 0; font-size: var(--text-lg); }
+  .cab {
+    grid-area: cabecera;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    flex-wrap: wrap;
+  }
+  .cab h2 { margin: 0; font-size: var(--text-xl); font-weight: 700; line-height: 1.15; }
 
-  .cobertura {
-    font-size: var(--text-sm);
-    font-variant-numeric: tabular-nums;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    border-radius: 999px;
-    padding: 1px var(--space-2);
-    white-space: nowrap;
+  /* El chip (base.css) en acento suave: es lo que se gana, no un aviso. */
+  .cobertura { font-variant-numeric: tabular-nums; }
+
+  .cab-fin {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
   }
   .explica {
-    margin-left: auto;
     min-height: var(--target-min);
     min-width: var(--target-min);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: var(--space-2) var(--space-3);
-    font-size: var(--text-sm);
   }
+  .seguir { color: var(--fg-muted); font-size: var(--text-sm); }
 
-  .focus { grid-area: explicacion; margin: 0; color: var(--fg-muted); max-width: 78ch; font-size: var(--text-sm); }
+  .focus { grid-area: explicacion; margin: 0; color: var(--fg-muted); max-width: 78ch; font-size: var(--text-base); }
 
   .texto-caja {
     grid-area: texto;
@@ -507,8 +530,9 @@
     background: var(--surface);
     /* Es la caja que se pulsa para escribir: cuenta como contorno de control. */
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius);
-    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-card);
+    /* Abajo, sitio para la barra de avance: nunca tapa la última línea. */
+    padding: var(--space-3) var(--space-4) calc(var(--space-3) + 4px);
     margin: 0;
     overflow-wrap: anywhere;
     /* Si el texto es largo o la letra muy grande, se desplaza aquí dentro y no
@@ -526,11 +550,32 @@
     outline-offset: 2px;
   }
 
+  /* Barra de avance de 4px pegada al borde inferior de la tarjeta. Está fuera
+     de la caja que se desplaza para que no se vaya con el texto. */
+  .avance {
+    position: absolute;
+    left: 1px; right: 1px; bottom: 1px;
+    height: 4px;
+    background: var(--surface-sunken);
+    border-radius: 0 0 var(--radius-card) var(--radius-card);
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .avance span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transform-origin: left;
+    transition: transform var(--motion-base) var(--ease);
+  }
+
+  /* Cuatro estados, y ninguno solo por color: lo pendiente va atenuado y sin
+     subrayar; lo acertado, en tinta plena con subrayado sencillo; el error,
+     con fondo y subrayado doble; el cursor, en bloque. */
   .ch { padding: 1px 0; border-bottom: 3px solid transparent; }
   .ch.pending { color: var(--fg-muted); }
-  .ch.correct { color: var(--ok); border-bottom-color: var(--ok); }
+  .ch.correct { color: var(--fg); border-bottom-color: var(--ok); }
 
-  /* El error no se marca solo con color: fondo, subrayado y borde. */
   .ch.wrong {
     color: var(--error);
     background: var(--error-bg);
@@ -538,11 +583,11 @@
     border-radius: 2px;
   }
 
-  /* El cursor tampoco: caja, fondo y parpadeo suave. */
   .ch.current {
     background: var(--accent);
     color: var(--accent-fg);
-    border-radius: 3px;
+    border-bottom-color: var(--fg);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     animation: blink 1.1s var(--ease) infinite;
   }
 

@@ -1,0 +1,201 @@
+/* Estilos base de los controles, compartidos por todas las pantallas.
+ *
+ * Van aquí y no en cada componente para que un botón principal sea el mismo
+ * en el resultado, en la lección cero y en el editor de texto propio. Todo
+ * valor sale de tokens.css. Un componente que necesite otra cosa la añade en
+ * su <style> (que gana por especificidad), no copia la regla entera.
+ *
+ * Clases:
+ *   (ninguna)    <button> a secas: secundario. Papel, contorno de control.
+ *   .secundario  lo mismo, para decirlo explícitamente.
+ *   .primario    la acción principal de la pantalla: relleno de acento, negrita
+ *                y canto sólido debajo (--shadow-boton).
+ *   .suave       acción de apoyo destacada: fondo --accent-soft, texto
+ *                --accent-ink (el repaso al pie del resultado).
+ *   .enlace      botón que parece enlace: texto en --accent-ink subrayado.
+ *                Sigue midiendo --target-min: parecer enlace no lo encoge.
+ *   .btn-barra   botón sin caja de la barra superior. Abierto o pulsado
+ *                (aria-expanded/aria-pressed="true", o .activo) se invierte:
+ *                fondo --fg y texto --bg.
+ *   .group       grupo segmentado (role="group" con botones aria-pressed). La
+ *                opción elegida lleva papel, contorno, negrita y «✓»: nunca
+ *                solo color.
+ *   .chip        píldora informativa (no es un control). Variantes .neutro y
+ *                .celebra.
+ *   .superficie  superficie con borde y radio de tarjeta (no se llama .tarjeta
+ *                porque Temario ya usa ese nombre para sus botones).
+ *   .antetitulo  línea pequeña sobre un titular («Antes de empezar · paso 3»).
+ */
+
+/* Todas las cifras de la interfaz a ancho fijo: las métricas en vivo no
+   bailan al cambiar de 9 a 10, y las columnas de números se alinean. */
+body { font-variant-numeric: tabular-nums; }
+
+button {
+  font: inherit;
+  font-weight: 500;
+  min-height: var(--target-min);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease),
+    box-shadow var(--motion-fast) var(--ease),
+    transform var(--motion-fast) var(--ease);
+}
+button:hover:not(:disabled) { background: var(--surface-sunken); }
+button:disabled { cursor: default; }
+
+.secundario {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--fg);
+}
+
+.primario {
+  min-height: var(--target-primario);
+  padding-inline: var(--space-6);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 700;
+  box-shadow: var(--shadow-boton);
+}
+.primario:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 88%, var(--accent-deep));
+}
+/* Al pulsarlo baja lo que medía el canto: se nota que ha cedido. */
+.primario:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--accent-deep);
+}
+
+.suave {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.suave:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-soft) 80%, var(--accent));
+}
+
+.enlace {
+  min-height: var(--target-min);
+  padding-inline: var(--space-2);
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent-ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+.enlace:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.btn-barra {
+  background: transparent;
+  border-color: transparent;
+}
+/* Con caja: los que abren un panel (Progreso, Ajustes). */
+.btn-barra.contorno {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+.btn-barra[aria-expanded="true"],
+.btn-barra[aria-pressed="true"],
+.btn-barra.activo,
+.btn-barra[aria-expanded="true"]:hover,
+.btn-barra[aria-pressed="true"]:hover,
+.btn-barra.activo:hover {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--bg);
+}
+
+/* --- Grupo segmentado ------------------------------------------------------ */
+.group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--surface-sunken);
+  border-radius: var(--radius);
+  max-width: 100%;
+}
+.group > button {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-muted);
+  border-radius: calc(var(--radius) - 3px);
+}
+.group > button:hover:not(:disabled) {
+  color: var(--fg);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+}
+.group > button[aria-pressed="true"],
+.group > button[aria-pressed="true"]:hover {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--fg);
+  font-weight: 700;
+}
+/* El «✓» marca la elegida sin depender del color. El lector de pantalla ya
+   oye «pulsado» por aria-pressed: la segunda declaración le quita el texto
+   alternativo donde se entiende, y donde no, se queda la primera. */
+.group > button[aria-pressed="true"]::before {
+  content: "✓ ";
+  content: "✓ " / "";
+}
+
+/* --- Piezas no interactivas ------------------------------------------------ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-chip);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.chip.neutro { background: var(--surface-sunken); color: var(--fg-muted); }
+.chip.celebra { background: var(--celebracion); color: var(--on-celebracion); }
+
+.superficie {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.antetitulo {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+input[type="range"],
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+@media (forced-colors: active) {
+  /* Sin esto, la opción elegida solo se distinguiría por la negrita y el ✓. */
+  .group > button[aria-pressed="true"] { border-color: Highlight; }
+  .btn-barra[aria-expanded="true"],
+  .btn-barra[aria-pressed="true"],
+  .btn-barra.activo {
+    border-color: Highlight;
+    outline: 2px solid Highlight;
+  }
+}

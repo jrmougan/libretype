@@ -27,6 +27,22 @@ export interface Voz {
    * reprender, y eso está prohibido en los dos tonos.
    */
   repaso: string;
+  /**
+   * Encabeza las teclas que más costaron en el intento («…: la P y la tilde»).
+   * El sujeto son las teclas, no la persona, por la misma razón que en `repaso`.
+   */
+  costaron: string;
+  /** Cierra esa lista sin reprender: lo que costó se asienta practicando. */
+  costaronAnimo: string;
+  /** Invita a practicar las teclas flojas desde el diálogo de resultado. */
+  refuerzo: string;
+  /**
+   * Horizonte realista. Aprender a escribir sin mirar lleva semanas y hay un
+   * tramo en que parece que no se avanza, que es cuando más se abandona.
+   * Decirlo antes lo convierte en algo esperado. Sin cifra de días ni cuenta
+   * atrás: una cifra sería una meta que se puede incumplir.
+   */
+  horizonte: string;
 }
 
 const JUEGO: Voz = {
@@ -38,6 +54,12 @@ const JUEGO: Voz = {
   siguiente: '¡Siguiente!',
   progreso: 'Lo que llevas conseguido',
   repaso: '¡A repasar! Hay teclas ganadas que piden otra vuelta.',
+  costaron: 'Las que más se han resistido:',
+  costaronAnimo: '¡Con un poco de práctica saldrán solas!',
+  refuerzo: '¡Dales un repaso a las que más cuestan!',
+  horizonte:
+    '¡Escribir sin mirar se consigue en unas semanas, con un ratito cada día! ' +
+    'Si algún día parece que no avanzas, no pasa nada: le pasa a todo el mundo, y luego se nota el salto.',
 };
 
 const SOBRIO: Voz = {
@@ -49,6 +71,12 @@ const SOBRIO: Voz = {
   siguiente: 'Siguiente lección',
   progreso: 'Tu progreso',
   repaso: 'Hay teclas ya superadas que llevan un tiempo sin salir.',
+  costaron: 'Las teclas que más costaron esta vez:',
+  costaronAnimo: 'Es normal; se asientan practicando.',
+  refuerzo: 'Puedes practicar ahora las teclas que más cuestan.',
+  horizonte:
+    'Aprender a escribir sin mirar lleva unas semanas, un rato cada día. ' +
+    'Es normal que haya un tramo en el que parece que no se avanza: forma parte del aprendizaje.',
 };
 
 export const VOCES: Record<Tono, Voz> = { juego: JUEGO, sobrio: SOBRIO };
@@ -60,3 +88,11 @@ export function vozDe(tono: Tono | null): Voz {
 
 /** Umbral de precisión a partir del cual el ánimo es de enhorabuena. */
 export const PRECISION_ALTA = 95;
+
+/**
+ * Qué son las «ppm», igual en los dos tonos porque es información, no ánimo.
+ * El motor cuenta cada cinco caracteres acertados como una palabra.
+ */
+export const QUE_ES_PPM =
+  'ppm son palabras por minuto: cuántas palabras escribirías en un minuto a este ritmo. ' +
+  'Cada cinco letras acertadas cuentan como una palabra.';

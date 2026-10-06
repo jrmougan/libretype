@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { VOCES, vozDe, type Voz } from './voz';
+import { QUE_ES_PPM, VOCES, vozDe, type Voz } from './voz';
 
 const CLAVES: (keyof Voz)[] = [
   'terminada', 'record', 'animoAlto', 'animoBajo', 'repetir', 'siguiente', 'progreso', 'repaso',
@@ -49,3 +49,45 @@ describe('voces', () => {
     }
   });
 });
+
+describe('feedback del intento, refuerzo y horizonte (fase 1)', () => {
+  const NUEVAS: (keyof Voz)[] = ['costaron', 'costaronAnimo', 'refuerzo', 'horizonte'];
+
+  it('los dos tonos tienen todos los textos nuevos', () => {
+    for (const clave of NUEVAS) {
+      expect(VOCES.juego[clave].trim().length, `juego.${clave}`).toBeGreaterThan(10);
+      expect(VOCES.sobrio[clave].trim().length, `sobrio.${clave}`).toBeGreaterThan(10);
+    }
+  });
+
+  it('el sobrio tampoco exclama aquí', () => {
+    for (const clave of NUEVAS) expect(VOCES.sobrio[clave], clave).not.toMatch(/[¡!]/);
+  });
+
+  it('decir qué teclas costaron no reprende en ninguna voz', () => {
+    // Se habla de las teclas, no de la persona; y nada de «mal», «error» o «fallo».
+    for (const tono of ['juego', 'sobrio'] as const) {
+      for (const clave of ['costaron', 'costaronAnimo', 'refuerzo', 'horizonte'] as const) {
+        const texto = VOCES[tono][clave].toLowerCase();
+        for (const palabra of ['mal', 'error', 'fallo', 'fallaste', 'incorrecto', 'peor', 'deberías']) {
+          expect(texto, `${tono}.${clave} usa "${palabra}"`).not.toMatch(new RegExp(`\\b${palabra}`));
+        }
+      }
+    }
+  });
+
+  it('el horizonte habla de semanas sin cifra ni cuenta atrás', () => {
+    for (const tono of ['juego', 'sobrio'] as const) {
+      const h = VOCES[tono].horizonte;
+      expect(h).toMatch(/semanas/);
+      expect(h).toMatch(/cada día/);
+      expect(h, 'una cifra sería una meta que se puede incumplir').not.toMatch(/\d/);
+      expect(h).not.toMatch(/\b(dos|tres|cuatro|cinco|seis|siete|ocho|diez|treinta)\b/i);
+    }
+  });
+
+  it('explica qué son las ppm', () => {
+    expect(QUE_ES_PPM).toMatch(/palabras por minuto/);
+  });
+});
+

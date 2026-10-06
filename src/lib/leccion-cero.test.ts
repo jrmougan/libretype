@@ -56,6 +56,16 @@ describe('lección cero', () => {
     }
   });
 
+  it('da un horizonte realista: semanas, un rato cada día, sin cifra ni cuenta atrás', () => {
+    // El abandono llega en el tramo en que parece que no se avanza. Avisarlo
+    // antes lo convierte en algo esperado en vez de en una señal de fracaso.
+    const texto = PASOS.map((p) => p.cuerpo.join(' ')).join(' ');
+    expect(texto).toMatch(/unas semanas, un rato cada día/);
+    expect(texto).toMatch(/parezca que no avanzas/);
+    const horizonte = PASOS.flatMap((p) => p.cuerpo).filter((c) => /semanas|avanzas/.test(c));
+    for (const c of horizonte) expect(c).not.toMatch(/\d/);
+  });
+
   it('todos los pasos tienen título y algo que leer', () => {
     for (const paso of PASOS) {
       expect(paso.titulo.length).toBeGreaterThan(5);

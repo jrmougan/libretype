@@ -45,6 +45,26 @@ describe('normalizar', () => {
     expect(normalizar({ buscarActualizaciones: 'no' }).buscarActualizaciones).toBe(true);
   });
 
+  it('el sonido viene apagado y solo un true explícito lo enciende', () => {
+    // En un aula con veinte equipos, un valor corrupto no puede ponerlos a sonar.
+    expect(normalizar({}).sonido).toBe(false);
+    expect(normalizar({ sonido: 'sí' }).sonido).toBe(false);
+    expect(normalizar({ sonido: true }).sonido).toBe(true);
+  });
+
+  it('acota el volumen y lo recupera si viene corrupto', () => {
+    expect(normalizar({ volumen: 5 }).volumen).toBe(1);
+    expect(normalizar({ volumen: 0 }).volumen).toBe(0.1);
+    expect(normalizar({ volumen: 'alto' }).volumen).toBe(POR_DEFECTO.volumen);
+    expect(normalizar({ volumen: 0.3 }).volumen).toBe(0.3);
+  });
+
+  it('las métricas se ven salvo que se pida ocultarlas', () => {
+    expect(normalizar({}).ocultarMetricas).toBe(false);
+    expect(normalizar({ ocultarMetricas: true }).ocultarMetricas).toBe(true);
+    expect(normalizar({ ocultarMetricas: 1 }).ocultarMetricas).toBe(false);
+  });
+
   it('normaliza animaciones reducidas a movimiento reducido', () => {
     expect(normalizar({ animaciones: 'reducidas' }).movimiento).toBe('reducido');
     expect(normalizar({ movimiento: 'reducido' }).movimiento).toBe('reducido');
@@ -96,6 +116,7 @@ describe('aplicar al documento', () => {
       escala: 1.8, tema: 'oscuro', movimiento: 'reducido',
       fuente: 'dislexia', tono: 'juego', ayudaTeclado: 'siempre',
       buscarActualizaciones: true, layout: 'es-iso',
+      sonido: false, volumen: 0.6, ocultarMetricas: false,
     }, raiz);
     expect(raiz.getAttribute('data-theme')).toBe('dark');
     expect(raiz.getAttribute('data-motion')).toBe('reducido');

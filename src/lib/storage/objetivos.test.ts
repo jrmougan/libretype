@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { LESSONS } from '../lessons';
-import type { Sesion } from './progreso';
+import { PCT_MINIMO_PARA_RECORD, type Sesion } from './progreso';
 import {
-  conservarLogros, FILA_DISPONIBLE, leccionesSuperadas, nivelDisponible, OBJETIVO_PANEL,
+  conservarLogros, FILA_DISPONIBLE, leccionesSuperadas, nivelDisponible, NOTA_MARCA, OBJETIVO_PANEL,
   OBJETIVO_PENDIENTE, objetivoLeccion, PCT_OBJETIVO, SIN_PRESION,
 } from './objetivos';
 
@@ -77,6 +77,11 @@ describe('cómo se comunica el objetivo (issue #54)', () => {
     });
   }
 
+  it('la nota de la marca lleva su umbral y lenguaje que quita presión (0.8)', () => {
+    expect(NOTA_MARCA).toContain(`${PCT_MINIMO_PARA_RECORD}%`);
+    expect(NOTA_MARCA).toMatch(RE_SIN_PRESION);
+  });
+
   it('la etiqueta corta de cada fila no vuelve a meter el número en la tabla', () => {
     // El umbral ya está explicado en la nota del panel, justo encima: repetirlo
     // fila a fila no informa y convierte cada lección en un examen.
@@ -87,8 +92,21 @@ describe('cómo se comunica el objetivo (issue #54)', () => {
   it('ninguna vista interpola el umbral por su cuenta', () => {
     const reinciden = Object.entries(FUENTES)
       .filter(([ruta]) => ruta.endsWith('.svelte'))
-      .filter(([, fuente]) => fuente.includes('PCT_OBJETIVO'))
+      .filter(([, fuente]) => /PCT_OBJETIVO|PCT_MINIMO_PARA_RECORD/.test(fuente))
       .map(([ruta]) => ruta);
-    expect(reinciden, 'el umbral solo se enseña con las frases de objetivos.ts').toEqual([]);
+    expect(reinciden, 'los umbrales solo se enseñan con las frases de objetivos.ts').toEqual([]);
+  });
+
+  it('ninguna vista escribe a mano la cifra de un umbral seguida de % (0.8)', () => {
+    // El «90% de acierto» de Progreso.svelte se coló así: escrito como texto,
+    // sin pasar por ninguna constante, y el guardián de arriba no lo veía.
+    const cifras = [...new Set([PCT_OBJETIVO, PCT_MINIMO_PARA_RECORD])];
+    const re = new RegExp(`\\b(${cifras.join('|')})\\s*%`);
+    const reinciden = Object.entries(FUENTES)
+      .filter(([ruta]) => ruta.endsWith('.svelte'))
+      // Los estilos no hablan con nadie: un `color-mix(… 90%, …)` no es un umbral.
+      .filter(([, fuente]) => re.test(fuente.replace(/<style[\s\S]*?<\/style>/g, '')))
+      .map(([ruta]) => ruta);
+    expect(reinciden, 'los umbrales solo se enseñan con las frases de objetivos.ts').toEqual([]);
   });
 });

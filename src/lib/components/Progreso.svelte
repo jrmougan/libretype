@@ -5,7 +5,7 @@
   import { resumirDificultad } from "../storage/dificultad";
   import { tituloRetirada } from "../storage/equivalencias";
   import {
-    FILA_DISPONIBLE, leccionesSuperadas, nivelDisponible, OBJETIVO_PANEL,
+    FILA_DISPONIBLE, leccionesSuperadas, nivelDisponible, NOTA_MARCA, OBJETIVO_PANEL,
   } from "../storage/objetivos";
   import type { Lesson } from "../lessons";
   import type { Almacen } from "../storage/almacen";
@@ -278,10 +278,7 @@
       </p>
     {/if}
 
-    <p class="nota">
-      Solo cuentan para la marca los intentos con 90% de acierto o más: ir
-      rápido fallando no es escribir mejor.
-    </p>
+    <p class="nota">{NOTA_MARCA}</p>
 
     <p class="nota">
       «Hasta superar» cuenta los intentos que costó llegar al objetivo la

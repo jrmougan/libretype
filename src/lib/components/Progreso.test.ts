@@ -492,7 +492,10 @@ describe("Progreso.svelte - comparado con uno mismo (0.7 y 2.4)", () => {
   it("cuenta las teclas sin mirar y los días, y ya no hay racha que perder", () => {
     montarCon([sesionPrueba], new Map([["KeyA", dominada]]));
     const dts = [...document.querySelectorAll(".global dt")].map((dt) => dt.textContent);
-    expect(dts).toEqual(["Teclas que ya escribes sin mirar", "Esta semana", "Días practicados", "Tiempo total"]);
+    expect(dts).toEqual([
+      "Lecciones superadas", "Teclas que ya escribes sin mirar", "Esta semana",
+      "Días practicados", "Tiempo total", "Tu mejor marca",
+    ]);
     expect(document.querySelector(".progreso")?.textContent).not.toMatch(/racha/i);
   });
 

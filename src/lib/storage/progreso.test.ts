@@ -3,7 +3,8 @@ import {
   esRecord, formatearDuracion, PCT_MINIMO_PARA_RECORD,
   resumirEvolucion, resumirGlobal, resumirLecciones, type Sesion,
 } from './progreso';
-import { AlmacenLocal, AlmacenMemoria, AlmacenSqlite, type DbSql } from './almacen';
+import { AlmacenLocal, AlmacenMemoria, AlmacenSqlite } from './almacen';
+import { crearDbDePrueba } from './sqlite-de-prueba';
 import type { EstadoTecla } from '../keyboard/dominio';
 
 const sesion = (p: Partial<Sesion> = {}): Sesion => ({
@@ -263,38 +264,8 @@ describe('almacén en memoria', () => {
 });
 
 describe('almacén sqlite (Issue #38)', () => {
-  function crearDbMock(): DbSql {
-    const filasTeclas: { code: string; intentos: number; aciertos: number; ms_total: number }[] = [];
-    return {
-      async execute(sql: string, params?: unknown[]): Promise<unknown> {
-        if (sql.includes('DELETE FROM teclas')) {
-          filasTeclas.length = 0;
-        } else if (sql.includes('INSERT INTO teclas')) {
-          const code = params![0] as string;
-          const fila = {
-            code,
-            intentos: params![1] as number,
-            aciertos: params![2] as number,
-            ms_total: params![3] as number,
-          };
-          const ix = filasTeclas.findIndex((t) => t.code === code);
-          if (ix >= 0) filasTeclas[ix] = fila;
-          else filasTeclas.push(fila);
-        }
-        return {};
-      },
-      async select<T>(sql: string): Promise<T> {
-        if (sql.includes('FROM teclas')) {
-          return [...filasTeclas] as unknown as T;
-        }
-        return [] as unknown as T;
-      },
-    };
-  }
-
   it('guarda, actualiza y recupera el mapa de teclas íntegro', async () => {
-    const db = crearDbMock();
-    const a = new AlmacenSqlite(db);
+    const a = new AlmacenSqlite(crearDbDePrueba().db);
 
     expect(await a.leerTeclas()).toEqual(new Map());
 

@@ -1,3 +1,6 @@
+use std::path::{Path, PathBuf};
+
+use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 /// El progreso vive en un SQLite local, en el directorio de datos de la app.
@@ -37,7 +40,96 @@ fn migraciones() -> Vec<Migration> {
         ",
             kind: MigrationKind::Up,
         },
+        // Perfiles: un equipo de aula lo comparten varios alumnos. Todo lo que
+        // ya había pasa al perfil 1, «Principal». Va en una transacción (sqlx
+        // envuelve cada migración en una), así que o se aplica entera o no se
+        // aplica. `teclas` se rehace porque su clave pasa de `code` a
+        // `(perfil, code)`, y en SQLite eso no se puede cambiar con un ALTER.
+        // La columna `perfil` de `sesiones` no lleva REFERENCES: con las claves
+        // foráneas activas, SQLite no deja añadir una con valor por defecto.
+        Migration {
+            version: 3,
+            description: "perfiles locales",
+            sql: "
+            CREATE TABLE IF NOT EXISTS perfiles (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                alias      TEXT    NOT NULL,
+                creado_en  TEXT    NOT NULL
+            );
+            INSERT INTO perfiles (id, alias, creado_en)
+                VALUES (1, 'Principal', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            ALTER TABLE sesiones ADD COLUMN perfil INTEGER NOT NULL DEFAULT 1;
+            CREATE INDEX IF NOT EXISTS idx_sesiones_perfil
+                ON sesiones (perfil, leccion);
+            CREATE TABLE teclas_por_perfil (
+                perfil    INTEGER NOT NULL,
+                code      TEXT    NOT NULL,
+                intentos  INTEGER NOT NULL,
+                aciertos  INTEGER NOT NULL,
+                ms_total  INTEGER NOT NULL,
+                PRIMARY KEY (perfil, code)
+            );
+            INSERT INTO teclas_por_perfil (perfil, code, intentos, aciertos, ms_total)
+                SELECT 1, code, intentos, aciertos, ms_total FROM teclas;
+            DROP TABLE teclas;
+            ALTER TABLE teclas_por_perfil RENAME TO teclas;
+        ",
+            kind: MigrationKind::Up,
+        },
     ]
+}
+
+/// El fichero que abre tauri-plugin-sql, dentro de `app_config_dir()`.
+const BASE_DE_DATOS: &str = "libretype.db";
+/// Junto a la base de datos: la versión del esquema que ya tiene copia hecha.
+const MARCA_ESQUEMA: &str = "libretype.db.esquema";
+
+/// La versión más alta del esquema que conoce este binario (van en orden).
+fn version_esquema() -> i64 {
+    migraciones().last().map_or(0, |m| m.version)
+}
+
+/// Copia la base de datos antes de que una migración nueva la toque.
+///
+/// Las migraciones las aplica tauri-plugin-sql al cargar la base de datos
+/// desde la interfaz, que es después de `setup`. Aquí no se puede preguntar a
+/// SQLite qué versión tiene sin abrirla, así que se lleva la cuenta en un
+/// fichero al lado: si este binario trae un esquema más nuevo que el último
+/// copiado, se copia `libretype.db` (y su `-wal`/`-shm`, si los hay) a
+/// `libretype-antes-de-esquema-N.db`. Una copia que ya existe no se pisa: si
+/// escribir la marca falla, el siguiente arranque no puede sustituir la copia
+/// buena por una ya migrada.
+///
+/// Devuelve la ruta de la copia, si se hizo.
+fn copiar_antes_de_migrar(dir: &Path, version: i64) -> std::io::Result<Option<PathBuf>> {
+    let marca = dir.join(MARCA_ESQUEMA);
+    let copiada: i64 = std::fs::read_to_string(&marca)
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0);
+    if copiada >= version {
+        return Ok(None);
+    }
+
+    let db = dir.join(BASE_DE_DATOS);
+    let mut copia = None;
+    if db.is_file() {
+        let destino = dir.join(format!("libretype-antes-de-esquema-{version}.db"));
+        if !destino.exists() {
+            std::fs::copy(&db, &destino)?;
+            for sufijo in ["-wal", "-shm"] {
+                let origen = dir.join(format!("{BASE_DE_DATOS}{sufijo}"));
+                if origen.is_file() {
+                    let nombre = format!("libretype-antes-de-esquema-{version}.db{sufijo}");
+                    std::fs::copy(&origen, dir.join(nombre))?;
+                }
+            }
+        }
+        copia = Some(destino);
+    }
+    std::fs::create_dir_all(dir)?;
+    std::fs::write(&marca, version.to_string())?;
+    Ok(copia)
 }
 
 /// Cómo se empaquetó este binario: "deb", "rpm", "appimage", "msi", "nsis",
@@ -95,6 +187,17 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Antes de que la interfaz cargue la base de datos y se apliquen
+            // las migraciones. Que falle la copia no impide practicar.
+            match app.path().app_config_dir() {
+                Ok(dir) => match copiar_antes_de_migrar(&dir, version_esquema()) {
+                    Ok(Some(copia)) => log::info!("copia previa a la migración en {copia:?}"),
+                    Ok(None) => {}
+                    Err(e) => log::warn!("no se pudo copiar la base de datos: {e}"),
+                },
+                Err(e) => log::warn!("sin directorio de configuración para la copia: {e}"),
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -108,7 +211,7 @@ mod tests {
     #[test]
     fn migraciones_tienen_versiones_validas_y_sql_no_vacio() {
         let migs = migraciones();
-        assert_eq!(migs.len(), 2, "debe haber 2 migraciones iniciales");
+        assert_eq!(migs.len(), 3, "debe haber 3 migraciones");
 
         // Versión 1: sesiones de práctica
         assert_eq!(migs[0].version, 1);
@@ -119,11 +222,58 @@ mod tests {
         assert_eq!(migs[1].version, 2);
         assert!(migs[1].sql.contains("CREATE TABLE IF NOT EXISTS teclas"));
 
+        // Versión 3: perfiles
+        assert_eq!(migs[2].version, 3);
+        assert!(migs[2].sql.contains("CREATE TABLE IF NOT EXISTS perfiles"));
+        assert_eq!(version_esquema(), 3);
+
         // Invariantes generales
         for (idx, m) in migs.iter().enumerate() {
             assert_eq!(m.version as usize, idx + 1);
             assert!(!m.sql.trim().is_empty());
             assert!(!m.description.trim().is_empty());
         }
+    }
+
+    /// Un directorio temporal propio de cada test, para que no se pisen.
+    fn dir_de_prueba(nombre: &str) -> PathBuf {
+        let nombre = format!("libretype-test-{}-{nombre}", std::process::id());
+        let dir = std::env::temp_dir().join(nombre);
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn copia_la_base_de_datos_antes_de_un_esquema_nuevo_y_solo_una_vez() {
+        let dir = dir_de_prueba("copia");
+        std::fs::write(dir.join(BASE_DE_DATOS), b"version 2").unwrap();
+        std::fs::write(dir.join("libretype.db-wal"), b"wal").unwrap();
+
+        let copia = copiar_antes_de_migrar(&dir, 3).unwrap().expect("debe copiar");
+        assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
+        let wal = dir.join("libretype-antes-de-esquema-3.db-wal");
+        assert_eq!(std::fs::read(wal).unwrap(), b"wal");
+
+        // Ya migrada: el siguiente arranque no vuelve a copiar.
+        std::fs::write(dir.join(BASE_DE_DATOS), b"version 3").unwrap();
+        assert!(copiar_antes_de_migrar(&dir, 3).unwrap().is_none());
+        assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
+
+        // Si la marca se perdió, la copia buena tampoco se pisa.
+        std::fs::remove_file(dir.join(MARCA_ESQUEMA)).unwrap();
+        copiar_antes_de_migrar(&dir, 3).unwrap();
+        assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn en_una_instalacion_nueva_no_hay_nada_que_copiar() {
+        let dir = dir_de_prueba("nueva");
+        assert!(copiar_antes_de_migrar(&dir, 3).unwrap().is_none());
+        let marca = std::fs::read_to_string(dir.join(MARCA_ESQUEMA)).unwrap();
+        assert_eq!(marca, "3");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

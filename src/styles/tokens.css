@@ -1,3 +1,26 @@
+/* OpenDyslexic, incluida con la app (OFL 1.1, licencia en assets/fonts/OFL.txt).
+ * Sale de github.com/antijingoist/opendyslexic, carpeta compiled/, commit
+ * 1824da5c. Va en el paquete y no se pide a ningún servidor: la app promete no
+ * hablar con nadie salvo para buscar actualizaciones. Antes solo se nombraba
+ * en la pila de fuentes, sin incluirla, y en Linux no cargaba nada (la de respaldo
+ * tampoco existe allí): el ajuste «Para dislexia» no cambiaba la letra.
+ * La negrita del fichero es de peso 800; se declara como 700 para que la use
+ * cualquier `font-weight: bold`. */
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("../assets/fonts/OpenDyslexic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("../assets/fonts/OpenDyslexic-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Tokens de diseño de LibreType.
  *
  * Todo color, tamaño y duración sale de aquí. La razón no es estética: la
@@ -45,9 +68,15 @@
 
   --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-drill: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* Las letras del teclado van siempre en la monoespaciada: la geometría de la
+   * tecla (ver --factor-tecla y geometria.test.ts) está medida con sus
+   * métricas, y OpenDyslexic es más ancha y más alta. Por eso es un token
+   * aparte que la fuente para dislexia no toca. */
+  --font-key: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   /* Fuente para dislexia: se activa poniendo data-font="dyslexic" en <html>.
-   * Se degrada a una sans normal si la fuente no está instalada. */
+   * La fuente viene incluida (@font-face de arriba); la sans del sistema solo
+   * queda como respaldo si el fichero no llegase a cargar. */
   --font-stack: var(--font-ui);
 
   /* --- Espaciado y forma --- */
@@ -283,8 +312,8 @@
 }
 
 :root[data-font="dyslexic"] {
-  --font-stack: "OpenDyslexic", "Comic Sans MS", var(--font-ui);
-  --font-drill: "OpenDyslexic Mono", "OpenDyslexic", var(--font-ui);
+  --font-stack: "OpenDyslexic", var(--font-ui);
+  --font-drill: "OpenDyslexic", var(--font-ui);
   letter-spacing: 0.02em;
 }
 

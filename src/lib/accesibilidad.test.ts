@@ -231,3 +231,40 @@ describe("Contraste de controles y teclas (roadmap 0.10, WCAG 1.4.11)", () => {
     expect(forzado).toMatch(/--accent:\s*Highlight/);
   });
 });
+
+describe("Tipografía para dislexia (roadmap 0.9)", () => {
+  // Antes solo se nombraba OpenDyslexic sin incluirla, y en Linux el ajuste no
+  // cambiaba nada. Estos tests fallan si la fuente vuelve a quedarse fuera.
+  const caras = [...tokensCss.matchAll(/@font-face\s*\{[^}]*\}/g)].map((m) => m[0]);
+  const urls = caras.flatMap((c) => [...c.matchAll(/url\("\.\.\/([^"]+)"\)/g)].map((m) => m[1]));
+
+  it("declara OpenDyslexic con @font-face en normal y negrita", () => {
+    const deOpenDyslexic = caras.filter((c) => c.includes('font-family: "OpenDyslexic"'));
+    expect(deOpenDyslexic.map((c) => c.match(/font-weight:\s*(\d+)/)?.[1]).sort()).toEqual(["400", "700"]);
+    expect(urls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("los ficheros existen, son woff2 de verdad y llevan la licencia OFL al lado", () => {
+    for (const url of urls) {
+      const binario = readFileSync(`src/${url}`);
+      expect(binario.subarray(0, 4).toString("latin1"), url).toBe("wOF2");
+    }
+    const licencia = readFileSync("src/assets/fonts/OFL.txt", "utf8");
+    expect(licencia).toContain("SIL OPEN FONT LICENSE Version 1.1");
+    expect(licencia).toContain("OpenDyslexic");
+  });
+
+  it("la pila para dislexia empieza por la fuente incluida y no por una que no existe en Linux", () => {
+    const bloque = tokensCss.slice(tokensCss.indexOf(':root[data-font="dyslexic"]'));
+    expect(bloque).toMatch(/--font-stack:\s*"OpenDyslexic"/);
+    expect(bloque).toMatch(/--font-drill:\s*"OpenDyslexic"/);
+    expect(tokensCss).not.toContain("Comic Sans");
+    expect(tokensCss).not.toContain("OpenDyslexic Mono");
+  });
+
+  it("el teclado conserva la monoespaciada con la que está medida su geometría", () => {
+    expect(keyboardSvelte).toMatch(/\.lbl\s*\{[^}]*font-family:\s*var\(--font-key\)/);
+    const bloque = tokensCss.slice(tokensCss.indexOf(':root[data-font="dyslexic"]'));
+    expect(bloque.slice(0, bloque.indexOf("}"))).not.toContain("--font-key");
+  });
+});

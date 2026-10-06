@@ -193,7 +193,7 @@
   .key rect { transition: fill var(--motion-fast) var(--ease); }
 
   .lbl {
-    font-family: var(--font-drill);
+    font-family: var(--font-key);
     pointer-events: none;
     user-select: none;
   }

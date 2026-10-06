@@ -945,14 +945,16 @@
       {/key}
     {:else if vista === 'propio'}
       {#if enEdicionPropio}
-        <div class="centrado editor-propio">
-          <h2>Práctica libre con texto propio</h2>
-          <p class="note">Escribe o pega el texto que desees practicar. Se utilizarán las teclas disponibles en la distribución activa.</p>
+        <section class="centrado editor-propio" aria-labelledby="propio-tit">
+          <p class="antetitulo">Práctica libre · Texto propio</p>
+          <h2 id="propio-tit">Práctica libre con texto propio</h2>
+          <p class="descripcion" id="propio-desc">Escribe o pega el texto que desees practicar. Se utilizarán las teclas disponibles en la distribución activa.</p>
           <label for="texto-propio-input" class="sr-only">Texto personalizado</label>
           <textarea
             id="texto-propio-input"
             class="input-texto-propio"
             rows="5"
+            aria-describedby="propio-desc"
             bind:value={textoPropio}
             placeholder="Escribe o pega aquí tu propio texto..."
           ></textarea>
@@ -960,9 +962,12 @@
             <p class="nota aviso aviso-error" role="alert">{errorTextoPropio}</p>
           {/if}
           <div class="acciones-propio">
+            <span class="contador">
+              {textoPropio.length === 1 ? '1 carácter' : `${textoPropio.length} caracteres`}
+            </span>
             <button class="primario" onclick={empezarTextoPropio}>Empezar a teclear</button>
           </div>
-        </div>
+        </section>
       {:else}
         {#key propioKey}
           <Drill
@@ -1880,25 +1885,75 @@
     border-left: 4px solid var(--pending);
     border-radius: 0 var(--radius) var(--radius) 0;
   }
+  /* --- Editor de texto propio: una tarjeta centrada ---------------------- */
   .editor-propio {
     display: grid;
     gap: var(--space-3);
-    width: 100%;
+    width: min(47.5rem, 100%);
+    max-width: none;
+    padding: var(--space-6);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 1.25rem;
   }
+  .editor-propio .antetitulo {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--accent-ink);
+  }
+  .editor-propio h2 {
+    margin: 0;
+    font-size: var(--text-xl);
+    line-height: 1.2;
+  }
+  .editor-propio .descripcion {
+    margin: 0;
+    font-size: calc(1.0625rem * var(--ui-scale));
+    color: var(--fg-muted);
+  }
+  /* El campo se ve como campo aunque no tenga el foco: borde de acento. Al
+     enfocarlo gana un halo, además del contorno de foco de siempre. */
   .input-texto-propio {
     width: 100%;
-    min-height: 120px;
+    min-height: calc(7.5rem * var(--ui-scale));
     font-family: var(--font-drill);
-    font-size: var(--text-base);
-    padding: var(--space-3);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius);
+    font-size: calc(1.25rem * var(--ui-scale));
+    line-height: 1.6;
+    padding: var(--space-3) var(--space-4);
+    border: 2px solid var(--accent);
+    border-radius: 0.75rem;
     background: var(--surface);
     color: var(--fg);
     resize: vertical;
   }
+  .input-texto-propio:focus { box-shadow: 0 0 0 4px var(--accent-soft); }
+  .input-texto-propio::placeholder { color: var(--fg-muted); }
+  .editor-propio .aviso-error {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border-left: 4px solid var(--error);
+    background: var(--error-bg);
+    color: var(--fg);
+    border-radius: 0 0.75rem 0.75rem 0;
+  }
   .acciones-propio {
     display: flex;
-    gap: var(--space-2);
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+  .contador {
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .acciones-propio .primario {
+    min-height: calc(var(--target-min) + 0.25rem);
+    padding-inline: var(--space-6);
+    font-weight: 700;
+    border-radius: 0.75rem;
+    box-shadow: 0 3px 0 var(--accent-deep);
   }
 </style>

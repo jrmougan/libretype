@@ -90,7 +90,7 @@
     </p>
     <div class="botones">
       <button class="primario" onclick={() => (fase = 'tramo')}>Empezar la prueba</button>
-      <button onclick={() => onSeguir(inicio)}>Mejor empiezo por las lecciones</button>
+      <button class="secundario" onclick={() => onSeguir(inicio)}>Mejor empiezo por las lecciones</button>
     </div>
   </section>
 {:else if fase === 'tramo'}
@@ -139,10 +139,43 @@
 {/if}
 
 <style>
-  .centrado { align-self: center; justify-self: center; max-width: 72ch; }
-  .prueba { display: grid; gap: var(--space-3); }
-  h2 { margin: 0; font-size: var(--text-xl); }
-  p { margin: 0; font-size: var(--text-lg); }
-  .botones { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-  .primario { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  /* Antes y después de la prueba, una tarjeta centrada como el resto de
+     pantallas de entrada; durante, el Drill de siempre. */
+  .centrado { align-self: center; justify-self: center; width: min(72ch, 100%); }
+  .prueba {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-6);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 1.25rem;
+  }
+  h2 {
+    margin: 0;
+    font-size: calc(1.875rem * var(--ui-scale));
+    line-height: 1.2;
+  }
+  p { margin: 0; font-size: calc(1.0625rem * var(--ui-scale)); line-height: 1.6; }
+  .botones {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-top: var(--space-2);
+  }
+  button { border-radius: 0.75rem; }
+  .secundario {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    color: var(--fg);
+  }
+  .primario {
+    min-height: calc(var(--target-min) + 0.25rem);
+    padding-inline: var(--space-6);
+    font-weight: 700;
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
+    box-shadow: 0 3px 0 var(--accent-deep);
+  }
+  .primario:hover { background: var(--accent); filter: brightness(1.05); }
 </style>

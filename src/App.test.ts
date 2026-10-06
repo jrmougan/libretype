@@ -651,3 +651,14 @@ describe('prueba de colocación (2.9)', () => {
     expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
   });
 });
+
+describe('el botón del temario en la bienvenida (dirección 1a)', () => {
+  it('dice dónde está la persona en vez de quedarse vacío', async () => {
+    await unmount(app);
+    localStorage.clear();
+    guardar({ ...POR_DEFECTO, tono: null });
+    app = mount(App, { target: document.body });
+    await vi.waitFor(() => expect(document.querySelector('button.btn-temario')?.textContent).toContain('Bienvenida'));
+    expect(document.querySelector('button.btn-temario')?.textContent).toContain('Elige el tono');
+  });
+});

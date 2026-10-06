@@ -201,7 +201,10 @@
     display: grid;
     gap: var(--space-4);
     grid-template-areas: 'cab' 'contenido' 'teclado' 'pasos';
-    grid-template-rows: auto minmax(0, auto) minmax(min(34vh, 230px), 1fr) auto;
+    /* El contenido mide lo que su texto, con tope: con minmax(0, …) la rejilla
+       lo aplastaba a nada al 200% antes de dejar que .escena se desplazara, y
+       las instrucciones desaparecían sin rastro. */
+    grid-template-rows: auto auto minmax(min(34vh, 230px), 1fr) auto;
     min-height: 0;
   }
   .cab { grid-area: cab; }
@@ -211,8 +214,15 @@
     gap: var(--space-4) var(--space-6);
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    min-height: 0;
+    /* Un contenedor con desplazamiento tiene mínimo automático 0: sin este
+       suelo, la fila `auto` también se encogía a nada. Al 100% queda por debajo
+       de lo que ya mide el texto, así que no añade hueco. */
+    min-height: min(40vh, 10rem);
+    max-height: 40vh;
     overflow-y: auto;
+    /* Hueco para el anillo de foco del recuadro de acción, que el
+       desplazamiento recortaría. */
+    padding: var(--space-1);
   }
   .contenido.con-accion { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
   /* La fila 1fr le da altura definida, que es lo que permite al SVG escalarse

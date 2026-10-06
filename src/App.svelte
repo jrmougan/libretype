@@ -667,6 +667,7 @@
       : vista === 'cero' || vista === 'colocacion' ? 'Antes de empezar'
       : vista === 'leccion' || vista === 'continua' || vista === 'fluidez' || vista === 'propio'
         ? 'Práctica libre'
+      : vista === 'tono' || vista === 'perfil' ? 'Bienvenida'
       : '',
   );
   const rotuloActual = $derived(
@@ -676,6 +677,8 @@
       : vista === 'fluidez' ? 'Fluidez'
       : vista === 'colocacion' ? 'Prueba de colocación'
       : vista === 'propio' ? 'Texto propio'
+      : vista === 'tono' ? 'Elige el tono'
+      : vista === 'perfil' ? '¿Quién practica?'
       : '',
   );
   /**
@@ -1101,7 +1104,7 @@
           {#if result.sinMirar && result.sinMirar.length > 0}
             <p class="note logro">
               {result.sinMirar.length === 1 ? 'Ya escribes sin mirar la tecla' : 'Ya escribes sin mirar las teclas'}
-              {result.sinMirar.map((c) => `«${c}»`).join(', ')}{prefs.ayudaTeclado === 'auto'
+              {result.sinMirar.map((c) => (c === ' ' ? 'la barra espaciadora' : `«${c}»`)).join(', ')}{prefs.ayudaTeclado === 'auto'
                 ? (result.sinMirar.length === 1 ? ': su letra deja el teclado de la pantalla.' : ': sus letras dejan el teclado de la pantalla.')
                 : '.'}
             </p>
@@ -1497,9 +1500,11 @@
   /* El botón del temario sustituye a los diez botones que ocupaban dos filas
      y al <select> que vino después. Dice dónde estás sin tener que abrirlo:
      el tramo arriba, la lección en negrita y la pista de segmentos debajo. */
+  /* Mide lo que su texto, con un mínimo: estirada a todo el ancho cuando la
+     barra no lleva métricas parecía una caja vacía. */
   .btn-temario {
-    flex: 1 1 260px;
-    min-width: 0;
+    flex: 0 1 auto;
+    min-width: min(100%, 16.25rem);
     min-height: var(--target-min);
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;

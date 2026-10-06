@@ -70,12 +70,12 @@
           aria-invalid={error ? 'true' : undefined}
         />
         <button type="submit" class="primario">Empezar</button>
-        <button type="button" onclick={() => { creando = false; error = ''; }}>Cancelar</button>
+        <button type="button" class="secundario" onclick={() => { creando = false; error = ''; }}>Cancelar</button>
       </div>
       {#if error}<p id="alias-error" class="error" role="alert">{error}</p>{/if}
     </form>
   {:else}
-    <button type="button" onclick={abrirFormulario}>No estoy en la lista</button>
+    <button type="button" class="secundario otro" onclick={abrirFormulario}>No estoy en la lista</button>
   {/if}
 
   <p class="nota">
@@ -86,15 +86,27 @@
 </section>
 
 <style>
+  /* Una tarjeta centrada, como el resto de pantallas de entrada. */
   .quien {
     display: grid;
     gap: var(--space-4);
-    max-width: 72ch;
+    width: min(72ch, 100%);
     margin: 0 auto;
-    padding: var(--space-4);
+    padding: var(--space-6);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
   }
-  h2 { margin: 0; font-size: var(--text-xl); }
-  .intro { margin: 0; font-size: var(--text-lg); color: var(--fg-muted); }
+  h2 {
+    margin: 0;
+    font-size: calc(1.875rem * var(--ui-scale));
+    line-height: 1.2;
+  }
+  .intro {
+    margin: 0;
+    font-size: calc(1.1875rem * var(--ui-scale));
+    color: var(--fg-muted);
+  }
 
   .perfiles {
     list-style: none;
@@ -105,36 +117,59 @@
     gap: var(--space-3);
   }
   /* Botones grandes: se elige con el ratón, el dedo o el teclado, y el
-     público incluye a quien tiene menos precisión motora. */
+     público incluye a quien tiene menos precisión motora. Cada nombre es una
+     tarjeta entera. */
   .perfil {
     width: 100%;
     min-height: calc(var(--target-min) * 1.5);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: 700;
+    text-align: left;
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface);
     border: 2px solid var(--border-strong);
+    border-radius: var(--radius-card);
+    box-shadow: 0 2px 0 var(--border);
     overflow-wrap: anywhere;
   }
-  .perfil:hover { border-color: var(--accent); }
+  .perfil:hover { background: var(--accent-soft); border-color: var(--accent); }
+
+  button { border-radius: var(--radius); }
+  .otro { justify-self: start; }
 
   .nuevo { display: grid; gap: var(--space-2); }
-  .fila { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .nuevo label { font-weight: 700; }
+  .fila { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+  /* El mismo campo que el editor de texto propio: borde de acento y halo al
+     enfocar, para que se vea dónde se escribe. */
   input {
     font: inherit;
+    font-size: var(--text-lg);
     min-height: var(--target-min);
     padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border-strong);
+    border: 2px solid var(--border-strong);
     border-radius: var(--radius);
     background: var(--surface);
     color: var(--fg);
     flex: 1 1 14rem;
   }
-  .primario { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
   .error {
     margin: 0;
     padding: var(--space-2) var(--space-3);
     border-left: 4px solid var(--error);
     background: var(--error-bg);
     color: var(--fg);
+    border-radius: 0 var(--radius) var(--radius) 0;
   }
-  .nota { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
+  .nota {
+    margin: 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+  }
 </style>

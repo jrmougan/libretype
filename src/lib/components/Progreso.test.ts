@@ -492,7 +492,10 @@ describe("Progreso.svelte - comparado con uno mismo (0.7 y 2.4)", () => {
   it("cuenta las teclas sin mirar y los días, y ya no hay racha que perder", () => {
     montarCon([sesionPrueba], new Map([["KeyA", dominada]]));
     const dts = [...document.querySelectorAll(".global dt")].map((dt) => dt.textContent);
-    expect(dts).toEqual(["Teclas que ya escribes sin mirar", "Esta semana", "Días practicados", "Tiempo total"]);
+    expect(dts).toEqual([
+      "Lecciones superadas", "Teclas que ya escribes sin mirar", "Esta semana",
+      "Días practicados", "Tiempo total", "Tu mejor marca",
+    ]);
     expect(document.querySelector(".progreso")?.textContent).not.toMatch(/racha/i);
   });
 
@@ -518,5 +521,59 @@ describe("Progreso.svelte - comparado con uno mismo (0.7 y 2.4)", () => {
     ]);
     const frases = document.querySelector(".comparacion")?.textContent ?? "";
     expect(frases).toContain("del 85% de tus primeros días al 97% de esta semana");
+  });
+});
+
+describe("Progreso.svelte - dirección visual 1a", () => {
+  function montar(props: Record<string, unknown> = {}) {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones: [sesionPrueba], lecciones: LESSONS, tipoAlmacen: "sqlite", onBorrar: () => {}, ...props },
+    });
+    flushSync();
+  }
+
+  const filaDe = (titulo: string) => [...document.querySelectorAll("tbody tr")]
+    .find((tr) => tr.querySelector("th")?.textContent?.includes(titulo))!;
+
+  it("la insignia de cada fila acompaña a su etiqueta escrita", () => {
+    montar();
+    const reposo = filaDe(LESSONS[0].title).querySelector(".insignia")!;
+    expect(reposo.getAttribute("aria-hidden")).toBe("true");
+    expect(reposo.textContent).toBe("✓");
+    expect(filaDe(LESSONS[1].title).querySelector(".insignia")?.textContent).toBe("›");
+    expect(filaDe(LESSONS[2].title).querySelector(".insignia")?.textContent).toBe("");
+    expect(filaDe(LESSONS[2].title).querySelector("small")?.textContent).toContain("Bloqueada");
+  });
+
+  it("marca la lección en curso con texto además del fondo", () => {
+    montar({ leccionActual: 1 });
+    expect(filaDe(LESSONS[1].title).classList.contains("actual")).toBe(true);
+    expect(filaDe(LESSONS[1].title).textContent).toContain("Estás aquí");
+    expect(document.querySelectorAll("tr.actual")).toHaveLength(1);
+  });
+
+  it("la tarjeta de constancia solo lleva el color de celebración con ese tono", () => {
+    montar();
+    expect(document.querySelector(".global .constancia")).toBeNull();
+    unmount(componente!);
+    document.body.replaceChildren();
+    montar({ celebra: true });
+    expect(document.querySelector(".global .constancia dt")?.textContent).toBe("Esta semana");
+  });
+
+  it("el umbral sale una sola vez, como subtítulo", () => {
+    montar();
+    const conCifra = [...document.querySelectorAll<HTMLElement>(".progreso *")]
+      .filter((el) => el.children.length === 0 && el.textContent!.includes(`${PCT_OBJETIVO}% de precisión`));
+    expect(conCifra).toHaveLength(1);
+    expect(conCifra[0].classList.contains("subtitulo")).toBe(true);
+  });
+
+  it("las teclas flojas se distinguen con texto y cifra en negrita, no solo por color", () => {
+    montar({ teclas: new Map([["KeyA", { intentos: 10, aciertos: 6, msTotal: 8000 }]]) });
+    const floja = document.querySelector(".tecla-card.tecla-floja")!;
+    expect(floja.querySelector(".badge-floja")?.textContent).toBe("reforzar");
+    expect(floja.querySelector(".tecla-pct")?.textContent).toBe("60%");
   });
 });

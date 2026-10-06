@@ -4,6 +4,7 @@ import App from './App.svelte';
 import { LESSONS } from './lib/lessons';
 import { guardar, POR_DEFECTO } from './lib/preferencias';
 import { PCT_OBJETIVO, SIN_PRESION } from './lib/storage/objetivos';
+import { VOCES } from './lib/voz';
 
 let app: ReturnType<typeof App>;
 
@@ -56,6 +57,16 @@ function boton(texto: string): HTMLButtonElement {
   return [...document.querySelectorAll('button')].find(b => b.textContent?.trim() === texto)!;
 }
 
+/**
+ * «Siguiente» lleva detrás el nombre de la lección a la que lleva
+ * («Siguiente lección · Vocales»), así que no se busca por el texto exacto.
+ */
+function botonSiguiente(): HTMLButtonElement | null {
+  const b = document.querySelector<HTMLButtonElement>('#dialogo-resultado button.siguiente');
+  if (b) expect(b.textContent?.trim().startsWith(VOCES.sobrio.siguiente)).toBe(true);
+  return b;
+}
+
 function campo(): HTMLTextAreaElement {
   return document.querySelector('textarea.capture')!;
 }
@@ -95,7 +106,7 @@ describe('captura y paneles', () => {
     await tick();
     const repasar = boton('Repasar con práctica continua');
     expect(Boolean(repasar)).toBe(antigua);
-    expect(boton('Siguiente lección')).toBeDefined();
+    expect(botonSiguiente()?.textContent).toContain(LESSONS[2].title);
     if (antigua) {
       repasar.click();
       await tick();
@@ -152,7 +163,11 @@ describe('captura y paneles', () => {
     expect(dialogo.hasAttribute('aria-live')).toBe(false);
     expect(dialogo.querySelectorAll('[aria-live], [role="status"], [role="alert"]')).toHaveLength(1);
     expect(campo().disabled).toBe(true);
-    boton(accion).click();
+    if (accion === 'Repetir') boton(accion).click();
+    else {
+      expect(botonSiguiente()?.textContent).toContain(`· ${LESSONS[1].title}`);
+      botonSiguiente()!.click();
+    }
     await tick();
     expect(document.querySelector('dialog')).toBeNull();
     expect(document.activeElement).toBe(campo());
@@ -181,7 +196,7 @@ describe('captura y paneles', () => {
       this.open = false;
     });
 
-    boton('Siguiente lección').click();
+    botonSiguiente()!.click();
     await tick();
 
     // En WKWebView, retirar primero el campo hace que la restauración nativa
@@ -216,8 +231,11 @@ describe('captura y paneles', () => {
     expect(document.querySelector('h2')?.textContent).toContain('texto propio');
     const inputTexto = document.querySelector('textarea.input-texto-propio') as HTMLTextAreaElement;
     expect(inputTexto).not.toBeNull();
+    expect(document.querySelector('.contador')?.textContent?.trim()).toBe('0 caracteres');
     inputTexto.value = 'hola mundo';
     inputTexto.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    expect(document.querySelector('.contador')?.textContent?.trim()).toBe('10 caracteres');
 
     boton('Empezar a teclear').click();
     await tick();
@@ -295,7 +313,7 @@ describe('experiencia de producto (#21, #23, #24)', () => {
     expect(dialogo).not.toBeNull();
     const btnPrimario = dialogo?.querySelector('button.primario');
     expect(btnPrimario?.textContent).toContain('Repetir');
-    expect(boton('Siguiente lección')).toBeUndefined();
+    expect(botonSiguiente()).toBeNull();
     boton('Repetir').click();
     await tick();
     await abrirTemario();
@@ -419,6 +437,39 @@ describe('el titular del resultado cuenta lo que ha pasado (roadmap 0.1)', () =>
     expect(titulo.toLowerCase()).not.toContain('superada');
   });
 
+  it('el tono tranquilo no lleva franja de colores y el récord va en su chip', async () => {
+    completar();
+    expect(document.querySelector('#dialogo-resultado .franja')).toBeNull();
+    expect(document.querySelector('#dialogo-resultado .chip-record')?.textContent).toContain('Récord');
+  });
+
+  it('con el tono de celebración el resultado lleva la franja de los dedos', async () => {
+    await conTonoDeJuego();
+    campo().value = textoEnPantalla();
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    expect(document.querySelector('#dialogo-resultado .franja')?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('la tarjeta de precisión solo se pinta de acierto cuando lo es', async () => {
+    completar();
+    expect(document.querySelectorAll('#resultado-desc .cifra')).toHaveLength(2);
+    expect(document.querySelector('#resultado-desc .cifra-ok')?.textContent).toContain('100%');
+    boton('Repetir').click();
+    await tick();
+    // Al repetir llega un texto nuevo: se lee de la pantalla.
+    const objetivo = textoEnPantalla();
+    let conFallos = '';
+    for (let i = 0; i < objetivo.length; i++) conFallos += i % 2 === 0 ? 'x' : objetivo[i];
+    campo().value = conFallos;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    expect(document.querySelector('#resultado-desc .cifra-ok')).toBeNull();
+    expect(document.querySelector('#resultado-desc')?.textContent).toContain('de precisión');
+  });
+
   it.each(['continua', 'propio'] as const)('en %s no habla de superar ninguna lección', async (modo) => {
     await conTonoDeJuego();
     await irAModo(modo);
@@ -473,12 +524,27 @@ describe('temario y selectores operables con teclado (0.3)', () => {
   it('el botón del temario dice dónde estás y abre el panel compartido', async () => {
     const temario = document.querySelector<HTMLButtonElement>('button.btn-temario')!;
     expect(temario.textContent).toContain('Temario');
-    expect(temario.textContent).toContain(`1. ${LESSONS[0].title}`);
+    expect(temario.textContent).toContain(`Lección 1 de ${LESSONS.length}`);
+    expect(temario.textContent).toContain(LESSONS[0].title);
     expect(temario.getAttribute('aria-controls')).toBe('panel-dialogo');
     await abrirTemario();
     expect(temario.getAttribute('aria-expanded')).toBe('true');
     expect(document.querySelector('#panel-dialogo')?.getAttribute('aria-label')).toBe('Temario');
     expect(campo().disabled).toBe(true);
+  });
+
+  it('la pista de segmentos del temario marca la lección actual, es decorativa y no lleva cifras', async () => {
+    const pista = document.querySelector('button.btn-temario .tm-pista')!;
+    expect(pista.getAttribute('aria-hidden')).toBe('true');
+    const segs = [...pista.querySelectorAll('.seg')];
+    expect(segs).toHaveLength(LESSONS.length);
+    expect(segs.findIndex((s) => s.classList.contains('actual'))).toBe(0);
+    expect(pista.textContent?.trim()).toBe('');
+    // En práctica libre no hay lección actual que marcar.
+    await elegirModo('continua');
+    const temario = document.querySelector('button.btn-temario')!;
+    expect(temario.textContent).toContain('Práctica libre');
+    expect(temario.querySelectorAll('.seg.actual')).toHaveLength(0);
   });
 
   it('cambiar el vocabulario de la práctica continua no tira el texto hasta pulsar el botón', async () => {
@@ -583,5 +649,16 @@ describe('prueba de colocación (2.9)', () => {
     boton(`Ir a «${LESSONS[1].title}»`).click();
     await tick();
     expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
+  });
+});
+
+describe('el botón del temario en la bienvenida (dirección 1a)', () => {
+  it('dice dónde está la persona en vez de quedarse vacío', async () => {
+    await unmount(app);
+    localStorage.clear();
+    guardar({ ...POR_DEFECTO, tono: null });
+    app = mount(App, { target: document.body });
+    await vi.waitFor(() => expect(document.querySelector('button.btn-temario')?.textContent).toContain('Bienvenida'));
+    expect(document.querySelector('button.btn-temario')?.textContent).toContain('Elige el tono');
   });
 });

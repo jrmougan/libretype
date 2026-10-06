@@ -96,14 +96,20 @@
             aria-current={actual ? 'true' : undefined}
             onclick={() => { if (!cerrada) onLeccion(i); }}
           >
-            <span class="titulo"><span class="num">{i + 1}.</span> {l.title}</span>
+            <!-- La insignia repite el estado que ya dice el texto de debajo:
+                 ✓ superada, › abierta, vacía con borde si sigue cerrada. -->
+            <span class="titulo">
+              <span class="insignia" class:ins-superada={superada} class:ins-abierta={!cerrada && !superada}
+                    aria-hidden="true">{superada ? '✓' : cerrada ? '' : '›'}</span>
+              <span><span class="num">{i + 1}.</span> {l.title}</span>
+            </span>
             <span class="estado">
               {#if cerrada}
-                <span class="marca" aria-hidden="true">🔒</span> Cerrada. {motivoBloqueo(lecciones[nivel].title, i === nivel + 1)}
+                Cerrada. {motivoBloqueo(lecciones[nivel].title, i === nivel + 1)}
               {:else if superada}
-                <span class="marca" aria-hidden="true">✓</span> Superada
+                Superada
               {:else}
-                <span class="marca" aria-hidden="true">●</span> {FILA_DISPONIBLE}
+                {FILA_DISPONIBLE}
               {/if}
             </span>
             <span class="detalle">Al terminarla podrás escribir el {pct(l.cobertura)}% de las palabras del español.</span>
@@ -159,18 +165,18 @@
 </div>
 
 <style>
-  .temario { display: grid; gap: var(--space-4); }
-  section { display: grid; gap: var(--space-2); }
-  h3 { margin: 0; font-size: var(--text-base); }
-  .nota { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
+  .temario { display: grid; gap: var(--space-6); }
+  section { display: grid; gap: var(--space-3); }
+  h3 { margin: 0; font-size: var(--text-lg); }
+  .nota { margin: 0; font-size: var(--text-base); color: var(--fg-muted); }
 
   .lista {
     list-style: none;
     margin: 0;
     padding: 0;
     display: grid;
-    gap: var(--space-2);
-    /* Al 200% cabe una por fila; al 100%, dos en el panel ancho. */
+    gap: var(--space-3);
+    /* Al 200% cabe una por fila; al 100%, dos o tres en el panel. */
     grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(16rem * var(--ui-scale))), 1fr));
   }
 
@@ -181,40 +187,64 @@
     gap: var(--space-1);
     align-content: start;
     text-align: left;
-    padding: var(--space-3);
-    border: 2px solid var(--border-strong);
-    border-radius: var(--radius);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-card);
     background: var(--surface);
   }
-  .titulo { font-weight: 600; font-size: var(--text-base); }
+  .titulo {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-weight: 700;
+    font-size: var(--text-base);
+  }
   .num { font-variant-numeric: tabular-nums; }
   .estado { font-size: var(--text-sm); }
   .detalle { font-size: var(--text-sm); color: var(--fg-muted); }
-  .marca { display: inline-block; min-width: 1.2em; }
 
-  /* Superada: borde de acierto y la marca ✓, no solo el color. */
-  .superada { border-color: var(--ok); }
-  .superada .estado { color: var(--ok); }
+  /* Insignia redonda, la misma que en la tabla del progreso. */
+  .insignia {
+    flex: none;
+    align-self: center;
+    display: inline-grid;
+    place-items: center;
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 50%;
+    font-size: var(--text-xs);
+    line-height: 1;
+    border: 2px solid var(--border-strong);
+  }
+  .ins-superada { background: var(--ok); border-color: var(--ok); color: var(--surface); }
+  .ins-abierta { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 
-  /* Cerrada: borde discontinuo, candado y el texto que lo explica. Se atenúa,
-     pero el texto sigue siendo legible (--fg-muted cumple 4,5:1). */
+  /* Superada: la insignia ✓ y la palabra, con el texto en verde de acierto. */
+  .superada .estado { color: var(--ok); font-weight: 700; }
+
+  /* Cerrada: borde discontinuo, insignia vacía y el texto que lo explica. Se
+     atenúa, pero el texto sigue siendo legible (--fg-muted cumple 4,5:1). */
   .cerrada {
     border-style: dashed;
-    border-color: var(--border-strong);
     background: var(--surface-sunken);
     color: var(--fg-muted);
     cursor: not-allowed;
   }
   .cerrada:hover { background: var(--surface-sunken); }
 
-  /* Lo que está en curso lleva texto («Estás aquí») además del borde grueso. */
-  .tarjeta[aria-current='true'] { border-width: 4px; border-color: var(--accent); }
+  /* Lo que está en curso: fondo suave de acento, borde grueso y el texto
+     «Estás aquí», que es lo que no depende del color. */
+  .tarjeta[aria-current='true'] {
+    background: var(--accent-soft);
+    border-width: 2px;
+    border-color: var(--accent);
+  }
   .aqui {
     justify-self: start;
     font-size: var(--text-xs);
     font-weight: 700;
     padding: 0 var(--space-2);
-    border-radius: 999px;
+    border-radius: var(--radius-chip);
     background: var(--accent);
     color: var(--accent-fg);
   }

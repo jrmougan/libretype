@@ -656,17 +656,41 @@
   /** Lo que se está practicando, en los términos del temario. */
   const modoActual = $derived<Modo | null>(vista === 'tono' || vista === 'perfil' ? null : vista);
 
-  /** Qué dice el botón del temario: dónde está ahora la persona. */
+  /**
+   * Qué dice el botón del temario: dónde está ahora la persona. Dos líneas,
+   * como en un índice: el tramo («Lección 5 de 15», «Práctica libre») y el
+   * nombre de lo que tiene delante.
+   */
+  const enLeccionDelTemario = $derived(vista === 'leccion' && !leccionPersonalizada);
+  const tramoActual = $derived(
+    enLeccionDelTemario ? `Lección ${lessonIx + 1} de ${LESSONS.length}`
+      : vista === 'cero' || vista === 'colocacion' ? 'Antes de empezar'
+      : vista === 'leccion' || vista === 'continua' || vista === 'fluidez' || vista === 'propio'
+        ? 'Práctica libre'
+      : vista === 'tono' || vista === 'perfil' ? 'Bienvenida'
+      : '',
+  );
   const rotuloActual = $derived(
-    vista === 'leccion'
-      ? (leccionPersonalizada ? leccionPersonalizada.title : `${lessonIx + 1}. ${lesson.title}`)
-      : vista === 'cero' ? 'Antes de empezar'
+    vista === 'leccion' ? lesson.title
+      : vista === 'cero' ? 'Dónde van las manos'
       : vista === 'continua' ? 'Práctica continua'
       : vista === 'fluidez' ? 'Fluidez'
       : vista === 'colocacion' ? 'Prueba de colocación'
       : vista === 'propio' ? 'Texto propio'
+      : vista === 'tono' ? 'Elige el tono'
+      : vista === 'perfil' ? '¿Quién practica?'
       : '',
   );
+  /**
+   * La pista de segmentos bajo el título: una por lección. Es decorativa (el
+   * panel del temario dice lo mismo con palabras) y no lleva ninguna cifra de
+   * umbral: superada o no lo decide `leccionesSuperadas`, como en el panel.
+   */
+  const segmentos = $derived(LESSONS.map((l, i) =>
+    enLeccionDelTemario && i === lessonIx ? 'actual'
+      : superadas.has(l.id) ? 'superada'
+      : i > maxDesbloqueado ? 'bloqueada'
+      : 'disponible'));
 
   async function elegirModo(modo: Exclude<Modo, 'leccion'>): Promise<void> {
     if (modo === 'continua') return activarContinua();
@@ -719,7 +743,7 @@
 -->
 <div class="app">
   <header class="barra">
-    <h1>LibreType</h1>
+    <h1 class="logo">Libre<span class="logo-type">Type</span></h1>
 
     <!-- El temario es un panel, no un <select>: con teclado, el desplegable
          cambiaba de lección con cada flecha (WCAG 3.2.2). -->
@@ -730,26 +754,38 @@
       aria-controls="panel-dialogo"
       onclick={() => { verTemario = !verTemario; settingsOpen = false; verProgreso = false; }}
     >
-      <span class="eti">Temario</span>
-      {#if rotuloActual}<span class="actual">{rotuloActual}</span>{/if}
+      {#if rotuloActual}
+        <span class="tm-tramo">Temario{#if tramoActual}<span class="sep" aria-hidden="true">·</span><span class="sr-only">,</span> {tramoActual}{/if}</span>
+        <span class="tm-titulo">{rotuloActual}</span>
+      {:else}
+        <!-- Antes de elegir tono o perfil no hay nada que situar. -->
+        <span class="tm-titulo solo">Temario</span>
+      {/if}
+      <span class="tm-flecha" aria-hidden="true">▾</span>
+      {#if progresoCargado && rotuloActual}
+        <span class="tm-pista" aria-hidden="true">
+          {#each segmentos as estado, i (i)}<span class="seg {estado}"></span>{/each}
+        </span>
+      {/if}
     </button>
 
     {#if enPractica}
       {@const textoObjetivo = vista === 'continua' ? textoContinua : vista === 'propio' ? textoPropioActivo : vista === 'fluidez' ? textoFluidez : textoLeccion}
       <div class="controles-intento">
         <!-- El único «Empezar de nuevo»: había otro en la cabecera de la
-             lección y un tercero en Texto propio. -->
-        <button type="button" class="btn-intento" onclick={reiniciarLeccion}>
-          Empezar de nuevo
+             lección y un tercero en Texto propio. El icono acompaña al texto,
+             no lo sustituye: «↺» a secas no lo entiende todo el mundo. -->
+        <button type="button" class="btn-barra btn-intento" onclick={reiniciarLeccion}>
+          <span class="ico ico-reiniciar" aria-hidden="true"></span>Empezar de nuevo
         </button>
         <button
           type="button"
-          class="btn-intento"
+          class="btn-barra btn-intento"
           onclick={alternarPausa}
           aria-pressed={pausado}
           title="También con Esc mientras escribes"
         >
-          {pausado ? 'Reanudar' : 'Pausar'}
+          <span class="ico {pausado ? 'ico-seguir' : 'ico-pausa'}" aria-hidden="true"></span>{pausado ? 'Reanudar' : 'Pausar'}
         </button>
       </div>
 
@@ -759,10 +795,10 @@
         <dl class="metricas">
           <div title={QUE_ES_PPM}>
             <dt>Velocidad</dt>
-            <dd>{ultimasStats.wpm}<small aria-hidden="true">ppm</small><span class="sr-only"> palabras por minuto</span></dd>
+            <dd>{ultimasStats.wpm} <small aria-hidden="true">ppm</small><span class="sr-only"> palabras por minuto</span></dd>
           </div>
-          <div><dt>Precisión</dt><dd>{ultimasStats.accuracy}<small>%</small></dd></div>
-          <div><dt>Avance</dt><dd>{ultimasStats.typed}<small>/{textoObjetivo.length}</small></dd></div>
+          <div><dt>Precisión</dt><dd>{ultimasStats.accuracy} <small>%</small></dd></div>
+          <div><dt>Avance</dt><dd>{ultimasStats.typed} <small>de {textoObjetivo.length}</small></dd></div>
         </dl>
       {/if}
     {/if}
@@ -795,6 +831,7 @@
         </div>
       {/if}
       <button
+        class="btn-barra contorno"
         aria-expanded={verProgreso}
         aria-controls="panel-dialogo"
         onclick={() => { verProgreso = !verProgreso; settingsOpen = false; verTemario = false; }}
@@ -802,6 +839,7 @@
         Progreso
       </button>
       <button
+        class="btn-barra contorno"
         aria-expanded={settingsOpen}
         aria-controls="panel-dialogo"
         onclick={() => { settingsOpen = !settingsOpen; verProgreso = false; verTemario = false; }}
@@ -831,15 +869,6 @@
     {:else if vista === 'cero'}
       <LeccionCero {layout} onTerminar={() => pick(0)} />
     {:else if vista === 'continua'}
-      <div class="barra-practica">
-        <label for="selector-nivel-practica">Vocabulario desbloqueado hasta:</label>
-        <select id="selector-nivel-practica" bind:value={nivelElegido}>
-          {#each LESSONS.slice(0, maxDesbloqueado + 1) as l, i}
-            <option value={i}>{i + 1}. {l.title}</option>
-          {/each}
-        </select>
-        <button onclick={() => nuevaContinua(nivelElegido)}>Nuevo texto</button>
-      </div>
       {#key continuaKey}
         <Drill
           bind:this={drill}
@@ -853,6 +882,7 @@
           titulo="Práctica continua"
           explicacion={`Vocabulario acumulado hasta la lección ${nivelPractica + 1}: ${LESSONS[nivelPractica].title}.`}
           cobertura={pct(LESSONS[nivelPractica].cobertura)}
+          coberturaRotulo="Este vocabulario:"
           espacioJusto={prefs.escala >= 1.4}
           movimiento={prefs.movimiento}
           animaciones={prefs.movimiento === 'reducido' ? 'reducidas' : 'normales'}
@@ -860,7 +890,19 @@
           onDone={terminada}
           onTecla={anotarTecla}
           onStats={(s) => (ultimasStats = s)}
-        />
+        >
+          {#snippet controles()}
+            <div class="barra-practica">
+              <label for="selector-nivel-practica">Vocabulario desbloqueado hasta:</label>
+              <select id="selector-nivel-practica" bind:value={nivelElegido}>
+                {#each LESSONS.slice(0, maxDesbloqueado + 1) as l, i}
+                  <option value={i}>{i + 1}. {l.title}</option>
+                {/each}
+              </select>
+              <button onclick={() => nuevaContinua(nivelElegido)}>Nuevo texto</button>
+            </div>
+          {/snippet}
+        </Drill>
       {/key}
     {:else if vista === 'colocacion'}
       {#key colocacionKey}
@@ -906,14 +948,16 @@
       {/key}
     {:else if vista === 'propio'}
       {#if enEdicionPropio}
-        <div class="centrado editor-propio">
-          <h2>Práctica libre con texto propio</h2>
-          <p class="note">Escribe o pega el texto que desees practicar. Se utilizarán las teclas disponibles en la distribución activa.</p>
+        <section class="centrado editor-propio" aria-labelledby="propio-tit">
+          <p class="antetitulo">Práctica libre · Texto propio</p>
+          <h2 id="propio-tit">Práctica libre con texto propio</h2>
+          <p class="descripcion" id="propio-desc">Escribe o pega el texto que desees practicar. Se utilizarán las teclas disponibles en la distribución activa.</p>
           <label for="texto-propio-input" class="sr-only">Texto personalizado</label>
           <textarea
             id="texto-propio-input"
             class="input-texto-propio"
             rows="5"
+            aria-describedby="propio-desc"
             bind:value={textoPropio}
             placeholder="Escribe o pega aquí tu propio texto..."
           ></textarea>
@@ -921,17 +965,13 @@
             <p class="nota aviso aviso-error" role="alert">{errorTextoPropio}</p>
           {/if}
           <div class="acciones-propio">
+            <span class="contador">
+              {textoPropio.length === 1 ? '1 carácter' : `${textoPropio.length} caracteres`}
+            </span>
             <button class="primario" onclick={empezarTextoPropio}>Empezar a teclear</button>
           </div>
-        </div>
+        </section>
       {:else}
-        <div class="barra-practica">
-          <span>Practicando tu propio texto ({textoPropioActivo.length} caracteres)</span>
-          <button onclick={() => { enEdicionPropio = true; }}>Cambiar texto</button>
-          {#if avisoTextoPropio}
-            <p class="aviso-quitados" role="status">{avisoTextoPropio}</p>
-          {/if}
-        </div>
         {#key propioKey}
           <Drill
             bind:this={drill}
@@ -952,7 +992,17 @@
             onDone={terminada}
             onTecla={anotarTecla}
             onStats={(s) => (ultimasStats = s)}
-          />
+          >
+            {#snippet controles()}
+              <div class="barra-practica">
+                <span class="chip neutro">{textoPropioActivo.length} caracteres</span>
+                <button onclick={() => { enEdicionPropio = true; }}>Cambiar texto</button>
+                {#if avisoTextoPropio}
+                  <p class="aviso-quitados" role="status">{avisoTextoPropio}</p>
+                {/if}
+              </div>
+            {/snippet}
+          </Drill>
         {/key}
       {/if}
     {:else}
@@ -983,6 +1033,10 @@
 
   <!-- Superpuesto: aparecer no puede mover el teclado de sitio. -->
   {#if result}
+    {@const repetirPrimero = result.stats.accuracy < 90}
+    {@const enTemario = vista === 'leccion' && !leccionPersonalizada}
+    {@const siguienteLeccion = enTemario && lessonIx < maxDesbloqueado ? LESSONS[lessonIx + 1] : null}
+    {@const conRepaso = enTemario && leccionesOxidadas(sesiones, undefined, lesson.id).length > 0}
     <dialog
       id="dialogo-resultado"
       class="capa"
@@ -1001,77 +1055,98 @@
         class:celebra={result.record && prefs.tono === 'juego'}
         aria-live="polite"
       >
-        <strong id="resultado-titulo">
-          {#if result.record}★ {/if}{textosRes?.titulo}
-        </strong>
-        <div id="resultado-desc">
-          <span>{result.stats.wpm} palabras por minuto, {result.stats.accuracy}% de precisión.</span>
-          <span class="animo">{textosRes?.animo}</span>
-        </div>
-        {#if vista === 'leccion' && !leccionPersonalizada}
-          <p class="note">
-            {#if superadas.has(lesson.id)}
-              Lección superada.{lessonIx === LESSONS.length - 1 ? ' Has completado el temario.' : ' Puedes pasar a la siguiente lección.'}
-            {:else}
-              {OBJETIVO_PENDIENTE}
-            {/if}
-          </p>
-        {/if}
-        {#if vista === 'leccion' && !leccionPersonalizada && !superadas.has(lesson.id)}
-          <p class="note">{voz.horizonte}</p>
-        {/if}
-        {#if result.costaron.length > 0}
-          <p class="note costaron">
-            {voz.costaron} {enumerar(result.costaron.map((t) => t.nombre))}. {voz.costaronAnimo}
-          </p>
-        {/if}
-        {#if vista === 'fluidez' && valoracionFluidez}
-          <p class="note">{valoracionFluidez}</p>
-        {/if}
-        {#if result.sinMirar && result.sinMirar.length > 0}
-          <p class="note logro">
-            {result.sinMirar.length === 1 ? 'Ya escribes sin mirar la tecla' : 'Ya escribes sin mirar las teclas'}
-            {result.sinMirar.map((c) => `«${c}»`).join(', ')}{prefs.ayudaTeclado === 'auto'
-              ? (result.sinMirar.length === 1 ? ': su letra deja el teclado de la pantalla.' : ': sus letras dejan el teclado de la pantalla.')
-              : '.'}
-          </p>
-        {/if}
-        {#if errorGuardado}
-          <p class="note">No se pudo guardar el resultado. El avance de este intento solo estará disponible durante esta sesión.</p>
-        {/if}
-        <div class="botones">
-          {#if result.stats.accuracy < 90}
-            <button class="primario" onclick={again}>{voz.repetir}</button>
-            {#if vista === 'continua'}
-              <button onclick={() => nuevaContinua()}>Nuevo texto</button>
-            {:else if vista === 'fluidez'}
-              <button onclick={() => nuevaFluidez()}>Otra tanda</button>
-            {:else if vista === 'propio'}
-              <button onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
-            {:else if !leccionPersonalizada && lessonIx < maxDesbloqueado}
-              <button onclick={() => pick(lessonIx + 1)}>{voz.siguiente}</button>
-            {/if}
-          {:else}
-            <button onclick={again}>{voz.repetir}</button>
-            {#if vista === 'continua'}
-              <button class="primario" onclick={() => nuevaContinua()}>Nuevo texto</button>
-            {:else if vista === 'fluidez'}
-              <button class="primario" onclick={() => nuevaFluidez()}>Otra tanda</button>
-            {:else if vista === 'propio'}
-              <button class="primario" onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
-            {:else if !leccionPersonalizada && lessonIx < maxDesbloqueado}
-              <button class="primario" onclick={() => pick(lessonIx + 1)}>{voz.siguiente}</button>
-            {/if}
+        <!-- La franja con los colores de los dedos es del tono con
+             celebración: en el tranquilo, el resultado no se adorna. -->
+        {#if prefs.tono === 'juego'}<div class="franja" aria-hidden="true"></div>{/if}
+        <div class="res-cuerpo">
+          <div class="res-cab">
+            <!-- El récord se dice con la estrella y la palabra, no solo con el color. -->
+            {#if result.record}<span class="chip-record">★ Récord</span>{/if}
+            <h2 id="resultado-titulo">{textosRes?.titulo}</h2>
+          </div>
+
+          <div id="resultado-desc">
+            <div class="cifras">
+              <p class="cifra">
+                <span class="cifra-valor">{result.stats.wpm}</span>
+                <span class="cifra-eti">palabras por minuto<span class="sr-only">,</span></span>
+              </p>
+              <!-- El fondo de acierto solo cuando lo es: por debajo del objetivo
+                   la tarjeta queda neutra, sin rojo ni reproche. -->
+              <p class="cifra" class:cifra-ok={!repetirPrimero}>
+                <span class="cifra-valor">{result.stats.accuracy}%</span>
+                <span class="cifra-eti">de precisión<span class="sr-only">.</span></span>
+              </p>
+            </div>
+            <p class="animo">{textosRes?.animo}</p>
+          </div>
+
+          {#if enTemario}
+            <p class="note">
+              {#if superadas.has(lesson.id)}
+                Lección superada.{lessonIx === LESSONS.length - 1 ? ' Has completado el temario.' : ' Puedes pasar a la siguiente lección.'}
+              {:else}
+                {OBJETIVO_PENDIENTE}
+              {/if}
+            </p>
           {/if}
+          {#if enTemario && !superadas.has(lesson.id)}
+            <p class="note">{voz.horizonte}</p>
+          {/if}
+          {#if result.costaron.length > 0}
+            <p class="note costaron">
+              {voz.costaron} {enumerar(result.costaron.map((t) => t.nombre))}. {voz.costaronAnimo}
+            </p>
+          {/if}
+          {#if vista === 'fluidez' && valoracionFluidez}
+            <p class="note">{valoracionFluidez}</p>
+          {/if}
+          {#if result.sinMirar && result.sinMirar.length > 0}
+            <p class="note logro">
+              {result.sinMirar.length === 1 ? 'Ya escribes sin mirar la tecla' : 'Ya escribes sin mirar las teclas'}
+              {result.sinMirar.map((c) => (c === ' ' ? 'la barra espaciadora' : `«${c}»`)).join(', ')}{prefs.ayudaTeclado === 'auto'
+                ? (result.sinMirar.length === 1 ? ': su letra deja el teclado de la pantalla.' : ': sus letras dejan el teclado de la pantalla.')
+                : '.'}
+            </p>
+          {/if}
+          {#if errorGuardado}
+            <p class="note">No se pudo guardar el resultado. El avance de este intento solo estará disponible durante esta sesión.</p>
+          {/if}
+
+          <!-- Lo que se propone primero depende del intento: por debajo del
+               objetivo, repetir; si no, seguir. El primario se lleva el ancho. -->
+          <div class="botones" class:repetir-primero={repetirPrimero}>
+            <button class:primario={repetirPrimero} onclick={again}>{voz.repetir}</button>
+            {#if vista === 'continua'}
+              <button class:primario={!repetirPrimero} onclick={() => nuevaContinua()}>Nuevo texto</button>
+            {:else if vista === 'fluidez'}
+              <button class:primario={!repetirPrimero} onclick={() => nuevaFluidez()}>Otra tanda</button>
+            {:else if vista === 'propio'}
+              <button class:primario={!repetirPrimero} onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
+            {:else if siguienteLeccion}
+              <button class="siguiente" class:primario={!repetirPrimero} onclick={() => pick(lessonIx + 1)}>
+                {voz.siguiente} <span class="sig-nombre">· {siguienteLeccion.title}</span>
+              </button>
+            {/if}
+          </div>
         </div>
-        {#if vista === 'leccion' && !leccionPersonalizada && leccionesOxidadas(sesiones, undefined, lesson.id).length > 0}
-          <p class="note">{voz.repaso} Puedes practicar a tu ritmo con vocabulario conocido.</p>
-          <button onclick={() => { vista = 'continua'; nuevaContinua(maxDesbloqueado); }}>Repasar con práctica continua</button>
-        {/if}
-        {#if result.refuerzo}
+
+        {#if conRepaso || result.refuerzo}
           {@const refuerzo = result.refuerzo}
-          <p class="note">{voz.refuerzo}</p>
-          <button onclick={() => practicarRefuerzo(refuerzo)}>Practicar las teclas que más cuestan</button>
+          <div class="res-pie">
+            {#if conRepaso}
+              <div class="pie-fila">
+                <p class="note">{voz.repaso} Puedes practicar a tu ritmo con vocabulario conocido.</p>
+                <button class="suave" onclick={() => { vista = 'continua'; nuevaContinua(maxDesbloqueado); }}>Repasar con práctica continua</button>
+              </div>
+            {/if}
+            {#if refuerzo}
+              <div class="pie-fila">
+                <p class="note">{voz.refuerzo}</p>
+                <button class="suave" onclick={() => practicarRefuerzo(refuerzo)}>Practicar las teclas que más cuestan</button>
+              </div>
+            {/if}
+          </div>
         {/if}
       </div>
     </dialog>
@@ -1083,293 +1158,306 @@
   />
 
   {#if panelAbierto}
+    <!-- El <dialog> ocupa la ventana y pinta el velo; la caja va centrada
+         encima. Así el velo no depende de que ::backdrop herede los tokens. -->
     <dialog
       id="panel-dialogo"
       class="panel"
-      class:ancho={verTemario}
       bind:this={dialogoPanel}
       use:abrirDialogo
       aria-label={settingsOpen ? 'Ajustes' : verTemario ? 'Temario' : 'Progreso'}
       oncancel={(e) => { e.preventDefault(); cerrarPanel(); }}
     >
-      <div class="panel-cab">
-        <h2>{settingsOpen ? 'Ajustes' : verTemario ? 'Temario' : voz.progreso}{#if verProgreso && !settingsOpen && perfiles.length > 1} · {aliasActivo}{/if}</h2>
-        <button onclick={cerrarPanel}>Cerrar</button>
-      </div>
+      <div class="panel-caja" class:caja-ajustes={settingsOpen} class:caja-temario={verTemario && !settingsOpen}>
+        <div class="panel-cab">
+          <h2>{settingsOpen ? 'Ajustes' : verTemario ? 'Temario' : voz.progreso}{#if verProgreso && !settingsOpen && perfiles.length > 1} · {aliasActivo}{/if}</h2>
+          <button class="cerrar" onclick={cerrarPanel}>Cerrar</button>
+        </div>
 
-      <div class="panel-cuerpo">
-        {#if settingsOpen}
-          <div class="field">
-            <TamanoTexto escala={prefs.escala} conDeslizador
-                         onCambiar={(escala) => (prefs = { ...prefs, escala })} />
-          </div>
+        <!-- El panel sí se desplaza por dentro (al 200% no cabe): es lo que
+             evita que lo haga la página, y nada queda recortado sin llegar. -->
+        <div class="panel-cuerpo">
+          {#if settingsOpen}
+            <div class="ajustes">
+              <div class="ajustes-col">
+                <div class="field">
+                  <TamanoTexto escala={prefs.escala} conDeslizador
+                               onCambiar={(escala) => (prefs = { ...prefs, escala })} />
+                </div>
 
-          <div class="field">
-            <span id="theme-l">Tema</span>
-            <div class="group" role="group" aria-labelledby="theme-l">
-              {#each [['auto', 'Sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']] as [v, l] (v)}
-                <button aria-pressed={prefs.tema === v}
-                        onclick={() => (prefs = { ...prefs, tema: v as Preferencias['tema'] })}>
-                  {l}
-                </button>
-              {/each}
-            </div>
-          </div>
+                <div class="field">
+                  <span id="theme-l">Tema</span>
+                  <div class="group" role="group" aria-labelledby="theme-l">
+                    {#each [['auto', 'Sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']] as [v, l] (v)}
+                      <button aria-pressed={prefs.tema === v}
+                              onclick={() => (prefs = { ...prefs, tema: v as Preferencias['tema'] })}>
+                        {l}
+                      </button>
+                    {/each}
+                  </div>
+                </div>
 
-          <div class="field">
-            <span id="contraste-l">Contraste</span>
-            <div class="group" role="group" aria-labelledby="contraste-l">
-              {#each [['auto', 'Sistema'], ['normal', 'Normal'], ['alto', 'Alto']] as [v, l] (v)}
-                <button aria-pressed={prefs.contraste === v}
-                        onclick={() => (prefs = { ...prefs, contraste: v as Preferencias['contraste'] })}>
-                  {l}
-                </button>
-              {/each}
-            </div>
-            <p class="note">
-              «Alto» pone negro sobre blanco (o al revés con el tema oscuro) y
-              bordes marcados. En «Sistema» se activa solo si tu equipo pide más
-              contraste.
-            </p>
-          </div>
+                <div class="field">
+                  <span id="contraste-l">Contraste</span>
+                  <div class="group" role="group" aria-labelledby="contraste-l">
+                    {#each [['auto', 'Sistema'], ['normal', 'Normal'], ['alto', 'Alto']] as [v, l] (v)}
+                      <button aria-pressed={prefs.contraste === v}
+                              onclick={() => (prefs = { ...prefs, contraste: v as Preferencias['contraste'] })}>
+                        {l}
+                      </button>
+                    {/each}
+                  </div>
+                  <p class="note">
+                    «Alto» pone negro sobre blanco (o al revés con el tema oscuro) y
+                    bordes marcados. En «Sistema» se activa solo si tu equipo pide más
+                    contraste.
+                  </p>
+                </div>
 
-          <div class="field">
-            <span id="tono-l">Cómo te habla</span>
-            <div class="group" role="group" aria-labelledby="tono-l">
-              <button aria-pressed={prefs.tono === 'juego'}
-                      onclick={() => (prefs = { ...prefs, tono: 'juego' })}>
-                Con celebración
-              </button>
-              <button aria-pressed={prefs.tono !== 'juego'}
-                      onclick={() => (prefs = { ...prefs, tono: 'sobrio' })}>
-                Tranquila
-              </button>
-            </div>
-            <p class="note">Cambia los colores y los mensajes. No cambia el tamaño ni las lecciones.</p>
-          </div>
+                <div class="field">
+                  <span id="tono-l">Cómo te habla</span>
+                  <div class="group" role="group" aria-labelledby="tono-l">
+                    <button aria-pressed={prefs.tono === 'juego'}
+                            onclick={() => (prefs = { ...prefs, tono: 'juego' })}>
+                      Con celebración
+                    </button>
+                    <button aria-pressed={prefs.tono !== 'juego'}
+                            onclick={() => (prefs = { ...prefs, tono: 'sobrio' })}>
+                      Tranquila
+                    </button>
+                  </div>
+                  <p class="note">Cambia los colores y los mensajes. No cambia el tamaño ni las lecciones.</p>
+                </div>
 
-          <div class="field">
-            <span id="motion-l">Animaciones</span>
-            <div class="group" role="group" aria-labelledby="motion-l">
-              <button aria-pressed={prefs.movimiento === 'auto'}
-                      onclick={() => (prefs = { ...prefs, movimiento: 'auto' })}>Normales</button>
-              <button aria-pressed={prefs.movimiento === 'reducido'}
-                      onclick={() => (prefs = { ...prefs, movimiento: 'reducido' })}>Reducidas</button>
-            </div>
-          </div>
+                <div class="field">
+                  <span id="motion-l">Animaciones</span>
+                  <div class="group" role="group" aria-labelledby="motion-l">
+                    <button aria-pressed={prefs.movimiento === 'auto'}
+                            onclick={() => (prefs = { ...prefs, movimiento: 'auto' })}>Normales</button>
+                    <button aria-pressed={prefs.movimiento === 'reducido'}
+                            onclick={() => (prefs = { ...prefs, movimiento: 'reducido' })}>Reducidas</button>
+                  </div>
+                </div>
 
-          <div class="field">
-            <span id="font-l">Tipografía</span>
-            <div class="group" role="group" aria-labelledby="font-l">
-              <button aria-pressed={prefs.fuente === 'normal'}
-                      onclick={() => (prefs = { ...prefs, fuente: 'normal' })}>Normal</button>
-              <button aria-pressed={prefs.fuente === 'dislexia'}
-                      onclick={() => (prefs = { ...prefs, fuente: 'dislexia' })}>Para dislexia</button>
-            </div>
-          </div>
+                <div class="field">
+                  <span id="metricas-l">Mientras practicas</span>
+                  <div class="group" role="group" aria-labelledby="metricas-l">
+                    <button aria-pressed={!prefs.ocultarMetricas}
+                            onclick={() => (prefs = { ...prefs, ocultarMetricas: false })}>Ver velocidad y precisión</button>
+                    <button aria-pressed={prefs.ocultarMetricas}
+                            onclick={() => (prefs = { ...prefs, ocultarMetricas: true })}>Ocultarlas</button>
+                  </div>
+                  <p class="note">
+                    Si ver los números a cada tecla te distrae o te agobia, puedes
+                    ocultarlos: al terminar se siguen enseñando. {QUE_ES_PPM}
+                  </p>
+                </div>
 
-          <div class="field">
-            <span id="ayuda-l">Letras del teclado en pantalla</span>
-            <div class="group" role="group" aria-labelledby="ayuda-l">
-              <button aria-pressed={prefs.ayudaTeclado === 'auto'}
-                      onclick={() => (prefs = { ...prefs, ayudaTeclado: 'auto' })}>Se van quitando</button>
-              <button aria-pressed={prefs.ayudaTeclado === 'siempre'}
-                      onclick={() => (prefs = { ...prefs, ayudaTeclado: 'siempre' })}>Siempre visibles</button>
-            </div>
-            <p class="note">
-              Las teclas que ya dominas dejan de mostrar su letra, para que dejes de
-              mirar el teclado. {#if aprendidas > 0}Llevas {aprendidas}
-              {aprendidas === 1 ? 'tecla aprendida' : 'teclas aprendidas'}.{/if}
-            </p>
-          </div>
-
-          <div class="field">
-            <span id="metricas-l">Mientras practicas</span>
-            <div class="group" role="group" aria-labelledby="metricas-l">
-              <button aria-pressed={!prefs.ocultarMetricas}
-                      onclick={() => (prefs = { ...prefs, ocultarMetricas: false })}>Ver velocidad y precisión</button>
-              <button aria-pressed={prefs.ocultarMetricas}
-                      onclick={() => (prefs = { ...prefs, ocultarMetricas: true })}>Ocultarlas</button>
-            </div>
-            <p class="note">
-              Si ver los números a cada tecla te distrae o te agobia, puedes
-              ocultarlos: al terminar se siguen enseñando. {QUE_ES_PPM}
-            </p>
-          </div>
-
-          <div class="field">
-            <span id="sonido-l">Sonido</span>
-            <div class="group" role="group" aria-labelledby="sonido-l">
-              <button aria-pressed={!prefs.sonido}
-                      onclick={() => (prefs = { ...prefs, sonido: false })}>Sin sonido</button>
-              <button aria-pressed={prefs.sonido}
-                      onclick={() => { prefs = { ...prefs, sonido: true }; sonido.fin(prefs.volumen); }}>Con sonido</button>
-            </div>
-            {#if prefs.sonido}
-              <label for="volumen">Volumen: {Math.round(prefs.volumen * 100)}%</label>
-              <input id="volumen" type="range" min="0.1" max="1" step="0.1"
-                     value={prefs.volumen}
-                     oninput={(e) => (prefs = { ...prefs, volumen: +e.currentTarget.value })}
-                     onchange={() => sonido.acierto(prefs.volumen)} />
-            {/if}
-            <p class="note">
-              Un toque suave al acertar, una nota grave al fallar y un acorde al
-              terminar. Se genera en el equipo: no descarga nada.
-            </p>
-          </div>
-
-          <div class="field">
-            <span id="longitud-l">Longitud de los textos de práctica</span>
-            <div class="group" role="group" aria-labelledby="longitud-l">
-              {#each [['corto', 'Cortos'], ['normal', 'Normales'], ['largo', 'Largos']] as [v, l] (v)}
-                <button aria-pressed={prefs.longitudTexto === v}
-                        onclick={() => (prefs = { ...prefs, longitudTexto: v as Preferencias['longitudTexto'] })}>
-                  {l}
-                </button>
-              {/each}
-            </div>
-            <p class="note">Cortos si cansa llegar al final; largos para coger ritmo.</p>
-          </div>
-
-          <div class="field">
-            <span id="pausa-l">Recordarme descansar</span>
-            <div class="group" role="group" aria-labelledby="pausa-l">
-              {#each MINUTOS_PAUSA as m (m)}
-                <button aria-pressed={prefs.recordatorioPausa === m}
-                        onclick={() => (prefs = { ...prefs, recordatorioPausa: m })}>
-                  {m === 0 ? 'No' : `Cada ${m} min`}
-                </button>
-              {/each}
-            </div>
-            <p class="note">Un aviso en una esquina, que no interrumpe ni se lleva el foco.</p>
-          </div>
-
-          <div class="field">
-            <span id="temblor-l">Si a veces una tecla se repite sin querer</span>
-            <div class="group" role="group" aria-labelledby="temblor-l">
-              <button aria-pressed={!prefs.ignorarRepeticion}
-                      onclick={() => (prefs = { ...prefs, ignorarRepeticion: false })}>Contar todo</button>
-              <button aria-pressed={prefs.ignorarRepeticion}
-                      onclick={() => (prefs = { ...prefs, ignorarRepeticion: true })}>Ignorar repeticiones muy rápidas</button>
-            </div>
-            <p class="note">
-              Con temblor, el dedo puede rebotar y escribir dos veces la misma
-              letra. Esto ignora la segunda si llega casi a la vez. Para algo más
-              completo, el sistema tiene «teclas de rebote» (o «teclas lentas»):
-              en Windows, en Configuración › Accesibilidad › Teclado; en macOS,
-              en Ajustes del Sistema › Accesibilidad › Teclado; en GNOME, en
-              Configuración › Accesibilidad › Escritura; en KDE, en Preferencias
-              del sistema › Accesibilidad › Filtros de teclado.
-            </p>
-          </div>
-
-          <div class="field">
-            <label for="layout">Distribución del teclado</label>
-            <select
-              id="layout"
-              value={layout.id}
-              onchange={(e) => {
-                const id = e.currentTarget.value;
-                layout = obtenerLayout(id);
-                prefs = { ...prefs, layout: id };
-              }}
-            >
-              {#each LAYOUTS as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
-            </select>
-            <p class="note">
-              No la detectamos automáticamente: la API que lo permite solo existe en
-              Chromium, así que en macOS y Linux no sería fiable.
-            </p>
-          </div>
-
-          {#if gestorDelSistema}
-            <div class="field">
-              <span id="act-l">Actualizaciones</span>
-              <p class="note">
-                {#if gestorDelSistema === 'politica'}
-                  Quien administra este equipo ha desactivado las
-                  actualizaciones automáticas: se encarga de instalar las
-                  versiones nuevas. La aplicación no consulta nada por internet.
-                {:else}
-                  LibreType se instaló con
-                  {gestorDelSistema === 'deb' ? 'apt' : 'dnf'}, así que las
-                  actualizaciones llegan con las del resto del sistema. La
-                  aplicación no las descarga por su cuenta ni consulta nada por
-                  internet.
-                {/if}
-              </p>
-            </div>
-          {:else if actualizador}
-            <div class="field">
-              <span id="act-l">Actualizaciones</span>
-              <div class="group" role="group" aria-labelledby="act-l">
-                <button aria-pressed={prefs.buscarActualizaciones}
-                        onclick={() => (prefs = { ...prefs, buscarActualizaciones: true })}>
-                  Avisarme
-                </button>
-                <button aria-pressed={!prefs.buscarActualizaciones}
-                        onclick={() => (prefs = { ...prefs, buscarActualizaciones: false })}>
-                  No buscar
-                </button>
-              </div>
-              <p class="note">
-                Es lo único que LibreType consulta por internet: un fichero público
-                en GitHub con el número de la última versión. No se envía nada de
-                tu progreso ni de quién eres. Nunca se instala sola.
-              </p>
-              <div class="act-manual">
-                <button
-                  onclick={() => void actualizador?.comprobar(true)}
-                  disabled={estadoAct.fase === 'buscando' || estadoAct.fase === 'descargando'}
-                >
-                  Buscar ahora
-                </button>
-                <!-- Aquí sí se cuentan todas las fases: alguien acaba de preguntar. -->
-                <p class="note" role="status">
-                  {#if estadoAct.fase === 'buscando'}Buscando…
-                  {:else if estadoAct.fase === 'al-dia'}Estás en la última versión, la {estadoAct.version}.
-                  {:else if estadoAct.fase === 'disponible'}Hay una versión nueva, la {estadoAct.version}.
-                  {:else if estadoAct.fase === 'descargando'}Descargando{estadoAct.pct >= 0 ? ` ${estadoAct.pct}%` : '…'}
-                  {:else if estadoAct.fase === 'lista'}Lista la {estadoAct.version}. Se aplica al reiniciar.
-                  {:else if estadoAct.fase === 'error'}No se ha podido comprobar. {estadoAct.mensaje}
+                <div class="field">
+                  <span id="sonido-l">Sonido</span>
+                  <div class="group" role="group" aria-labelledby="sonido-l">
+                    <button aria-pressed={!prefs.sonido}
+                            onclick={() => (prefs = { ...prefs, sonido: false })}>Sin sonido</button>
+                    <button aria-pressed={prefs.sonido}
+                            onclick={() => { prefs = { ...prefs, sonido: true }; sonido.fin(prefs.volumen); }}>Con sonido</button>
+                  </div>
+                  {#if prefs.sonido}
+                    <label for="volumen" class="eti-valor">Volumen: <span class="valor">{Math.round(prefs.volumen * 100)}%</span></label>
+                    <input id="volumen" type="range" min="0.1" max="1" step="0.1"
+                           value={prefs.volumen}
+                           oninput={(e) => (prefs = { ...prefs, volumen: +e.currentTarget.value })}
+                           onchange={() => sonido.acierto(prefs.volumen)} />
                   {/if}
-                </p>
+                  <p class="note">
+                    Un toque suave al acertar, una nota grave al fallar y un acorde al
+                    terminar. Se genera en el equipo: no descarga nada.
+                  </p>
+                </div>
+              </div>
+
+              <div class="ajustes-col">
+                <div class="field">
+                  <span id="font-l">Tipografía</span>
+                  <div class="group" role="group" aria-labelledby="font-l">
+                    <button aria-pressed={prefs.fuente === 'normal'}
+                            onclick={() => (prefs = { ...prefs, fuente: 'normal' })}>Normal</button>
+                    <button aria-pressed={prefs.fuente === 'dislexia'}
+                            onclick={() => (prefs = { ...prefs, fuente: 'dislexia' })}>Para dislexia</button>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <span id="ayuda-l">Letras del teclado en pantalla</span>
+                  <div class="group" role="group" aria-labelledby="ayuda-l">
+                    <button aria-pressed={prefs.ayudaTeclado === 'auto'}
+                            onclick={() => (prefs = { ...prefs, ayudaTeclado: 'auto' })}>Se van quitando</button>
+                    <button aria-pressed={prefs.ayudaTeclado === 'siempre'}
+                            onclick={() => (prefs = { ...prefs, ayudaTeclado: 'siempre' })}>Siempre visibles</button>
+                  </div>
+                  <p class="note">
+                    Las teclas que ya dominas dejan de mostrar su letra, para que dejes de
+                    mirar el teclado. {#if aprendidas > 0}Llevas {aprendidas}
+                    {aprendidas === 1 ? 'tecla aprendida' : 'teclas aprendidas'}.{/if}
+                  </p>
+                </div>
+
+                <div class="field">
+                  <label for="layout">Distribución del teclado</label>
+                  <select
+                    id="layout"
+                    value={layout.id}
+                    onchange={(e) => {
+                      const id = e.currentTarget.value;
+                      layout = obtenerLayout(id);
+                      prefs = { ...prefs, layout: id };
+                    }}
+                  >
+                    {#each LAYOUTS as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
+                  </select>
+                  <p class="note">
+                    No la detectamos automáticamente: la API que lo permite solo existe en
+                    Chromium, así que en macOS y Linux no sería fiable.
+                  </p>
+                </div>
+
+                <div class="field">
+                  <span id="longitud-l">Longitud de los textos de práctica</span>
+                  <div class="group" role="group" aria-labelledby="longitud-l">
+                    {#each [['corto', 'Cortos'], ['normal', 'Normales'], ['largo', 'Largos']] as [v, l] (v)}
+                      <button aria-pressed={prefs.longitudTexto === v}
+                              onclick={() => (prefs = { ...prefs, longitudTexto: v as Preferencias['longitudTexto'] })}>
+                        {l}
+                      </button>
+                    {/each}
+                  </div>
+                  <p class="note">Cortos si cansa llegar al final; largos para coger ritmo.</p>
+                </div>
+
+                <div class="field">
+                  <span id="pausa-l">Recordarme descansar</span>
+                  <div class="group" role="group" aria-labelledby="pausa-l">
+                    {#each MINUTOS_PAUSA as m (m)}
+                      <button aria-pressed={prefs.recordatorioPausa === m}
+                              onclick={() => (prefs = { ...prefs, recordatorioPausa: m })}>
+                        {m === 0 ? 'No' : `Cada ${m} min`}
+                      </button>
+                    {/each}
+                  </div>
+                  <p class="note">Un aviso en una esquina, que no interrumpe ni se lleva el foco.</p>
+                </div>
+
+                <div class="field">
+                  <span id="temblor-l">Si a veces una tecla se repite sin querer</span>
+                  <div class="group" role="group" aria-labelledby="temblor-l">
+                    <button aria-pressed={!prefs.ignorarRepeticion}
+                            onclick={() => (prefs = { ...prefs, ignorarRepeticion: false })}>Contar todo</button>
+                    <button aria-pressed={prefs.ignorarRepeticion}
+                            onclick={() => (prefs = { ...prefs, ignorarRepeticion: true })}>Ignorar repeticiones muy rápidas</button>
+                  </div>
+                  <p class="note">
+                    Con temblor, el dedo puede rebotar y escribir dos veces la misma
+                    letra. Esto ignora la segunda si llega casi a la vez. Para algo más
+                    completo, el sistema tiene «teclas de rebote» (o «teclas lentas»):
+                    en Windows, en Configuración › Accesibilidad › Teclado; en macOS,
+                    en Ajustes del Sistema › Accesibilidad › Teclado; en GNOME, en
+                    Configuración › Accesibilidad › Escritura; en KDE, en Preferencias
+                    del sistema › Accesibilidad › Filtros de teclado.
+                  </p>
+                </div>
+
+                {#if gestorDelSistema}
+                  <div class="field">
+                    <span id="act-l">Actualizaciones</span>
+                    <p class="note">
+                      {#if gestorDelSistema === 'politica'}
+                        Quien administra este equipo ha desactivado las
+                        actualizaciones automáticas: se encarga de instalar las
+                        versiones nuevas. La aplicación no consulta nada por internet.
+                      {:else}
+                        LibreType se instaló con
+                        {gestorDelSistema === 'deb' ? 'apt' : 'dnf'}, así que las
+                        actualizaciones llegan con las del resto del sistema. La
+                        aplicación no las descarga por su cuenta ni consulta nada por
+                        internet.
+                      {/if}
+                    </p>
+                  </div>
+                {:else if actualizador}
+                  <div class="field">
+                    <span id="act-l">Actualizaciones</span>
+                    <div class="group" role="group" aria-labelledby="act-l">
+                      <button aria-pressed={prefs.buscarActualizaciones}
+                              onclick={() => (prefs = { ...prefs, buscarActualizaciones: true })}>
+                        Avisarme
+                      </button>
+                      <button aria-pressed={!prefs.buscarActualizaciones}
+                              onclick={() => (prefs = { ...prefs, buscarActualizaciones: false })}>
+                        No buscar
+                      </button>
+                    </div>
+                    <p class="note">
+                      Es lo único que LibreType consulta por internet: un fichero público
+                      en GitHub con el número de la última versión. No se envía nada de
+                      tu progreso ni de quién eres. Nunca se instala sola.
+                    </p>
+                    <div class="act-manual">
+                      <button class="enlace"
+                        onclick={() => void actualizador?.comprobar(true)}
+                        disabled={estadoAct.fase === 'buscando' || estadoAct.fase === 'descargando'}
+                      >
+                        Buscar ahora
+                      </button>
+                      <!-- Aquí sí se cuentan todas las fases: alguien acaba de preguntar. -->
+                      <p class="note" role="status">
+                        {#if estadoAct.fase === 'buscando'}Buscando…
+                        {:else if estadoAct.fase === 'al-dia'}Estás en la última versión, la {estadoAct.version}.
+                        {:else if estadoAct.fase === 'disponible'}Hay una versión nueva, la {estadoAct.version}.
+                        {:else if estadoAct.fase === 'descargando'}Descargando{estadoAct.pct >= 0 ? ` ${estadoAct.pct}%` : '…'}
+                        {:else if estadoAct.fase === 'lista'}Lista la {estadoAct.version}. Se aplica al reiniciar.
+                        {:else if estadoAct.fase === 'error'}No se ha podido comprobar. {estadoAct.mensaje}
+                        {/if}
+                      </p>
+                    </div>
+                  </div>
+                {/if}
               </div>
             </div>
+          {:else if verTemario}
+            <Temario
+              lecciones={LESSONS}
+              {sesiones}
+              modo={leccionPersonalizada ? null : modoActual}
+              leccionActual={lessonIx}
+              onLeccion={(i) => void pick(i)}
+              onModo={(m) => void elegirModo(m)}
+            />
+          {:else}
+            <Progreso
+              {sesiones}
+              lecciones={LESSONS}
+              {tipoAlmacen}
+              {errorAlmacen}
+              {almacen}
+              {teclas}
+              {layout}
+              onBorrar={borrarProgreso}
+              onExportar={exportarProgreso}
+              onImportar={importarProgreso}
+              onPracticarRefuerzo={practicarRefuerzo}
+              leccionActual={vista === 'leccion' && !leccionPersonalizada ? lessonIx : null}
+              celebra={prefs.tono === 'juego'}
+            />
+            <Perfiles
+              {perfiles}
+              activo={perfilActivo}
+              onCambiar={cambiarPerfil}
+              onCrear={async (alias) => { await crearPerfil(alias); }}
+              onRenombrar={renombrarPerfil}
+              onBorrar={borrarPerfil}
+            />
+            <Informe alias={aliasActivo} {sesiones} {teclas} />
           {/if}
-        {:else if verTemario}
-          <Temario
-            lecciones={LESSONS}
-            {sesiones}
-            modo={leccionPersonalizada ? null : modoActual}
-            leccionActual={lessonIx}
-            onLeccion={(i) => void pick(i)}
-            onModo={(m) => void elegirModo(m)}
-          />
-        {:else}
-          <Progreso
-            {sesiones}
-            lecciones={LESSONS}
-            {tipoAlmacen}
-            {errorAlmacen}
-            {almacen}
-            {teclas}
-            {layout}
-            onBorrar={borrarProgreso}
-            onExportar={exportarProgreso}
-            onImportar={importarProgreso}
-            onPracticarRefuerzo={practicarRefuerzo}
-          />
-          <Perfiles
-            {perfiles}
-            activo={perfilActivo}
-            onCambiar={cambiarPerfil}
-            onCrear={async (alias) => { await crearPerfil(alias); }}
-            onRenombrar={renombrarPerfil}
-            onBorrar={borrarPerfil}
-          />
-          <Informe alias={aliasActivo} {sesiones} {teclas} />
-        {/if}
+        </div>
       </div>
     </dialog>
   {/if}
@@ -1386,6 +1474,10 @@
     position: relative;
   }
 
+  /* La barra no puede ganar altura con el rediseño: medida a 1280×800, 65px
+     al 100% (una fila) y 221px al 200% (dos filas), igual que antes. Por eso
+     el botón del temario y las métricas aprietan el interlineado en vez de
+     crecer: todo lo que va en la fila cabe en --target-min. */
   .barra {
     display: flex;
     align-items: center;
@@ -1395,33 +1487,65 @@
     border-bottom: 1px solid var(--border);
     background: var(--surface);
   }
-  h1 {
+  .logo {
     margin: 0;
-    font-size: var(--text-lg);
+    font-size: var(--text-cifra);
+    font-weight: 700;
+    letter-spacing: -0.01em;
     white-space: nowrap;
   }
+  /* Solo el color separa «Type», pero no comunica nada: es la marca. */
+  .logo-type { color: var(--accent-ink); }
 
   /* El botón del temario sustituye a los diez botones que ocupaban dos filas
-     y al <select> que vino después. Dice dónde estás sin tener que abrirlo. */
+     y al <select> que vino después. Dice dónde estás sin tener que abrirlo:
+     el tramo arriba, la lección en negrita y la pista de segmentos debajo. */
+  /* Mide lo que su texto, con un mínimo: estirada a todo el ancho cuando la
+     barra no lleva métricas parecía una caja vacía. */
   .btn-temario {
-    flex: 1 1 260px;
-    min-width: 0;
+    flex: 0 1 auto;
+    min-width: min(100%, 16.25rem);
     min-height: var(--target-min);
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'tramo flecha' 'titulo flecha' 'pista pista';
     align-items: center;
-    gap: var(--space-2);
+    column-gap: var(--space-2);
     text-align: left;
-    padding: 0 var(--space-3);
+    padding: calc(var(--space-1) / 2) var(--space-3);
+    line-height: 1.15;
   }
-  .btn-temario .eti { font-weight: 700; }
-  .btn-temario .actual {
+  .tm-tramo, .tm-titulo {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--fg-muted);
   }
-  .btn-temario .actual::before { content: '·'; margin-right: var(--space-2); }
+  .tm-tramo { grid-area: tramo; font-size: var(--text-xs); font-weight: 500; color: var(--fg-muted); }
+  .tm-titulo { grid-area: titulo; font-weight: 700; }
+  .tm-titulo.solo { grid-row: 1 / 3; }
+  .tm-tramo .sep { margin-left: 0.35em; }
+  .tm-flecha { grid-area: flecha; color: var(--fg-muted); }
+  .tm-pista {
+    grid-area: pista;
+    display: flex;
+    gap: 2px;
+    margin-top: 2px;
+  }
+  .seg {
+    flex: 1 1 0;
+    height: 4px;
+    border-radius: var(--radius-chip);
+    background: var(--border);
+  }
+  .seg.superada { background: var(--ok); }
+  .seg.disponible { background: var(--border-strong); }
+  /* La actual se distingue también por la forma: ocupa el doble. */
+  .seg.actual { flex-grow: 2.5; background: var(--accent); }
+  @media (forced-colors: active) {
+    .seg { background: GrayText; }
+    .seg.superada, .seg.actual { background: CanvasText; }
+  }
   #layout {
     width: 100%;
     font: inherit;
@@ -1433,17 +1557,53 @@
     color: var(--fg);
   }
 
-  .metricas { display: flex; gap: var(--space-4); margin: 0; }
-  .metricas div { display: flex; flex-direction: column; }
-  .metricas dt { font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.2; }
-  .metricas dd {
-    margin: 0; font-size: var(--text-lg); line-height: 1.1;
-    font-variant-numeric: tabular-nums;
+  .metricas {
+    display: flex;
+    gap: var(--space-4);
+    margin: 0;
+    padding: calc(var(--space-1) / 2) var(--space-3);
+    background: var(--surface-sunken);
+    border-radius: var(--radius);
   }
-  .metricas small { font-size: var(--text-xs); color: var(--fg-muted); }
+  .metricas div { display: flex; flex-direction: column; }
+  .metricas dt { font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.1; }
+  .metricas dd {
+    margin: 0; font-size: var(--text-cifra); font-weight: 700; line-height: 1;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .metricas small { font-size: var(--text-xs); font-weight: 500; color: var(--fg-muted); }
 
-  .controles-intento { display: flex; gap: var(--space-2); }
-  .btn-intento { min-height: var(--target-min); }
+  .controles-intento { display: flex; gap: var(--space-1); }
+  .btn-intento {
+    min-height: var(--target-min);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding-inline: var(--space-3);
+    white-space: nowrap;
+  }
+  /* Iconos dibujados con CSS y no con caracteres: así no entran en el nombre
+     accesible ni en el textContent del botón. */
+  .ico { display: inline-block; flex: none; width: 1em; height: 1em; }
+  .ico-reiniciar::before {
+    content: '↺';
+    content: '↺' / '';
+    display: block;
+    font-size: 1.25em;
+    line-height: 0.8;
+    font-weight: 700;
+  }
+  .ico-pausa {
+    width: 0.8em;
+    border-left: 0.28em solid currentColor;
+    border-right: 0.28em solid currentColor;
+  }
+  .ico-seguir {
+    width: 0.8em;
+    background: currentColor;
+    clip-path: polygon(10% 0, 100% 50%, 10% 100%);
+  }
 
   .acciones { display: flex; gap: var(--space-2); margin-left: auto; align-items: center; }
   .acciones button { min-height: var(--target-min); }
@@ -1487,7 +1647,12 @@
   .centrado { align-self: center; justify-self: center; max-width: 72ch; }
   .primera { display: grid; gap: var(--space-6); }
 
-  /* --- Superpuestos ------------------------------------------------------ */
+  /* --- Superpuestos ------------------------------------------------------
+   * Resultado y panel comparten forma: el <dialog> ocupa la ventana y pinta
+   * el velo (--scrim), y la caja va centrada encima. El velo va en el propio
+   * diálogo y no en ::backdrop porque este no hereda los tokens en todos los
+   * WebKit que soportamos. Los radios usan tokens de Fundamentos con el valor
+   * de la maqueta como respaldo. */
   dialog {
     color: var(--fg);
     max-width: none;
@@ -1496,40 +1661,129 @@
     padding: 0;
     border: 0;
   }
-  dialog::backdrop {
-    background: color-mix(in srgb, var(--bg) 78%, transparent);
-  }
-  .capa {
+  dialog::backdrop { background: transparent; }
+  .capa, .panel {
     position: fixed; inset: 0;
     width: 100%; height: 100%;
     display: grid; place-items: center;
-    background: transparent;
+    background: var(--scrim);
     padding: var(--space-4);
   }
+
+  /* Diálogo de resultado. */
   .resultado {
-    display: grid; gap: var(--space-2);
+    width: min(calc(36.25rem * var(--ui-scale)), 100%);
     min-height: 0;
     max-height: 100%;
     overflow-y: auto;
-    max-width: 46ch;
-    padding: var(--space-6);
+    display: grid;
     background: var(--surface);
-    border: 2px solid var(--ok);
-    border-radius: var(--radius);
-    box-shadow: 0 12px 40px rgb(0 0 0 / 0.28);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-panel);
   }
-  #resultado-desc { display: grid; gap: var(--space-1); }
+  /* Los nueve colores de los dedos, en el orden del teclado. Decorativa:
+     no dice nada que no diga el texto. */
+  .franja {
+    height: calc(var(--space-2) + var(--space-1) / 2);
+    background: linear-gradient(90deg,
+      var(--finger-l-pinky) 0 11.11%, var(--finger-l-ring) 0 22.22%,
+      var(--finger-l-middle) 0 33.33%, var(--finger-l-index) 0 44.44%,
+      var(--finger-thumb) 0 55.55%, var(--finger-r-index) 0 66.66%,
+      var(--finger-r-middle) 0 77.77%, var(--finger-r-ring) 0 88.88%,
+      var(--finger-r-pinky) 0 100%);
+  }
+  .res-cuerpo {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-6);
+  }
+  .res-cab { display: grid; gap: var(--space-2); justify-items: start; }
+  .chip-record {
+    font-size: var(--text-sm);
+    font-weight: 700;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-chip);
+    background: var(--celebracion);
+    color: var(--on-celebracion);
+  }
+  #resultado-titulo {
+    margin: 0;
+    font-size: var(--text-xl);
+    line-height: 1.2;
+  }
+  #resultado-desc { display: grid; gap: var(--space-3); }
+  .cifras {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(12rem * var(--ui-scale))), 1fr));
+    gap: var(--space-3);
+  }
+  .cifra {
+    margin: 0;
+    display: grid;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-card);
+    background: var(--surface-sunken);
+  }
+  .cifra-valor {
+    font-size: calc(2.5rem * var(--ui-scale));
+    font-weight: 700;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .cifra-eti { font-size: var(--text-sm); color: var(--fg-muted); }
+  /* El acierto se dice con la cifra y el texto; el fondo verde acompaña. */
+  .cifra-ok { background: var(--ok-bg); }
+  .cifra-ok .cifra-valor { color: var(--ok); }
+  .cifra-ok .cifra-eti { color: var(--fg); }
+  .animo { margin: 0; font-size: var(--text-lg); font-weight: 700; }
   /* El logro se distingue por el texto y el borde, no solo por el color. */
   .logro { color: var(--fg); border-left: 4px solid var(--ok); padding-left: var(--space-2); }
-  .resultado strong { font-size: var(--text-lg); }
-  .resultado .animo { color: var(--fg-muted); }
-  .botones { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
-  .primario { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  /* .primario, .suave, .enlace y .group son globales (styles/base.css). */
 
-  /* El récord se distingue por la estrella y el texto, no solo por el borde. */
-  .resultado.record { border-width: 3px; border-style: double; }
+  .botones { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+  .botones button { min-height: calc(var(--target-min) + var(--space-1)); border-radius: var(--radius); }
+  .botones .primario { flex: 1 1 auto; }
+  .sig-nombre { font-weight: 400; }
+
+  .res-pie {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-6);
+    border-top: 1px solid var(--border);
+  }
+  .pie-fila {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .pie-fila .note { flex: 1 1 calc(14rem * var(--ui-scale)); }
+
+  /* Botón primario de la maqueta: relleno de acento, negrita y una sombra
+     corta que lo despega del resto. */
+  .primario {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
+    font-weight: 700;
+    box-shadow: 0 3px 0 var(--accent-deep);
+  }
+  .primario:hover { background: var(--accent); filter: brightness(1.05); }
+  /* Acción secundaria que no compite con los botones: texto de acento sobre
+     su fondo suave. El borde mantiene el contorno a 3:1. */
+  .suave {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    border-color: var(--accent-ink);
+    font-weight: 700;
+    border-radius: var(--radius);
+  }
+  .suave:hover { background: var(--accent-soft); filter: brightness(0.97); }
+
+  /* El récord se distingue por el chip y su texto, no solo por un color. */
   .resultado.celebra {
-    border-color: var(--celebracion);
     animation: celebrar var(--motion-slow) var(--ease) 2 alternate;
   }
   @keyframes celebrar { from { transform: scale(1); } to { transform: scale(1.015); } }
@@ -1539,39 +1793,62 @@
     animation: none;
   }
 
-  .panel {
-    position: fixed; top: 0; right: 0; bottom: 0; left: auto;
-    height: 100%;
-    width: min(30rem, 100%);
+  /* Panel compartido: Progreso, Temario y Ajustes. */
+  .panel-caja {
+    width: min(70rem, 100%);
+    max-height: 100%;
+    min-height: 0;
     display: grid;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
     background: var(--surface);
-    border-left: 1px solid var(--border);
-    box-shadow: -12px 0 40px rgb(0 0 0 / 0.22);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-panel);
   }
-  /* El temario necesita más ancho para que las tarjetas vayan de dos en dos. */
-  .panel.ancho { width: min(46rem, 100%); }
+  .panel-caja.caja-ajustes { width: min(65rem, 100%); }
+  .panel-caja.caja-temario { width: min(60rem, 100%); }
   .panel-cab {
     display: flex; align-items: center; justify-content: space-between;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-4) var(--space-6);
     border-bottom: 1px solid var(--border);
   }
-  .panel-cab h2 { margin: 0; font-size: var(--text-lg); }
+  .panel-cab h2 { margin: 0; font-size: calc(1.5rem * var(--ui-scale)); line-height: 1.2; }
+  .panel-cab .cerrar { border-radius: var(--radius); }
   /* El panel sí se desplaza por dentro: es lo que evita que lo haga la página. */
   .panel-cuerpo {
+    min-height: 0;
     overflow-y: auto;
-    padding: var(--space-4);
+    padding: var(--space-4) var(--space-6) var(--space-6);
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-6);
     align-content: start;
   }
 
-  .field { display: grid; gap: var(--space-2); align-content: start; }
-  .group { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-  .group button[aria-pressed='true'] {
-    background: var(--accent); color: var(--accent-fg); border-color: var(--accent);
+  /* Ajustes: dos columnas al 100%; al crecer la letra, una. La base de cada
+     columna escala con --ui-scale, así que es el propio tamaño el que decide
+     cuándo dejan de caber dos. */
+  .ajustes { display: flex; flex-wrap: wrap; gap: 0 var(--space-8); }
+  .ajustes-col {
+    flex: 1 1 calc(26rem * var(--ui-scale));
+    min-width: 0;
+    display: grid;
+    align-content: start;
   }
+  .field {
+    display: grid; gap: var(--space-2); align-content: start;
+    padding-block: var(--space-4);
+    border-bottom: 1px solid var(--border);
+  }
+  .ajustes-col .field:last-child { border-bottom: 0; }
+  .field > span:first-child, .field > label:first-child { font-weight: 700; }
+  .eti-valor .valor { color: var(--accent-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .field input[type='range'] { accent-color: var(--accent); width: 100%; min-height: var(--target-min); }
+
+  /* El grupo segmentado y el enlace-botón son globales (styles/base.css). */
+  .field .group { justify-self: start; max-width: 100%; }
+
   .note { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
 
   /* Pantallas bajas: la barra se aprieta para dejarle sitio al teclado. */
@@ -1581,11 +1858,13 @@
     .metricas { gap: var(--space-3); }
   }
 
+  /* Controles de la práctica libre. Viven en la cabecera del ejercicio (el
+     snippet `controles` de Drill), no en una fila propia que restase alto al
+     teclado. */
   .barra-practica {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-2);
+    gap: var(--space-2);
     font-size: var(--text-sm);
     color: var(--fg-muted);
     flex-wrap: wrap;
@@ -1611,25 +1890,75 @@
     border-left: 4px solid var(--pending);
     border-radius: 0 var(--radius) var(--radius) 0;
   }
+  /* --- Editor de texto propio: una tarjeta centrada ---------------------- */
   .editor-propio {
     display: grid;
     gap: var(--space-3);
-    width: 100%;
+    width: min(47.5rem, 100%);
+    max-width: none;
+    padding: var(--space-6);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
   }
+  .editor-propio .antetitulo {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--accent-ink);
+  }
+  .editor-propio h2 {
+    margin: 0;
+    font-size: var(--text-xl);
+    line-height: 1.2;
+  }
+  .editor-propio .descripcion {
+    margin: 0;
+    font-size: calc(1.0625rem * var(--ui-scale));
+    color: var(--fg-muted);
+  }
+  /* El campo se ve como campo aunque no tenga el foco: borde de acento. Al
+     enfocarlo gana un halo, además del contorno de foco de siempre. */
   .input-texto-propio {
     width: 100%;
-    min-height: 120px;
+    min-height: calc(7.5rem * var(--ui-scale));
     font-family: var(--font-drill);
-    font-size: var(--text-base);
-    padding: var(--space-3);
-    border: 1px solid var(--border-strong);
+    font-size: calc(1.25rem * var(--ui-scale));
+    line-height: 1.6;
+    padding: var(--space-3) var(--space-4);
+    border: 2px solid var(--accent);
     border-radius: var(--radius);
     background: var(--surface);
     color: var(--fg);
     resize: vertical;
   }
+  .input-texto-propio:focus { box-shadow: 0 0 0 4px var(--accent-soft); }
+  .input-texto-propio::placeholder { color: var(--fg-muted); }
+  .editor-propio .aviso-error {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border-left: 4px solid var(--error);
+    background: var(--error-bg);
+    color: var(--fg);
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
   .acciones-propio {
     display: flex;
-    gap: var(--space-2);
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+  .contador {
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .acciones-propio .primario {
+    min-height: calc(var(--target-min) + 0.25rem);
+    padding-inline: var(--space-6);
+    font-weight: 700;
+    border-radius: var(--radius);
+    box-shadow: 0 3px 0 var(--accent-deep);
   }
 </style>

@@ -216,8 +216,11 @@ describe('captura y paneles', () => {
     expect(document.querySelector('h2')?.textContent).toContain('texto propio');
     const inputTexto = document.querySelector('textarea.input-texto-propio') as HTMLTextAreaElement;
     expect(inputTexto).not.toBeNull();
+    expect(document.querySelector('.contador')?.textContent?.trim()).toBe('0 caracteres');
     inputTexto.value = 'hola mundo';
     inputTexto.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    expect(document.querySelector('.contador')?.textContent?.trim()).toBe('10 caracteres');
 
     boton('Empezar a teclear').click();
     await tick();

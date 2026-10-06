@@ -133,8 +133,12 @@ describe("Accesibilidad visual (WCAG 2.2)", () => {
     });
 
     it("LeccionCero.svelte: el botón .enlace respeta --target-min", () => {
-      expect(leccionCeroSvelte).toMatch(/\.enlace\s*\{[^}]*min-height:\s*var\(--target-min\)/);
-      expect(leccionCeroSvelte).toMatch(/\.enlace\s*\{[^}]*min-width:\s*var\(--target-min\)/);
+      // El estilo es global (styles/base.css); la lección cero lo usa y no lo encoge.
+      const baseCss = readFileSync("src/styles/base.css", "utf8");
+      expect(baseCss).toMatch(/\.enlace\s*\{[^}]*min-height:\s*var\(--target-min\)/);
+      expect(baseCss).toMatch(/\.enlace\s*\{[^}]*min-width:\s*var\(--target-min\)/);
+      expect(leccionCeroSvelte).toMatch(/class="enlace"/);
+      expect(leccionCeroSvelte).not.toMatch(/\.enlace\s*\{[^}]*min-(height|width):/);
     });
   });
 

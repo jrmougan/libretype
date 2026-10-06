@@ -148,12 +148,13 @@
     <Keyboard
       {layout}
       held={pulsadas}
+      variante="reposo"
       guia={new Set(paso.guia)}
+      objetivos={paso.guia.length <= 2 ? new Set(paso.guia) : undefined}
       etiqueta={paso.guia.length
         ? `Teclado en pantalla con la posición de reposo señalada: ${paso.guia.length} teclas.`
         : 'Teclado en pantalla.'}
     />
-    <!-- variante de lección cero: la añade Keyboard -->
   </div>
 
   <nav class="pasos" aria-label="Pasos de la lección cero">
@@ -265,7 +266,7 @@
     align-content: start;
     cursor: text;
     border: 2px dashed var(--accent);
-    border-radius: 1rem;
+    border-radius: var(--radius-card);
     padding: var(--space-4);
     background: var(--accent-soft);
     min-height: var(--target-min);
@@ -302,7 +303,7 @@
     font-weight: 700;
     background: var(--dedo);
     color: var(--on-finger);
-    border-radius: 0.75rem;
+    border-radius: var(--radius);
   }
   /* «La barra espaciadora» no es una letra: va en la letra de la interfaz y
      más pequeña, para que la teja no ocupe medio recuadro. */
@@ -322,22 +323,7 @@
     gap: var(--space-3) var(--space-4);
     flex-wrap: wrap;
   }
-  .pasos button { border-radius: 0.75rem; }
-  .secundario {
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
-    color: var(--fg);
-  }
-  .primario {
-    min-height: calc(var(--target-min) + 0.25rem);
-    padding-inline: var(--space-6);
-    font-weight: 700;
-    background: var(--accent);
-    color: var(--accent-fg);
-    border-color: var(--accent);
-    box-shadow: 0 3px 0 var(--accent-deep);
-  }
-  .primario:hover { background: var(--accent); filter: brightness(1.05); }
+  .pasos button { border-radius: var(--radius); }
   button:disabled { opacity: 0.45; cursor: default; }
 
   /* El enlace ocupa el hueco central: empuja los puntos y «Siguiente» a la
@@ -352,22 +338,6 @@
     gap: var(--space-1);
     flex-wrap: wrap;
   }
-  .enlace {
-    background: none;
-    border: none;
-    padding: 0 var(--space-1);
-    min-height: var(--target-min);
-    min-width: var(--target-min);
-    display: inline-flex;
-    align-items: center;
-    color: var(--accent-ink);
-    font-weight: 700;
-    text-decoration: underline;
-    text-underline-offset: 4px;
-    cursor: pointer;
-    font-size: var(--text-base);
-  }
-  .enlace:hover { background: none; text-decoration-thickness: 2px; }
 
   .progreso-pasos { display: flex; align-items: center; gap: var(--space-3); }
   .cuenta {
@@ -387,7 +357,7 @@
   .puntos li {
     width: calc(0.625rem * var(--ui-scale));
     height: calc(0.625rem * var(--ui-scale));
-    border-radius: 999px;
+    border-radius: var(--radius-chip);
     border: 2px solid var(--border-strong);
     background: transparent;
   }

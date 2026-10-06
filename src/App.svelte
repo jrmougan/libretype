@@ -1894,7 +1894,7 @@
     padding: var(--space-6);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 1.25rem;
+    border-radius: var(--radius-panel);
   }
   .editor-propio .antetitulo {
     margin: 0;
@@ -1922,7 +1922,7 @@
     line-height: 1.6;
     padding: var(--space-3) var(--space-4);
     border: 2px solid var(--accent);
-    border-radius: 0.75rem;
+    border-radius: var(--radius);
     background: var(--surface);
     color: var(--fg);
     resize: vertical;
@@ -1935,7 +1935,7 @@
     border-left: 4px solid var(--error);
     background: var(--error-bg);
     color: var(--fg);
-    border-radius: 0 0.75rem 0.75rem 0;
+    border-radius: 0 var(--radius) var(--radius) 0;
   }
   .acciones-propio {
     display: flex;
@@ -1953,7 +1953,7 @@
     min-height: calc(var(--target-min) + 0.25rem);
     padding-inline: var(--space-6);
     font-weight: 700;
-    border-radius: 0.75rem;
+    border-radius: var(--radius);
     box-shadow: 0 3px 0 var(--accent-deep);
   }
 </style>

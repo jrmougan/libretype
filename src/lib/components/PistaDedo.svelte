@@ -183,7 +183,7 @@
     width: calc(1.125rem * var(--ui-scale));
     height: calc(var(--alto) * 4rem * var(--ui-scale));
     background: var(--dedo);
-    border-radius: 999px;
+    border-radius: var(--radius-chip);
     opacity: 0.28;
     box-sizing: border-box;
   }

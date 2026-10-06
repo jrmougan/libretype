@@ -95,7 +95,7 @@
     padding: var(--space-6);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 1.25rem;
+    border-radius: var(--radius-panel);
   }
   h2 {
     margin: 0;
@@ -128,29 +128,14 @@
     padding: var(--space-3) var(--space-4);
     background: var(--surface);
     border: 2px solid var(--border-strong);
-    border-radius: 1rem;
+    border-radius: var(--radius-card);
     box-shadow: 0 2px 0 var(--border);
     overflow-wrap: anywhere;
   }
   .perfil:hover { background: var(--accent-soft); border-color: var(--accent); }
 
-  button { border-radius: 0.75rem; }
-  .secundario {
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
-    color: var(--fg);
-  }
+  button { border-radius: var(--radius); }
   .otro { justify-self: start; }
-  .primario {
-    min-height: calc(var(--target-min) + 0.25rem);
-    padding-inline: var(--space-6);
-    font-weight: 700;
-    background: var(--accent);
-    color: var(--accent-fg);
-    border-color: var(--accent);
-    box-shadow: 0 3px 0 var(--accent-deep);
-  }
-  .primario:hover { background: var(--accent); filter: brightness(1.05); }
 
   .nuevo { display: grid; gap: var(--space-2); }
   .nuevo label { font-weight: 700; }
@@ -163,7 +148,7 @@
     min-height: var(--target-min);
     padding: var(--space-2) var(--space-3);
     border: 2px solid var(--border-strong);
-    border-radius: 0.75rem;
+    border-radius: var(--radius);
     background: var(--surface);
     color: var(--fg);
     flex: 1 1 14rem;
@@ -178,7 +163,7 @@
     border-left: 4px solid var(--error);
     background: var(--error-bg);
     color: var(--fg);
-    border-radius: 0 0.75rem 0.75rem 0;
+    border-radius: 0 var(--radius) var(--radius) 0;
   }
   .nota {
     margin: 0;

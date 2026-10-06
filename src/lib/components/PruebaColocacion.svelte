@@ -148,7 +148,7 @@
     padding: var(--space-6);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 1.25rem;
+    border-radius: var(--radius-panel);
   }
   h2 {
     margin: 0;
@@ -162,20 +162,5 @@
     flex-wrap: wrap;
     margin-top: var(--space-2);
   }
-  button { border-radius: 0.75rem; }
-  .secundario {
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
-    color: var(--fg);
-  }
-  .primario {
-    min-height: calc(var(--target-min) + 0.25rem);
-    padding-inline: var(--space-6);
-    font-weight: 700;
-    background: var(--accent);
-    color: var(--accent-fg);
-    border-color: var(--accent);
-    box-shadow: 0 3px 0 var(--accent-deep);
-  }
-  .primario:hover { background: var(--accent); filter: brightness(1.05); }
+  button { border-radius: var(--radius); }
 </style>

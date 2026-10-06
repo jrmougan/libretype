@@ -91,7 +91,7 @@
     text-align: left;
     min-height: calc(var(--target-min) * 3);
     border: 2px solid var(--border-strong);
-    border-radius: 1.25rem;
+    border-radius: var(--radius-panel);
     background: var(--surface);
     color: var(--fg);
     transition:
@@ -99,7 +99,7 @@
       border-color var(--motion-fast) var(--ease);
   }
   .opcion:hover { background: var(--surface); border-color: var(--accent); }
-  .opcion:focus-visible { outline-offset: 4px; border-radius: 1.25rem; }
+  .opcion:focus-visible { outline-offset: 4px; border-radius: var(--radius-panel); }
 
   /* «Con celebración» se anuncia ya desde el borde: color y sombra de
      celebración, como el diálogo que se verá al terminar una lección. */
@@ -143,7 +143,7 @@
     align-items: center;
     justify-content: center;
     min-height: calc(4rem * var(--ui-scale));
-    border-radius: 0.75rem;
+    border-radius: var(--radius);
     margin-bottom: var(--space-2);
   }
   /* La muestra enseña el resultado, no lo describe: se ve el color y el texto
@@ -154,7 +154,7 @@
     font-size: var(--text-base);
     font-weight: 700;
     padding: var(--space-1) var(--space-4);
-    border-radius: 999px;
+    border-radius: var(--radius-chip);
   }
   .muestra.juego .chip {
     background: var(--celebracion);

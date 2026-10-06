@@ -482,7 +482,7 @@
   }
   .resumen { margin: 0; font-size: var(--text-lg); line-height: 1.4; }
   .comparacion { margin: 0; padding-left: var(--space-4); display: grid; gap: var(--space-1); }
-  details summary { cursor: pointer; min-height: var(--target-min); display: flex; align-items: center; }
+  details summary { cursor: pointer; padding-block: var(--space-3); }
   .vacio { margin: 0; color: var(--fg-muted); }
 
   .global { display: flex; flex-wrap: wrap; gap: var(--space-6); margin: 0; }

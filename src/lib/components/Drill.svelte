@@ -298,7 +298,7 @@
   }
 </script>
 
-<div class="drill" class:sin-animaciones={sinAnimaciones}>
+<div class="drill" class:sin-animaciones={sinAnimaciones} class:justo={espacioJusto}>
   <header class="cab">
     <h2>{titulo}</h2>
     {#if cobertura}
@@ -434,6 +434,18 @@
     min-height: 0;
   }
 
+  /* Con la letra grande, el suelo de la caja del texto pasa de una línea a
+     dos (sin pasar del 30vh de siempre): la del cursor y la siguiente. Con
+     una sola, al llegar al final de una línea no se ve nada de lo que viene, y
+     leer por delante es como compensan los mecanógrafos mayores (2.8). El
+     interlineado baja algo para que las dos líneas quepan en ese 30vh. */
+  .drill.justo {
+    grid-template-rows: auto auto
+      minmax(min(calc(2 * 1.5 * var(--text-drill) + 2 * var(--space-3) + 2px), 30vh), auto)
+      auto minmax(min(34vh, 230px), 1fr);
+  }
+  .justo .text { line-height: 1.5; }
+
   .capture {
     position: absolute;
     width: 1px; height: 1px;
@@ -482,11 +494,7 @@
     /* Si el texto es largo o la letra muy grande, se desplaza aquí dentro y no
        arrastra a la página entera. */
     overflow-y: auto;
-    /* Al menos dos líneas a la vista, la del cursor y la siguiente, también al
-       200% en una ventana baja: con una sola, a final de línea no se ve nada
-       de lo que viene (2.8). Lo que gana aquí lo cede el teclado, que es el
-       siguiente en el orden de sacrificio. */
-    max-height: max(30vh, calc(2 * 1.7em + 2 * var(--space-3) + 2px));
+    max-height: 30vh;
   }
 
   /* Cada palabra es un bloque que no se parte, salvo que no quepa entera en

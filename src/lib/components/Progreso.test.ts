@@ -285,7 +285,8 @@ describe("Progreso.svelte - Evolución temporal (Issue #26) y Teclas flojas (Iss
     componente = mount(Progreso, {
       target: document.body,
       props: {
-        sesiones: [sesionPrueba],
+        // Ha llegado a «oclusivas»: la P ya se le ha enseñado y se puede reforzar.
+        sesiones: [sesionPrueba, { ...sesionPrueba, leccion: "oclusivas" }],
         lecciones: LESSONS,
         tipoAlmacen: "sqlite",
         teclas,
@@ -316,6 +317,30 @@ describe("Progreso.svelte - Evolución temporal (Issue #26) y Teclas flojas (Iss
     const arg = onPracticarRefuerzo.mock.calls[0][0];
     expect(arg.id).toBe("refuerzo");
     expect(arg.teclasFlojas).toContain("p");
+  });
+
+  it("el refuerzo desde el panel no pide teclas que aún no se han enseñado (0.4)", async () => {
+    const onPracticarRefuerzo = vi.fn();
+    componente = mount(Progreso, {
+      target: document.body,
+      props: {
+        sesiones: [sesionPrueba],
+        lecciones: LESSONS,
+        tipoAlmacen: "sqlite",
+        teclas: new Map([
+          ["KeyP", { intentos: 10, aciertos: 6, msTotal: 8000 }],
+          ["KeyA", { intentos: 10, aciertos: 6, msTotal: 8000 }],
+        ]),
+        onBorrar: () => {},
+        onPracticarRefuerzo,
+      },
+    });
+    flushSync();
+    (document.querySelector(".btn-refuerzo") as HTMLButtonElement).click();
+    await tick();
+    const arg = onPracticarRefuerzo.mock.calls[0][0];
+    expect(arg.teclasFlojas).toEqual(["a"]);
+    expect(arg.text).not.toMatch(/p/);
   });
 });
 

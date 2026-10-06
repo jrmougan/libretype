@@ -4,6 +4,8 @@
   import LeccionCero from './lib/components/LeccionCero.svelte';
   import Progreso from './lib/components/Progreso.svelte';
   import SelectorTono from './lib/components/SelectorTono.svelte';
+  import TamanoTexto from './lib/components/TamanoTexto.svelte';
+  import { escucharAtajosTamano } from './lib/tamano';
   import { buildIndex, LAYOUTS, obtenerLayout } from './lib/keyboard/layouts';
   import {
     generarTextoPractica,
@@ -161,6 +163,13 @@
     window.addEventListener('blur', onWindowBlur);
     return () => window.removeEventListener('blur', onWindowBlur);
   });
+
+  // Ctrl+ / Ctrl− / Ctrl+0 mueven --ui-scale (ver lib/tamano.ts).
+  onMount(() => escucharAtajosTamano(
+    window,
+    () => prefs.escala,
+    (escala) => { prefs = { ...prefs, escala }; },
+  ));
 
   function elegirTono(tono: Tono): void {
     prefs = { ...prefs, tono };
@@ -522,7 +531,11 @@
     {#if !progresoCargado}
       <p class="note" role="status">Cargando progreso…</p>
     {:else if vista === 'tono'}
-      <div class="centrado"><SelectorTono onElegir={elegirTono} /></div>
+      <div class="centrado primera">
+        <TamanoTexto id="tamano-inicio" escala={prefs.escala}
+                     onCambiar={(escala) => (prefs = { ...prefs, escala })} />
+        <SelectorTono onElegir={elegirTono} />
+      </div>
     {:else if vista === 'cero'}
       <LeccionCero {layout} onTerminar={() => pick(0)} />
     {:else if vista === 'continua'}
@@ -711,10 +724,8 @@
       <div class="panel-cuerpo">
         {#if settingsOpen}
           <div class="field">
-            <label for="scale">Tamaño del texto: {Math.round(prefs.escala * 100)}%</label>
-            <input id="scale" type="range" min="1" max="2" step="0.1"
-                   value={prefs.escala}
-                   oninput={(e) => (prefs = { ...prefs, escala: +e.currentTarget.value })} />
+            <TamanoTexto escala={prefs.escala} conDeslizador
+                         onCambiar={(escala) => (prefs = { ...prefs, escala })} />
           </div>
 
           <div class="field">
@@ -957,6 +968,7 @@
     overflow-y: auto;
   }
   .centrado { align-self: center; justify-self: center; max-width: 72ch; }
+  .primera { display: grid; gap: var(--space-6); }
 
   /* --- Superpuestos ------------------------------------------------------ */
   dialog {
@@ -1040,7 +1052,6 @@
     background: var(--accent); color: var(--accent-fg); border-color: var(--accent);
   }
   .note { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
-  input[type='range'] { min-height: var(--target-min); }
 
   /* Pantallas bajas: la barra se aprieta para dejarle sitio al teclado. */
   @media (max-height: 620px) {

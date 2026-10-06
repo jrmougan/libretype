@@ -55,7 +55,62 @@ export interface Preferencias {
   ultimaLeccion?: string;
   /** Identificador de la distribución seleccionada (p. ej. 'es-iso'). */
   layout: string;
+
+  // --- Fase 2: para cualquier edad -----------------------------------------
+
+  /**
+   * Alto contraste propio. En Linux y macOS no existe `forced-colors`, así que
+   * si la app no lo trae, quien lo necesita no lo tiene. 'auto' sigue a
+   * `prefers-contrast: more` del sistema; 'normal' lo apaga aunque el sistema
+   * lo pida, por si alguien lo tiene activado para otras aplicaciones.
+   */
+  contraste: 'auto' | 'normal' | 'alto';
+  /**
+   * Longitud de los textos de práctica generados. Ver `palabrasPorTexto()`:
+   * es el único sitio del que debe sacar la cifra cualquier generador.
+   */
+  longitudTexto: LongitudTexto;
+  /**
+   * Minutos de práctica tras los que se sugiere una pausa; 0 lo apaga. Nunca
+   * bloquea: es un aviso que se cierra y ya.
+   */
+  recordatorioPausa: number;
+  /**
+   * Ignorar la repetición involuntaria de un mismo carácter en muy poco
+   * tiempo (temblor). Viene apagado: a quien no lo necesita le podría comer
+   * una doble letra legítima tecleada muy rápido. Ver `keyboard/temblor.ts`.
+   */
+  ignorarRepeticion: boolean;
 }
+
+/**
+ * Longitud de los textos de práctica.
+ *
+ * Con temblor, fatiga o poca atención sostenida, un texto largo cansa antes de
+ * terminar; a quien ya va suelto, uno corto se le queda en nada.
+ */
+export type LongitudTexto = 'corto' | 'normal' | 'largo';
+
+/**
+ * Palabras por texto generado según la longitud elegida.
+ *
+ * **Contrato para los generadores de texto** (práctica continua, fluidez y el
+ * generador de lecciones de la fase 1): la cantidad de palabras sale de aquí,
+ * con `palabrasPorTexto(prefs.longitudTexto)`, y no de una cifra propia. Así la
+ * preferencia vale igual en todos los modos.
+ */
+export const PALABRAS_POR_LONGITUD: Readonly<Record<LongitudTexto, number>> = {
+  corto: 10,
+  normal: 20,
+  largo: 40,
+};
+
+export function palabrasPorTexto(longitud: LongitudTexto): number {
+  return PALABRAS_POR_LONGITUD[longitud] ?? PALABRAS_POR_LONGITUD.normal;
+}
+
+/** Opciones del recordatorio de pausa, en minutos. 0 es «no avisar». */
+export const MINUTOS_PAUSA = [0, 15, 20, 30, 45] as const;
 
 export const POR_DEFECTO: Preferencias = {
   escala: 1,
@@ -67,6 +122,10 @@ export const POR_DEFECTO: Preferencias = {
   buscarActualizaciones: true,
   ultimaLeccion: LESSONS[0]?.id ?? 'reposo',
   layout: 'es-iso',
+  contraste: 'auto',
+  longitudTexto: 'normal',
+  recordatorioPausa: 20,
+  ignorarRepeticion: false,
 };
 
 const CLAVE = 'libretype.preferencias';
@@ -104,6 +163,13 @@ export function normalizar(crudo: unknown): Preferencias {
         : POR_DEFECTO.buscarActualizaciones,
     ultimaLeccion: leccionValida ? (o.ultimaLeccion as string) : (POR_DEFECTO.ultimaLeccion ?? LESSONS[0].id),
     layout: typeof o.layout === 'string' && o.layout.trim() ? o.layout.trim() : POR_DEFECTO.layout,
+    contraste: unaDe(o.contraste, ['auto', 'normal', 'alto'] as const, POR_DEFECTO.contraste),
+    longitudTexto: unaDe(o.longitudTexto, ['corto', 'normal', 'largo'] as const, POR_DEFECTO.longitudTexto),
+    recordatorioPausa: (MINUTOS_PAUSA as readonly unknown[]).includes(o.recordatorioPausa)
+      ? (o.recordatorioPausa as number)
+      : POR_DEFECTO.recordatorioPausa,
+    ignorarRepeticion:
+      typeof o.ignorarRepeticion === 'boolean' ? o.ignorarRepeticion : POR_DEFECTO.ignorarRepeticion,
   };
 }
 
@@ -134,4 +200,6 @@ export function aplicar(p: Preferencias, raiz: HTMLElement): void {
   atributo('data-motion', reducido ? 'reducido' : null);
   atributo('data-font', p.fuente === 'dislexia' ? 'dyslexic' : null);
   atributo('data-tono', p.tono);
+  // Sin atributo manda `prefers-contrast` del sistema (ver tokens.css).
+  atributo('data-contrast', p.contraste === 'auto' ? null : p.contraste);
 }

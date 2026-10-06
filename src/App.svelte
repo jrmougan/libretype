@@ -741,6 +741,23 @@
           </div>
 
           <div class="field">
+            <span id="contraste-l">Contraste</span>
+            <div class="group" role="group" aria-labelledby="contraste-l">
+              {#each [['auto', 'Sistema'], ['normal', 'Normal'], ['alto', 'Alto']] as [v, l] (v)}
+                <button aria-pressed={prefs.contraste === v}
+                        onclick={() => (prefs = { ...prefs, contraste: v as Preferencias['contraste'] })}>
+                  {l}
+                </button>
+              {/each}
+            </div>
+            <p class="note">
+              «Alto» pone negro sobre blanco (o al revés con el tema oscuro) y
+              bordes marcados. En «Sistema» se activa solo si tu equipo pide más
+              contraste.
+            </p>
+          </div>
+
+          <div class="field">
             <span id="tono-l">Cómo te habla</span>
             <div class="group" role="group" aria-labelledby="tono-l">
               <button aria-pressed={prefs.tono === 'juego'}

@@ -161,7 +161,8 @@ fn ruta_politica() -> PathBuf {
 /// cualquiera, y entonces no sería una política.
 #[tauri::command]
 fn politica_del_sistema() -> String {
-    std::fs::read_to_string(ruta_politica()).unwrap_or_default()
+    let ruta = ruta_politica();
+    std::fs::read_to_string(ruta).unwrap_or_default()
 }
 
 /// Cómo se empaquetó este binario: "deb", "rpm", "appimage", "msi", "nsis",
@@ -194,7 +195,10 @@ fn tipo_de_paquete() -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![tipo_de_paquete, politica_del_sistema])
+        .invoke_handler(tauri::generate_handler![
+            tipo_de_paquete,
+            politica_del_sistema
+        ])
         // Guardar y abrir copias de seguridad con el diálogo del sistema. El
         // `<a download>` de siempre no guarda nada en WKWebView ni en
         // WebKitGTK. El diálogo añade al ámbito de fs solo el fichero elegido.
@@ -284,16 +288,19 @@ mod tests {
     #[test]
     fn copia_la_base_de_datos_antes_de_un_esquema_nuevo_y_solo_una_vez() {
         let dir = dir_de_prueba("copia");
-        std::fs::write(dir.join(BASE_DE_DATOS), b"version 2").unwrap();
-        std::fs::write(dir.join("libretype.db-wal"), b"wal").unwrap();
+        let db = dir.join(BASE_DE_DATOS);
+        std::fs::write(&db, b"version 2").unwrap();
+        let wal_original = dir.join("libretype.db-wal");
+        std::fs::write(&wal_original, b"wal").unwrap();
 
-        let copia = copiar_antes_de_migrar(&dir, 3).unwrap().expect("debe copiar");
+        let hecha = copiar_antes_de_migrar(&dir, 3).unwrap();
+        let copia = hecha.expect("debe copiar");
         assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
         let wal = dir.join("libretype-antes-de-esquema-3.db-wal");
         assert_eq!(std::fs::read(wal).unwrap(), b"wal");
 
         // Ya migrada: el siguiente arranque no vuelve a copiar.
-        std::fs::write(dir.join(BASE_DE_DATOS), b"version 3").unwrap();
+        std::fs::write(&db, b"version 3").unwrap();
         assert!(copiar_antes_de_migrar(&dir, 3).unwrap().is_none());
         assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
 

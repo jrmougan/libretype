@@ -26,7 +26,7 @@
     aplicar, cargar, guardar as guardarPrefs, POR_DEFECTO,
     type Preferencias, type Tono,
   } from './lib/preferencias';
-  import { PRECISION_ALTA, vozDe } from './lib/voz';
+  import { textosResultado, vozDe } from './lib/voz';
   import {
     crearActualizador, detectarEntorno,
     type Actualizador, type EstadoActualizacion,
@@ -112,6 +112,12 @@
 
   const voz = $derived(vozDe(prefs.tono));
   const lesson = $derived(leccionPersonalizada ?? LESSONS[lessonIx]);
+  /** Titular y ánimo del resultado: según el intento real y el modo (roadmap 0.1). */
+  const textosRes = $derived(result ? textosResultado(voz, {
+    modo: vista === 'leccion' && !leccionPersonalizada ? 'leccion' : 'practica',
+    precision: result.stats.accuracy,
+    record: result.record,
+  }) : null);
 
   /** En español el separador decimal es la coma, no el punto. */
   const pct = (n: number) => n.toLocaleString('es-ES', { maximumFractionDigits: 1 });
@@ -645,13 +651,11 @@
         aria-live="polite"
       >
         <strong id="resultado-titulo">
-          {#if result.record}★ {voz.record}{:else}{voz.terminada}{/if}
+          {#if result.record}★ {/if}{textosRes?.titulo}
         </strong>
         <div id="resultado-desc">
           <span>{result.stats.wpm} palabras por minuto, {result.stats.accuracy}% de precisión.</span>
-          <span class="animo">
-            {result.stats.accuracy < 90 ? voz.animoBajo : (result.stats.accuracy >= PRECISION_ALTA ? voz.animoAlto : voz.animoAlto)}
-          </span>
+          <span class="animo">{textosRes?.animo}</span>
         </div>
         {#if vista === 'leccion' && !leccionPersonalizada}
           <p class="note">

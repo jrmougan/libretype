@@ -22,7 +22,8 @@
  *                solo color.
  *   .chip        píldora informativa (no es un control). Variantes .neutro y
  *                .celebra.
- *   .tarjeta     superficie con borde y radio de tarjeta.
+ *   .superficie  superficie con borde y radio de tarjeta (no se llama .tarjeta
+ *                porque Temario ya usa ese nombre para sus botones).
  *   .antetitulo  línea pequeña sobre un titular («Antes de empezar · paso 3»).
  */
 
@@ -101,6 +102,11 @@ button:disabled { cursor: default; }
   background: transparent;
   border-color: transparent;
 }
+/* Con caja: los que abren un panel (Progreso, Ajustes). */
+.btn-barra.contorno {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
 .btn-barra[aria-expanded="true"],
 .btn-barra[aria-pressed="true"],
 .btn-barra.activo,
@@ -164,7 +170,7 @@ button:disabled { cursor: default; }
 .chip.neutro { background: var(--surface-sunken); color: var(--fg-muted); }
 .chip.celebra { background: var(--celebracion); color: var(--on-celebracion); }
 
-.tarjeta {
+.superficie {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);

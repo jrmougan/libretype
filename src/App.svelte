@@ -656,17 +656,38 @@
   /** Lo que se está practicando, en los términos del temario. */
   const modoActual = $derived<Modo | null>(vista === 'tono' || vista === 'perfil' ? null : vista);
 
-  /** Qué dice el botón del temario: dónde está ahora la persona. */
+  /**
+   * Qué dice el botón del temario: dónde está ahora la persona. Dos líneas,
+   * como en un índice: el tramo («Lección 5 de 15», «Práctica libre») y el
+   * nombre de lo que tiene delante.
+   */
+  const enLeccionDelTemario = $derived(vista === 'leccion' && !leccionPersonalizada);
+  const tramoActual = $derived(
+    enLeccionDelTemario ? `Lección ${lessonIx + 1} de ${LESSONS.length}`
+      : vista === 'cero' || vista === 'colocacion' ? 'Antes de empezar'
+      : vista === 'leccion' || vista === 'continua' || vista === 'fluidez' || vista === 'propio'
+        ? 'Práctica libre'
+      : '',
+  );
   const rotuloActual = $derived(
-    vista === 'leccion'
-      ? (leccionPersonalizada ? leccionPersonalizada.title : `${lessonIx + 1}. ${lesson.title}`)
-      : vista === 'cero' ? 'Antes de empezar'
+    vista === 'leccion' ? lesson.title
+      : vista === 'cero' ? 'Dónde van las manos'
       : vista === 'continua' ? 'Práctica continua'
       : vista === 'fluidez' ? 'Fluidez'
       : vista === 'colocacion' ? 'Prueba de colocación'
       : vista === 'propio' ? 'Texto propio'
       : '',
   );
+  /**
+   * La pista de segmentos bajo el título: una por lección. Es decorativa (el
+   * panel del temario dice lo mismo con palabras) y no lleva ninguna cifra de
+   * umbral: superada o no lo decide `leccionesSuperadas`, como en el panel.
+   */
+  const segmentos = $derived(LESSONS.map((l, i) =>
+    enLeccionDelTemario && i === lessonIx ? 'actual'
+      : superadas.has(l.id) ? 'superada'
+      : i > maxDesbloqueado ? 'bloqueada'
+      : 'disponible'));
 
   async function elegirModo(modo: Exclude<Modo, 'leccion'>): Promise<void> {
     if (modo === 'continua') return activarContinua();
@@ -719,7 +740,7 @@
 -->
 <div class="app">
   <header class="barra">
-    <h1>LibreType</h1>
+    <h1 class="logo">Libre<span class="logo-type">Type</span></h1>
 
     <!-- El temario es un panel, no un <select>: con teclado, el desplegable
          cambiaba de lección con cada flecha (WCAG 3.2.2). -->
@@ -730,26 +751,33 @@
       aria-controls="panel-dialogo"
       onclick={() => { verTemario = !verTemario; settingsOpen = false; verProgreso = false; }}
     >
-      <span class="eti">Temario</span>
-      {#if rotuloActual}<span class="actual">{rotuloActual}</span>{/if}
+      <span class="tm-tramo">Temario{#if tramoActual}<span class="sep" aria-hidden="true">·</span><span class="sr-only">,</span> {tramoActual}{/if}</span>
+      {#if rotuloActual}<span class="tm-titulo">{rotuloActual}</span>{/if}
+      <span class="tm-flecha" aria-hidden="true">▾</span>
+      {#if progresoCargado && rotuloActual}
+        <span class="tm-pista" aria-hidden="true">
+          {#each segmentos as estado, i (i)}<span class="seg {estado}"></span>{/each}
+        </span>
+      {/if}
     </button>
 
     {#if enPractica}
       {@const textoObjetivo = vista === 'continua' ? textoContinua : vista === 'propio' ? textoPropioActivo : vista === 'fluidez' ? textoFluidez : textoLeccion}
       <div class="controles-intento">
         <!-- El único «Empezar de nuevo»: había otro en la cabecera de la
-             lección y un tercero en Texto propio. -->
-        <button type="button" class="btn-intento" onclick={reiniciarLeccion}>
-          Empezar de nuevo
+             lección y un tercero en Texto propio. El icono acompaña al texto,
+             no lo sustituye: «↺» a secas no lo entiende todo el mundo. -->
+        <button type="button" class="btn-barra btn-intento" onclick={reiniciarLeccion}>
+          <span class="ico ico-reiniciar" aria-hidden="true"></span>Empezar de nuevo
         </button>
         <button
           type="button"
-          class="btn-intento"
+          class="btn-barra btn-intento"
           onclick={alternarPausa}
           aria-pressed={pausado}
           title="También con Esc mientras escribes"
         >
-          {pausado ? 'Reanudar' : 'Pausar'}
+          <span class="ico {pausado ? 'ico-seguir' : 'ico-pausa'}" aria-hidden="true"></span>{pausado ? 'Reanudar' : 'Pausar'}
         </button>
       </div>
 
@@ -759,10 +787,10 @@
         <dl class="metricas">
           <div title={QUE_ES_PPM}>
             <dt>Velocidad</dt>
-            <dd>{ultimasStats.wpm}<small aria-hidden="true">ppm</small><span class="sr-only"> palabras por minuto</span></dd>
+            <dd>{ultimasStats.wpm} <small aria-hidden="true">ppm</small><span class="sr-only"> palabras por minuto</span></dd>
           </div>
-          <div><dt>Precisión</dt><dd>{ultimasStats.accuracy}<small>%</small></dd></div>
-          <div><dt>Avance</dt><dd>{ultimasStats.typed}<small>/{textoObjetivo.length}</small></dd></div>
+          <div><dt>Precisión</dt><dd>{ultimasStats.accuracy} <small>%</small></dd></div>
+          <div><dt>Avance</dt><dd>{ultimasStats.typed} <small>de {textoObjetivo.length}</small></dd></div>
         </dl>
       {/if}
     {/if}
@@ -795,6 +823,7 @@
         </div>
       {/if}
       <button
+        class="btn-barra contorno"
         aria-expanded={verProgreso}
         aria-controls="panel-dialogo"
         onclick={() => { verProgreso = !verProgreso; settingsOpen = false; verTemario = false; }}
@@ -802,6 +831,7 @@
         Progreso
       </button>
       <button
+        class="btn-barra contorno"
         aria-expanded={settingsOpen}
         aria-controls="panel-dialogo"
         onclick={() => { settingsOpen = !settingsOpen; verProgreso = false; verTemario = false; }}
@@ -1386,6 +1416,10 @@
     position: relative;
   }
 
+  /* La barra no puede ganar altura con el rediseño: medida a 1280×800, 65px
+     al 100% (una fila) y 221px al 200% (dos filas), igual que antes. Por eso
+     el botón del temario y las métricas aprietan el interlineado en vez de
+     crecer: todo lo que va en la fila cabe en --target-min. */
   .barra {
     display: flex;
     align-items: center;
@@ -1395,33 +1429,62 @@
     border-bottom: 1px solid var(--border);
     background: var(--surface);
   }
-  h1 {
+  .logo {
     margin: 0;
-    font-size: var(--text-lg);
+    font-size: var(--text-cifra);
+    font-weight: 700;
+    letter-spacing: -0.01em;
     white-space: nowrap;
   }
+  /* Solo el color separa «Type», pero no comunica nada: es la marca. */
+  .logo-type { color: var(--accent-ink); }
 
   /* El botón del temario sustituye a los diez botones que ocupaban dos filas
-     y al <select> que vino después. Dice dónde estás sin tener que abrirlo. */
+     y al <select> que vino después. Dice dónde estás sin tener que abrirlo:
+     el tramo arriba, la lección en negrita y la pista de segmentos debajo. */
   .btn-temario {
     flex: 1 1 260px;
     min-width: 0;
     min-height: var(--target-min);
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'tramo flecha' 'titulo flecha' 'pista pista';
     align-items: center;
-    gap: var(--space-2);
+    column-gap: var(--space-2);
     text-align: left;
-    padding: 0 var(--space-3);
+    padding: calc(var(--space-1) / 2) var(--space-3);
+    line-height: 1.15;
   }
-  .btn-temario .eti { font-weight: 700; }
-  .btn-temario .actual {
+  .tm-tramo, .tm-titulo {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--fg-muted);
   }
-  .btn-temario .actual::before { content: '·'; margin-right: var(--space-2); }
+  .tm-tramo { grid-area: tramo; font-size: var(--text-xs); font-weight: 500; color: var(--fg-muted); }
+  .tm-titulo { grid-area: titulo; font-weight: 700; }
+  .tm-tramo .sep { margin-inline: 0.35em; }
+  .tm-flecha { grid-area: flecha; color: var(--fg-muted); }
+  .tm-pista {
+    grid-area: pista;
+    display: flex;
+    gap: 2px;
+    margin-top: 2px;
+  }
+  .seg {
+    flex: 1 1 0;
+    height: 4px;
+    border-radius: var(--radius-chip);
+    background: var(--border);
+  }
+  .seg.superada { background: var(--ok); }
+  .seg.disponible { background: var(--border-strong); }
+  /* La actual se distingue también por la forma: ocupa el doble. */
+  .seg.actual { flex-grow: 2.5; background: var(--accent); }
+  @media (forced-colors: active) {
+    .seg { background: GrayText; }
+    .seg.superada, .seg.actual { background: CanvasText; }
+  }
   #layout {
     width: 100%;
     font: inherit;
@@ -1433,17 +1496,53 @@
     color: var(--fg);
   }
 
-  .metricas { display: flex; gap: var(--space-4); margin: 0; }
-  .metricas div { display: flex; flex-direction: column; }
-  .metricas dt { font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.2; }
-  .metricas dd {
-    margin: 0; font-size: var(--text-lg); line-height: 1.1;
-    font-variant-numeric: tabular-nums;
+  .metricas {
+    display: flex;
+    gap: var(--space-4);
+    margin: 0;
+    padding: calc(var(--space-1) / 2) var(--space-3);
+    background: var(--surface-sunken);
+    border-radius: var(--radius);
   }
-  .metricas small { font-size: var(--text-xs); color: var(--fg-muted); }
+  .metricas div { display: flex; flex-direction: column; }
+  .metricas dt { font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.1; }
+  .metricas dd {
+    margin: 0; font-size: var(--text-cifra); font-weight: 700; line-height: 1;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .metricas small { font-size: var(--text-xs); font-weight: 500; color: var(--fg-muted); }
 
-  .controles-intento { display: flex; gap: var(--space-2); }
-  .btn-intento { min-height: var(--target-min); }
+  .controles-intento { display: flex; gap: var(--space-1); }
+  .btn-intento {
+    min-height: var(--target-min);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding-inline: var(--space-3);
+    white-space: nowrap;
+  }
+  /* Iconos dibujados con CSS y no con caracteres: así no entran en el nombre
+     accesible ni en el textContent del botón. */
+  .ico { display: inline-block; flex: none; width: 1em; height: 1em; }
+  .ico-reiniciar::before {
+    content: '↺';
+    content: '↺' / '';
+    display: block;
+    font-size: 1.25em;
+    line-height: 0.8;
+    font-weight: 700;
+  }
+  .ico-pausa {
+    width: 0.8em;
+    border-left: 0.28em solid currentColor;
+    border-right: 0.28em solid currentColor;
+  }
+  .ico-seguir {
+    width: 0.8em;
+    background: currentColor;
+    clip-path: polygon(10% 0, 100% 50%, 10% 100%);
+  }
 
   .acciones { display: flex; gap: var(--space-2); margin-left: auto; align-items: center; }
   .acciones button { min-height: var(--target-min); }

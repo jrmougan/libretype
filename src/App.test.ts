@@ -473,12 +473,27 @@ describe('temario y selectores operables con teclado (0.3)', () => {
   it('el botón del temario dice dónde estás y abre el panel compartido', async () => {
     const temario = document.querySelector<HTMLButtonElement>('button.btn-temario')!;
     expect(temario.textContent).toContain('Temario');
-    expect(temario.textContent).toContain(`1. ${LESSONS[0].title}`);
+    expect(temario.textContent).toContain(`Lección 1 de ${LESSONS.length}`);
+    expect(temario.textContent).toContain(LESSONS[0].title);
     expect(temario.getAttribute('aria-controls')).toBe('panel-dialogo');
     await abrirTemario();
     expect(temario.getAttribute('aria-expanded')).toBe('true');
     expect(document.querySelector('#panel-dialogo')?.getAttribute('aria-label')).toBe('Temario');
     expect(campo().disabled).toBe(true);
+  });
+
+  it('la pista de segmentos del temario marca la lección actual, es decorativa y no lleva cifras', async () => {
+    const pista = document.querySelector('button.btn-temario .tm-pista')!;
+    expect(pista.getAttribute('aria-hidden')).toBe('true');
+    const segs = [...pista.querySelectorAll('.seg')];
+    expect(segs).toHaveLength(LESSONS.length);
+    expect(segs.findIndex((s) => s.classList.contains('actual'))).toBe(0);
+    expect(pista.textContent?.trim()).toBe('');
+    // En práctica libre no hay lección actual que marcar.
+    await elegirModo('continua');
+    const temario = document.querySelector('button.btn-temario')!;
+    expect(temario.textContent).toContain('Práctica libre');
+    expect(temario.querySelectorAll('.seg.actual')).toHaveLength(0);
   });
 
   it('cambiar el vocabulario de la práctica continua no tira el texto hasta pulsar el botón', async () => {

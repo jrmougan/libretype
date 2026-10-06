@@ -100,7 +100,7 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
     // Métricas en vivo actualizadas
     const dlMetricas = document.querySelector('dl.metricas');
     expect(dlMetricas).not.toBeNull();
-    expect(dlMetricas?.textContent).toContain(`${mitad}/${target.length}`);
+    expect(dlMetricas?.textContent).toContain(`${mitad} de ${target.length}`);
 
     // Teclea hasta completar la lección
     campo.value = target;
@@ -144,7 +144,8 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
 
     // 10. Verifica que el resultado se ha cerrado y la lección 2 está activa
     expect(document.querySelector('#dialogo-resultado')).toBeNull();
-    expect(botonTemario.textContent).toContain(`2. ${LESSONS[1].title}`);
+    expect(botonTemario.textContent).toContain(`Lección 2 de ${LESSONS.length}`);
+    expect(botonTemario.textContent).toContain(LESSONS[1].title);
     expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
 
     const campoNuevo = campoCaptura();
@@ -158,7 +159,7 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
     campoNuevo.dispatchEvent(new InputEvent('input', { bubbles: true }));
     flushSync();
     await tick();
-    expect(document.querySelector('dl.metricas')?.textContent).toContain(`3/${LESSONS[1].text.length}`);
+    expect(document.querySelector('dl.metricas')?.textContent).toContain(`3 de ${LESSONS[1].text.length}`);
   });
 
   it('permite repetir la lección terminada reiniciando el campo y las métricas', async () => {

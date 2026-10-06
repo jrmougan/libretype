@@ -160,13 +160,20 @@
 
   onMount(() => {
     function onWindowBlur(): void {
-      if (vista === 'leccion' && !result && !settingsOpen && !verProgreso && ultimasStats.typed > 0) {
+      // En todos los modos con ejercicio en marcha, no solo en las lecciones:
+      // si no, el cronómetro de la práctica libre seguía corriendo (roadmap 0.2).
+      if (hayEjercicio() && !result && !settingsOpen && !verProgreso && ultimasStats.typed > 0) {
         pausado = true;
       }
     }
     window.addEventListener('blur', onWindowBlur);
     return () => window.removeEventListener('blur', onWindowBlur);
   });
+
+  /** Hay un `Drill` en pantalla: lección, práctica continua o texto propio ya elegido. */
+  function hayEjercicio(): boolean {
+    return vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio);
+  }
 
   function elegirTono(tono: Tono): void {
     prefs = { ...prefs, tono };
@@ -282,6 +289,7 @@
     textoContinua = generarTextoPractica(nivelPractica);
     continuaKey++;
     result = null;
+    pausado = false;
     vista = 'continua';
     settingsOpen = false;
     verProgreso = false;
@@ -300,6 +308,7 @@
     textoContinua = generarTextoPractica(nivelPractica);
     continuaKey++;
     result = null;
+    pausado = false;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     await tick();
     drill?.restart();
@@ -313,6 +322,7 @@
       teclas = new Map(teclasBase);
     }
     result = null;
+    pausado = false;
     settingsOpen = false;
     verProgreso = false;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
@@ -337,6 +347,7 @@
     }
     textoPropioActivo = limpio;
     enEdicionPropio = false;
+    pausado = false;
     propioKey++;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     await tick();
@@ -369,6 +380,12 @@
     if (!pausado) {
       tick().then(() => drill?.enfocar());
     }
+  }
+
+  /** Desde el cartel de pausa del propio ejercicio. */
+  function reanudar(): void {
+    pausado = false;
+    tick().then(() => drill?.enfocar());
   }
 
   async function practicarRefuerzo(ej: EjercicioRefuerzo): Promise<void> {
@@ -550,6 +567,8 @@
           bind:this={drill}
           {layout}
           activo={!settingsOpen && !verProgreso && !result}
+          {pausado}
+          onReanudar={reanudar}
           target={textoContinua}
           titulo="Práctica continua"
           explicacion={`Vocabulario acumulado hasta la lección ${nivelPractica + 1}: ${LESSONS[nivelPractica].title}.`}
@@ -594,6 +613,8 @@
             bind:this={drill}
             {layout}
             activo={!settingsOpen && !verProgreso && !result}
+            {pausado}
+            onReanudar={reanudar}
             target={textoPropioActivo}
             titulo="Texto propio"
             explicacion="Práctica libre con texto personalizado."
@@ -615,7 +636,7 @@
           {layout}
           activo={!settingsOpen && !verProgreso && !result}
           {pausado}
-          onReanudar={() => { pausado = false; tick().then(() => drill?.enfocar()); }}
+          onReanudar={reanudar}
           target={lesson.text}
           titulo={lesson.title}
           explicacion={leccionPersonalizada ? lesson.focus : objetivoLeccion(lesson.focus)}

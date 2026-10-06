@@ -143,6 +143,15 @@ describe("Accesibilidad visual (WCAG 2.2)", () => {
       expect(appSvelte).toContain('aria-live="polite"');
       expect(appSvelte).toContain('aria-describedby="resultado-desc"');
     });
+
+    it("App.svelte: el diálogo de resultado tiene una sola región viva (roadmap 0.11)", () => {
+      const dialogo = appSvelte.slice(
+        appSvelte.indexOf('id="dialogo-resultado"'),
+        appSvelte.indexOf('id="panel-dialogo"'),
+      );
+      const regiones = dialogo.match(/aria-live=|role="(status|alert|log)"/g) ?? [];
+      expect(regiones).toHaveLength(1);
+    });
   });
 
   describe("Issue #15: Animaciones reducidas y cursor", () => {
@@ -159,9 +168,10 @@ describe("Accesibilidad visual (WCAG 2.2)", () => {
   });
 
   describe("Issue #16: Texto accesible a lector de pantalla sin inundar pista", () => {
-    it("Drill.svelte: textarea y contenedor tienen aria-label descriptivo con el texto de la lección", () => {
-      expect(drillSvelte).toMatch(/aria-label=\{`Escribe el texto de la lección: \$\{target\}`\}/);
-      expect(drillSvelte).toMatch(/aria-label=\{`Texto de la lección: \$\{target\}`\}/);
+    it("Drill.svelte: el nombre del campo es corto y el texto va en aria-describedby (roadmap 0.11)", () => {
+      // El nombre con la lección entera se repetía cada vez que volvía el foco.
+      expect(drillSvelte).not.toMatch(/aria-label=\{`[^`]*\$\{target\}`\}/);
+      expect(drillSvelte).toMatch(/aria-describedby="\{uid\}-texto"/);
     });
 
     it("Drill.svelte: elementos decorativos tienen aria-hidden='true'", () => {

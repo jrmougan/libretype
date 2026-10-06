@@ -68,11 +68,26 @@ describe('foco de la lección', () => {
 });
 
 describe('accesibilidad de la lección (#15, #16)', () => {
-  it('proporciona un aria-label descriptivo con el texto de la lección al textarea', () => {
+  it('el campo tiene un nombre corto y el texto entero va como descripción (roadmap 0.11)', () => {
     const campo = montar();
-    expect(campo.getAttribute('aria-label')).toBe('Escribe el texto de la lección: ás');
-    const contenedor = campo.closest('label');
-    expect(contenedor?.getAttribute('aria-label')).toBe('Texto de la lección: ás');
+    expect(campo.getAttribute('aria-label')).toBe('Campo de práctica: Tildes');
+    expect(campo.getAttribute('aria-label')).not.toContain('ás');
+    const idDesc = campo.getAttribute('aria-describedby')!;
+    expect(document.getElementById(idDesc)?.textContent).toBe('Texto: ás');
+    // La etiqueta que envuelve el campo no le pisa el nombre con otro aria-label.
+    expect(campo.closest('label')?.hasAttribute('aria-label')).toBe(false);
+  });
+
+  it('el botón Reanudar queda fuera de la etiqueta del campo (roadmap 0.11)', () => {
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'ás', titulo: 'Tildes', pausado: true, onReanudar: () => {} },
+    });
+    flushSync();
+    const reanudar = document.querySelector<HTMLButtonElement>('.btn-reanudar')!;
+    expect(reanudar).not.toBeNull();
+    expect(reanudar.closest('label')).toBeNull();
+    expect(document.querySelector('label.text')?.querySelector('button')).toBeNull();
   });
 
   it('mantiene elementos decorativos con aria-hidden para no inundar el lector de pantalla', () => {

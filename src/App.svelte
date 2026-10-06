@@ -662,9 +662,11 @@
       use:abrirDialogo
       aria-labelledby="resultado-titulo"
       aria-describedby="resultado-desc"
-      aria-live="polite"
       oncancel={(e) => { e.preventDefault(); again(); }}
     >
+      <!-- Una sola región viva en todo el diálogo: anidar otra (en el
+           <dialog> o en el aviso de guardado) hacía que el lector anunciase
+           lo mismo dos veces. -->
       <div
         class="resultado"
         class:record={result.record}
@@ -688,7 +690,7 @@
           </p>
         {/if}
         {#if errorGuardado}
-          <p class="note" role="status">No se pudo guardar el resultado. El avance de este intento solo estará disponible durante esta sesión.</p>
+          <p class="note">No se pudo guardar el resultado. El avance de este intento solo estará disponible durante esta sesión.</p>
         {/if}
         <div class="botones">
           {#if result.stats.accuracy < 90}

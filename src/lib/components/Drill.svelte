@@ -432,11 +432,13 @@
     position: absolute;
     inset: 0;
     background: color-mix(in srgb, var(--surface) 92%, transparent);
+    /* En fila: con una sola línea de texto la tarjeta mide menos que el
+       rótulo y el botón uno encima del otro. */
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: var(--space-3);
+    gap: var(--space-2) var(--space-4);
     z-index: 5;
     border-radius: var(--radius-card);
     font-size: var(--text-lg);

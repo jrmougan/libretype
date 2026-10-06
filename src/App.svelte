@@ -751,8 +751,13 @@
       aria-controls="panel-dialogo"
       onclick={() => { verTemario = !verTemario; settingsOpen = false; verProgreso = false; }}
     >
-      <span class="tm-tramo">Temario{#if tramoActual}<span class="sep" aria-hidden="true">·</span><span class="sr-only">,</span> {tramoActual}{/if}</span>
-      {#if rotuloActual}<span class="tm-titulo">{rotuloActual}</span>{/if}
+      {#if rotuloActual}
+        <span class="tm-tramo">Temario{#if tramoActual}<span class="sep" aria-hidden="true">·</span><span class="sr-only">,</span> {tramoActual}{/if}</span>
+        <span class="tm-titulo">{rotuloActual}</span>
+      {:else}
+        <!-- Antes de elegir tono o perfil no hay nada que situar. -->
+        <span class="tm-titulo solo">Temario</span>
+      {/if}
       <span class="tm-flecha" aria-hidden="true">▾</span>
       {#if progresoCargado && rotuloActual}
         <span class="tm-pista" aria-hidden="true">
@@ -1470,6 +1475,7 @@
   }
   .tm-tramo { grid-area: tramo; font-size: var(--text-xs); font-weight: 500; color: var(--fg-muted); }
   .tm-titulo { grid-area: titulo; font-weight: 700; }
+  .tm-titulo.solo { grid-row: 1 / 3; }
   .tm-tramo .sep { margin-left: 0.35em; }
   .tm-flecha { grid-area: flecha; color: var(--fg-muted); }
   .tm-pista {
@@ -1630,7 +1636,7 @@
   .resultado strong { font-size: var(--text-lg); }
   .resultado .animo { color: var(--fg-muted); }
   .botones { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
-  .primario { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  /* .primario y .group son globales (styles/base.css). */
 
   /* El récord se distingue por la estrella y el texto, no solo por el borde. */
   .resultado.record { border-width: 3px; border-style: double; }
@@ -1674,10 +1680,6 @@
   }
 
   .field { display: grid; gap: var(--space-2); align-content: start; }
-  .group { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-  .group button[aria-pressed='true'] {
-    background: var(--accent); color: var(--accent-fg); border-color: var(--accent);
-  }
   .note { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
 
   /* Pantallas bajas: la barra se aprieta para dejarle sitio al teclado. */

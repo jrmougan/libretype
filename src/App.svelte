@@ -6,11 +6,11 @@
   import SelectorTono from './lib/components/SelectorTono.svelte';
   import { buildIndex, LAYOUTS, obtenerLayout } from './lib/keyboard/layouts';
   import {
-    generarTextoPractica,
     LESSONS,
     normalizarTextoLibre,
     type Lesson,
   } from './lib/lessons';
+  import { generarTextoPractica } from './lib/generador';
   import type { EjercicioRefuerzo } from './lib/refuerzo';
   import type { Stats } from './lib/keyboard/engine';
   import {

@@ -163,6 +163,11 @@ fn tipo_de_paquete() -> String {
 pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![tipo_de_paquete])
+        // Guardar y abrir copias de seguridad con el diálogo del sistema. El
+        // `<a download>` de siempre no guarda nada en WKWebView ni en
+        // WebKitGTK. El diálogo añade al ámbito de fs solo el fichero elegido.
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:libretype.db", migraciones())

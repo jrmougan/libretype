@@ -24,6 +24,11 @@ log = "0.4"
 tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-sql = { version = "2.4.1", features = ["sqlite"] }
+# Diálogo «Guardar como» / «Abrir» y escritura del fichero elegido, para las
+# copias de seguridad. Versiones de la misma tanda que sql y updater: las 2.8 y
+# 2.6 ya exigen tauri 2.12.
+tauri-plugin-dialog = "2.7.3"
+tauri-plugin-fs = "2.5.2"
 
 # El actualizador solo existe en escritorio: en móvil actualiza la tienda, no
 # la app. Se declaran aparte para no arrastrar reqwest ni zip a un build de

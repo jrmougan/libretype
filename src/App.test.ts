@@ -431,3 +431,26 @@ describe('pausa y un solo «Empezar de nuevo» (2.6)', () => {
     expect(aviso?.textContent).toContain('«“» «”» «—»');
   });
 });
+
+describe('fase de fluidez (2.5)', () => {
+  it('se llega desde el temario y compara la tanda con el propio ritmo', async () => {
+    await elegirModo('fluidez');
+    expect(document.querySelector('h2')?.textContent).toBe('Fluidez');
+    expect(document.querySelector('button.btn-temario')?.textContent).toContain('Fluidez');
+    const texto = [...document.querySelectorAll('.drill .ch')].map((c) => c.textContent).join('').replace(/ /g, ' ');
+    campo().value = texto;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    const dialogo = document.querySelector('dialog#dialogo-resultado')!;
+    expect(dialogo.textContent).toContain('Primera tanda limpia');
+    await vi.waitFor(() => expect(localStorage.getItem('libretype.sesiones')).toContain('"fluidez"'));
+
+    // La siguiente tanda ya tiene ritmo de referencia: el de la anterior.
+    boton('Otra tanda').click();
+    await tick();
+    expect(document.querySelector('p.focus')?.textContent ?? '').toMatch(/ritmo habitual|primera tanda/i);
+    expect(document.querySelector('#dialogo-resultado')).toBeNull();
+    expect(document.activeElement).toBe(campo());
+  });
+});

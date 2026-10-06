@@ -13,6 +13,7 @@
     comparacionPropia, fraseResumen, serieGrafica, teclasSinMirar,
   } from "../storage/comparacion";
   import GraficaEvolucion from "./GraficaEvolucion.svelte";
+  import { ID_FLUIDEZ } from "../fluidez";
   import type { Almacen } from "../storage/almacen";
   import type { EstadoTecla } from "../keyboard/dominio";
   import {
@@ -315,6 +316,9 @@
               {:else if r.leccion === 'texto-propio'}
                 Texto propio
                 <small>práctica libre</small>
+              {:else if r.leccion === ID_FLUIDEZ}
+                Fluidez
+                <small>práctica libre</small>
               {:else}
                 {tituloRetirada(r.leccion) ?? r.leccion}
                 <small>lección retirada</small>
@@ -339,7 +343,7 @@
       </table>
     </div>
 
-    {#if retiradas.some(r => r.leccion !== 'practica-continua' && r.leccion !== 'texto-propio')}
+    {#if retiradas.some(r => r.leccion !== 'practica-continua' && r.leccion !== 'texto-propio' && r.leccion !== ID_FLUIDEZ)}
       <p class="nota">
         Las lecciones retiradas son de una versión anterior de LibreType. El
         temario cambió, pero lo que practicaste sigue contando aquí.

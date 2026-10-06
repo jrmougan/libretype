@@ -9,6 +9,9 @@
   import Temario, { type Modo } from './lib/components/Temario.svelte';
   import { escucharAtajosTamano } from './lib/tamano';
   import { avisoQuitados, caracteresQuitados } from './lib/texto-propio';
+  import {
+    explicacionFluidez, generarTanda, ID_FLUIDEZ, ritmoReferencia, valorarTanda,
+  } from './lib/fluidez';
   import { buildIndex, LAYOUTS, obtenerLayout } from './lib/keyboard/layouts';
   import {
     generarTextoPractica,
@@ -72,7 +75,15 @@
   /** Cualquiera de los tres paneles superpuestos suspende la captura. */
   const panelAbierto = $derived(settingsOpen || verProgreso || verTemario);
   /** 'tono' solo aparece la primera vez; 'cero' es la colocación de manos; 'continua' y 'propio' son práctica libre. */
-  let vista = $state<'tono' | 'cero' | 'leccion' | 'continua' | 'propio'>('leccion');
+  let vista = $state<'tono' | 'cero' | 'leccion' | 'continua' | 'propio' | 'fluidez'>('leccion');
+
+  /** Tandas de fluidez (2.5): texto, clave para rehacer el Drill y su meta. */
+  let textoFluidez = $state('');
+  let fluidezKey = $state(0);
+  /** Tu ritmo de antes de esta tanda; se fija al empezarla, no al terminarla. */
+  let ritmoFluidez = $state<number | null>(null);
+  /** La valoración de la tanda recién terminada, contra ese ritmo. */
+  let valoracionFluidez = $state('');
 
   /** Variables para Práctica continua (Issue #19) */
   let nivelPractica = $state(0);
@@ -205,7 +216,10 @@
         ? 'practica-continua'
         : vista === 'propio'
           ? 'texto-propio'
-          : lesson.id;
+          : vista === 'fluidez'
+            ? ID_FLUIDEZ
+            : lesson.id;
+    if (vista === 'fluidez') valoracionFluidez = valorarTanda(stats.wpm, stats.accuracy, ritmoFluidez);
 
     const sesion: Sesion = {
       leccion: idLeccion,
@@ -333,6 +347,28 @@
     drill?.enfocar();
   }
 
+  /** Empieza o repite una tanda de fluidez con el vocabulario abierto. */
+  async function nuevaFluidez(): Promise<void> {
+    dialogoResultado?.close();
+    dialogoPanel?.close();
+    if (!result) teclas = new Map(teclasBase);
+    textoFluidez = generarTanda(maxDesbloqueado, palabrasPorTexto(prefs.longitudTexto));
+    // La meta es tu ritmo anterior: se toma antes de la tanda, con lo guardado.
+    ritmoFluidez = ritmoReferencia(sesiones);
+    valoracionFluidez = '';
+    fluidezKey++;
+    result = null;
+    pausado = false;
+    vista = 'fluidez';
+    settingsOpen = false;
+    verProgreso = false;
+    verTemario = false;
+    ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
+    await tick();
+    drill?.restart();
+    drill?.enfocar();
+  }
+
   async function activarPropio(): Promise<void> {
     dialogoResultado?.close();
     dialogoPanel?.close();
@@ -435,6 +471,12 @@
     return { destroy: () => dialogo.close() };
   }
 
+  /** Hay un ejercicio en pantalla (no el editor de texto propio ni un menú). */
+  const enPractica = $derived(
+    vista === 'leccion' || vista === 'continua' || vista === 'fluidez'
+      || (vista === 'propio' && !enEdicionPropio),
+  );
+
   /** Lo que se está practicando, en los términos del temario. */
   const modoActual = $derived<Modo | null>(vista === 'tono' ? null : vista);
 
@@ -444,6 +486,7 @@
       ? (leccionPersonalizada ? leccionPersonalizada.title : `${lessonIx + 1}. ${lesson.title}`)
       : vista === 'cero' ? 'Antes de empezar'
       : vista === 'continua' ? 'Práctica continua'
+      : vista === 'fluidez' ? 'Fluidez'
       : vista === 'propio' ? 'Texto propio'
       : '',
   );
@@ -451,6 +494,7 @@
   async function elegirModo(modo: Exclude<Modo, 'leccion'>): Promise<void> {
     if (modo === 'continua') return activarContinua();
     if (modo === 'propio') return activarPropio();
+    if (modo === 'fluidez') return nuevaFluidez();
     if (modo === 'cero') {
       dialogoPanel?.close();
       if (!result) teclas = new Map(teclasBase);
@@ -469,7 +513,7 @@
     verProgreso = false;
     verTemario = false;
     await tick();
-    if (vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio)) {
+    if (enPractica) {
       drill?.enfocar();
     }
   }
@@ -501,8 +545,8 @@
       {#if rotuloActual}<span class="actual">{rotuloActual}</span>{/if}
     </button>
 
-    {#if vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio)}
-      {@const textoObjetivo = vista === 'continua' ? textoContinua : vista === 'propio' ? textoPropioActivo : lesson.text}
+    {#if enPractica}
+      {@const textoObjetivo = vista === 'continua' ? textoContinua : vista === 'propio' ? textoPropioActivo : vista === 'fluidez' ? textoFluidez : lesson.text}
       <div class="controles-intento">
         <!-- El único «Empezar de nuevo»: había otro en la cabecera de la
              lección y un tercero en Texto propio. -->
@@ -605,6 +649,28 @@
           titulo="Práctica continua"
           explicacion={`Vocabulario acumulado hasta la lección ${nivelPractica + 1}: ${LESSONS[nivelPractica].title}.`}
           cobertura={pct(LESSONS[nivelPractica].cobertura)}
+          espacioJusto={prefs.escala >= 1.4}
+          movimiento={prefs.movimiento}
+          animaciones={prefs.movimiento === 'reducido' ? 'reducidas' : 'normales'}
+          {dominios}
+          onDone={terminada}
+          onTecla={anotarTecla}
+          onStats={(s) => (ultimasStats = s)}
+        />
+      {/key}
+    {:else if vista === 'fluidez'}
+      {#key fluidezKey}
+        <Drill
+          bind:this={drill}
+          {layout}
+          activo={!panelAbierto && !result}
+          {pausado}
+          onPausar={pausar}
+          onReanudar={reanudar}
+          ignorarRepeticion={prefs.ignorarRepeticion}
+          target={textoFluidez}
+          titulo="Fluidez"
+          explicacion={explicacionFluidez(ritmoFluidez)}
           espacioJusto={prefs.escala >= 1.4}
           movimiento={prefs.movimiento}
           animaciones={prefs.movimiento === 'reducido' ? 'reducidas' : 'normales'}
@@ -727,6 +793,9 @@
             {/if}
           </p>
         {/if}
+        {#if vista === 'fluidez' && valoracionFluidez}
+          <p class="note">{valoracionFluidez}</p>
+        {/if}
         {#if result.sinMirar && result.sinMirar.length > 0}
           <p class="note logro">
             {result.sinMirar.length === 1 ? 'Ya escribes sin mirar la tecla' : 'Ya escribes sin mirar las teclas'}
@@ -743,6 +812,8 @@
             <button class="primario" onclick={again}>{voz.repetir}</button>
             {#if vista === 'continua'}
               <button onclick={() => nuevaContinua()}>Nuevo texto</button>
+            {:else if vista === 'fluidez'}
+              <button onclick={() => nuevaFluidez()}>Otra tanda</button>
             {:else if vista === 'propio'}
               <button onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
             {:else if !leccionPersonalizada && lessonIx < maxDesbloqueado}
@@ -752,6 +823,8 @@
             <button onclick={again}>{voz.repetir}</button>
             {#if vista === 'continua'}
               <button class="primario" onclick={() => nuevaContinua()}>Nuevo texto</button>
+            {:else if vista === 'fluidez'}
+              <button class="primario" onclick={() => nuevaFluidez()}>Otra tanda</button>
             {:else if vista === 'propio'}
               <button class="primario" onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
             {:else if !leccionPersonalizada && lessonIx < maxDesbloqueado}
@@ -769,8 +842,7 @@
 
   <RecordatorioPausa
     minutos={prefs.recordatorioPausa}
-    practicando={(vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio))
-      && !pausado && !panelAbierto && !result}
+    practicando={enPractica && !pausado && !panelAbierto && !result}
   />
 
   {#if panelAbierto}

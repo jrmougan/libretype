@@ -46,6 +46,11 @@
       detalle: 'Textos nuevos con todo el vocabulario que ya tienes abierto.',
     },
     {
+      modo: 'fluidez',
+      titulo: 'Fluidez',
+      detalle: 'Tandas de las palabras más usadas, para ganar soltura sin perder precisión.',
+    },
+    {
       modo: 'propio',
       titulo: 'Texto propio',
       detalle: 'Pega o escribe el texto que quieras practicar.',

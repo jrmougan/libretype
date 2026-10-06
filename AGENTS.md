@@ -203,6 +203,12 @@ Reglas que están ahí por algo y no son parámetros que tocar a ojo:
 
 El dominio se persiste al terminar cada lección, no en cada pulsación.
 
+**El dominio mira lo reciente** (`VENTANA`): al llegar a dos ventanas de
+intentos, intentos, aciertos y milisegundos se reescalan a una en la misma
+proporción. Es una media que olvida sin tocar el esquema, que guarda enteros.
+Así el niño que mejora no arrastra los fallos de la primera semana, y una tecla
+dominada hace meses vuelve a enseñar su letra si hoy se falla.
+
 Los intentos se atribuyen a la tecla del carácter **objetivo**, no al `keydown`:
 los spikes demostraron que no se puede emparejar un carácter confirmado con la
 tecla que lo produjo. En una vocal con tilde cuentan las dos teclas —el acento y

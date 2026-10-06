@@ -316,7 +316,7 @@
           <tr class:sin-hacer={!r} class:actual={leccionActual === i}>
             <!-- La insignia acompaña a la etiqueta escrita: no es lo único que
                  dice el estado. -->
-            <th scope="row"><span class="fila-tit"><span class="insignia {estado}" aria-hidden="true">{estado === 'superada' ? '✓' : estado === 'abierta' ? '›' : ''}</span>{l.title}{#if leccionActual === i}<span class="aqui">Estás aquí</span>{/if}</span><small>{estado === 'cerrada' ? 'Bloqueada · supera las anteriores' : estado === 'superada' ? 'Superada' : FILA_DISPONIBLE}</small></th>
+            <th scope="row"><span class="fila-tit"><span class="insignia {estado}" aria-hidden="true">{estado === 'superada' ? '✓' : estado === 'abierta' ? '›' : ''}</span><span class="nombre">{l.title}{#if leccionActual === i} <span class="aqui">Estás aquí</span>{/if}</span></span><small>{estado === 'cerrada' ? 'Bloqueada · supera las anteriores' : estado === 'superada' ? 'Superada' : FILA_DISPONIBLE}</small></th>
             <td>{r ? r.intentos : "—"}</td>
             <td>
               {#if d}
@@ -580,7 +580,8 @@
     font-weight: 400;
     color: var(--fg-muted);
   }
-  .fila-tit { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .fila-tit { display: flex; align-items: center; gap: var(--space-2); }
+  .nombre { min-width: 0; }
 
   /* Insignia redonda del estado de la lección: ✓ superada, › abierta y vacía
      con borde si sigue cerrada. Siempre con la etiqueta escrita debajo. */
@@ -603,6 +604,7 @@
   /* La fila en curso se marca con fondo y con el texto «Estás aquí». */
   tr.actual > * { background: var(--accent-soft); }
   .aqui {
+    display: inline-block;
     font-size: var(--text-xs);
     font-weight: 700;
     padding: 0 var(--space-2);

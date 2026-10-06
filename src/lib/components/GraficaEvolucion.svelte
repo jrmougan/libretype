@@ -80,7 +80,15 @@
     background: var(--surface-sunken);
     border-radius: var(--radius-card, 16px);
   }
-  svg { width: 100%; height: auto; display: block; overflow: visible; }
+  /* Con todo el ancho del panel, la proporción del viewBox daría una gráfica
+     más alta que la ventana: se acota la altura y se centra. */
+  svg {
+    width: 100%;
+    height: auto;
+    max-height: calc(11rem * var(--ui-scale));
+    display: block;
+    overflow: visible;
+  }
   /* Barras en acento pleno: atenuadas no llegarían a 3:1 sobre el fondo. */
   .barra { fill: var(--accent); }
   .barra:hover { fill: var(--accent-deep); }

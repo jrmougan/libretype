@@ -1019,13 +1019,13 @@
             <div class="cifras">
               <p class="cifra">
                 <span class="cifra-valor">{result.stats.wpm}</span>
-                <span class="cifra-eti">palabras por minuto,</span>
+                <span class="cifra-eti">palabras por minuto<span class="sr-only">,</span></span>
               </p>
               <!-- El fondo de acierto solo cuando lo es: por debajo del objetivo
                    la tarjeta queda neutra, sin rojo ni reproche. -->
               <p class="cifra" class:cifra-ok={!repetirPrimero}>
                 <span class="cifra-valor">{result.stats.accuracy}%</span>
-                <span class="cifra-eti">de precisión.</span>
+                <span class="cifra-eti">de precisión<span class="sr-only">.</span></span>
               </p>
             </div>
             <p class="animo">{textosRes?.animo}</p>
@@ -1075,7 +1075,7 @@
               <button class:primario={!repetirPrimero} onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
             {:else if siguienteLeccion}
               <button class="siguiente" class:primario={!repetirPrimero} onclick={() => pick(lessonIx + 1)}>
-                {voz.siguiente}<span class="sig-nombre"> · {siguienteLeccion.title}</span>
+                {voz.siguiente} <span class="sig-nombre">· {siguienteLeccion.title}</span>
               </button>
             {/if}
           </div>

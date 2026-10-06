@@ -185,15 +185,19 @@ export function construirTexto(
   return elegidas.join(' ');
 }
 
+/** Caracteres por palabra, espacio incluido, para pasar de palabras a `largo`. */
+export const CARACTERES_POR_PALABRA = 6;
+
 /**
  * Texto de un intento de la lección `indice`. Más o menos igual de largo que
  * el texto revisado a mano de esa lección, para que la dificultad no cambie.
+ * `escala` aplica la preferencia de longitud (1 = la del texto revisado).
  */
-export function generarTextoLeccion(indice: number, semilla: number): string {
+export function generarTextoLeccion(indice: number, semilla: number, escala = 1): string {
   const i = Math.min(Math.max(0, indice), LESSONS.length - 1);
   const leccion = LESSONS[i];
   return construirTexto(piezasHasta(i), semilla, {
-    largo: Math.max(50, leccion.text.length),
+    largo: Math.max(50, Math.round(leccion.text.length * escala)),
     nuevas: leccion.nuevas,
   });
 }
@@ -203,9 +207,9 @@ export function generarTextoLeccion(indice: number, semilla: number): string {
  * lección usa el texto revisado a mano, que es el mejor que hay; a partir de
  * ahí, uno nuevo cada vez.
  */
-export function textoDeIntento(indice: number, yaPracticada: boolean, semilla: number): string {
+export function textoDeIntento(indice: number, yaPracticada: boolean, semilla: number, escala = 1): string {
   const leccion = LESSONS[Math.min(Math.max(0, indice), LESSONS.length - 1)];
-  return yaPracticada ? generarTextoLeccion(indice, semilla) : leccion.text;
+  return yaPracticada ? generarTextoLeccion(indice, semilla, escala) : leccion.text;
 }
 
 /**

@@ -268,3 +268,97 @@ describe("Tipografía para dislexia (roadmap 0.9)", () => {
     expect(bloque.slice(0, bloque.indexOf("}"))).not.toContain("--font-key");
   });
 });
+
+/**
+ * Alto contraste (2.2). Se leen las paletas del propio tokens.css en vez de
+ * copiarlas aquí: si alguien retoca un color, se mide el que de verdad se usa.
+ */
+describe("Alto contraste propio (2.2)", () => {
+  /** Declaraciones `--x: #rrggbb` del primer bloque con ese selector exacto. */
+  function bloque(selector: string): Record<string, string> {
+    const inicio = tokensCss.indexOf(selector + " {");
+    expect(inicio, `falta el bloque ${selector}`).toBeGreaterThanOrEqual(0);
+    const cuerpo = tokensCss.slice(inicio, tokensCss.indexOf("}", inicio));
+    return Object.fromEntries(
+      [...cuerpo.matchAll(/(--[a-z-]+):\s*(#[0-9a-f]{6});/gi)].map((m) => [m[1], m[2].toLowerCase()]),
+    );
+  }
+
+  const CLARO = [
+    ':root[data-contrast="alto"]',
+    ':root:not([data-contrast])',
+  ];
+  const OSCURO = [
+    ':root[data-contrast="alto"]:not([data-theme="light"])',
+    ':root[data-contrast="alto"][data-theme="dark"]',
+    ':root:not([data-contrast]):not([data-theme="light"])',
+    ':root:not([data-contrast])[data-theme="dark"]',
+  ];
+
+  it("se activa por preferencia y también con prefers-contrast: more", () => {
+    expect(tokensCss).toMatch(/@media \(prefers-contrast: more\)/);
+    expect(tokensCss).toContain(':root[data-contrast="alto"] {');
+  });
+
+  it("las copias de cada paleta dicen exactamente lo mismo", () => {
+    for (const grupo of [CLARO, OSCURO]) {
+      const [primera, ...resto] = grupo.map(bloque);
+      expect(Object.keys(primera).length).toBeGreaterThan(20);
+      for (const otra of resto) expect(otra).toEqual(primera);
+    }
+  });
+
+  for (const [nombre, selector] of [["claro", CLARO[0]], ["oscuro", OSCURO[0]]] as const) {
+    describe(`paleta ${nombre}`, () => {
+      const t = bloque(selector);
+      const fondos = ["--bg", "--surface", "--surface-sunken"] as const;
+
+      it("el texto, también el atenuado, llega a 7:1 (AAA) sobre cualquier fondo", () => {
+        for (const fondo of fondos) {
+          expect(contrast(t["--fg"], t[fondo]), `--fg sobre ${fondo}`).toBeGreaterThanOrEqual(7);
+          expect(contrast(t["--fg-muted"], t[fondo]), `--fg-muted sobre ${fondo}`).toBeGreaterThanOrEqual(7);
+        }
+      });
+
+      it("los bordes se ven de sobra (muy por encima de 3:1)", () => {
+        for (const fondo of fondos) {
+          expect(contrast(t["--border"], t[fondo])).toBeGreaterThanOrEqual(7);
+          expect(contrast(t["--border-strong"], t[fondo])).toBeGreaterThanOrEqual(7);
+        }
+      });
+
+      it("el acento se lee como texto y como fondo de botón", () => {
+        expect(contrast(t["--accent-fg"], t["--accent"])).toBeGreaterThanOrEqual(7);
+        expect(contrast(t["--accent"], t["--bg"])).toBeGreaterThanOrEqual(7);
+      });
+
+      it("acierto, error y pendiente se leen sobre su fondo y sobre el general", () => {
+        for (const estado of ["--ok", "--error", "--pending"]) {
+          expect(contrast(t[estado], t[`${estado}-bg`]), estado).toBeGreaterThanOrEqual(7);
+          expect(contrast(t[estado], t["--bg"]), estado).toBeGreaterThanOrEqual(7);
+        }
+      });
+
+      it("los colores de dedo superan 3:1 frente al fondo y la tecla", () => {
+        const dedos = Object.keys(t).filter((k) => k.startsWith("--finger-"));
+        expect(dedos.length).toBe(9);
+        for (const d of dedos) {
+          expect(contrast(t[d], t["--bg"]), d).toBeGreaterThanOrEqual(3);
+          expect(contrast(t[d], t["--surface-sunken"]), d).toBeGreaterThanOrEqual(3);
+        }
+      });
+
+      it("la letra atenuada de una tecla casi dominada sigue a 4,5:1 o más", () => {
+        for (let d = 0.5; d < DOMINADA; d += 0.01) {
+          const atenuado = blend(t["--fg"], t["--surface-sunken"], opacidadEtiqueta(d));
+          expect(contrast(atenuado, t["--surface-sunken"])).toBeGreaterThanOrEqual(4.5);
+        }
+      });
+    });
+  }
+
+  it("va después del tono de juego, para que su acento no lo pise", () => {
+    expect(tokensCss.indexOf(':root[data-contrast="alto"] {'))
+      .toBeGreaterThan(tokensCss.lastIndexOf('[data-tono="juego"]'));
+  });
+});

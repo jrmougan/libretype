@@ -421,13 +421,19 @@ describe("Progreso.svelte - Intentos hasta superar (Issue #53)", () => {
   }
 
   /** La columna se busca por su cabecera: no depende de cuántas haya ni de dónde. */
+  /** La tabla de lecciones: desde 2.4 la de evolución va antes que ella. */
+  function tablaLecciones(): HTMLTableElement {
+    return [...document.querySelectorAll("table")]
+      .find((t) => t.querySelector("caption")?.textContent === "Marca por lección")!;
+  }
+
   function columnaHastaSuperar(): number {
-    return [...document.querySelectorAll("thead th")]
+    return [...tablaLecciones().querySelectorAll("thead th")]
       .findIndex((th) => th.textContent?.trim() === "Hasta superar");
   }
 
   function celdaDe(titulo: string, columna: number): string | undefined {
-    const fila = [...document.querySelectorAll("tbody tr")]
+    const fila = [...tablaLecciones().querySelectorAll("tbody tr")]
       .find((tr) => tr.querySelector("th")?.textContent?.includes(titulo));
     return fila?.children[columna]?.textContent?.replace(/\s+/g, " ").trim();
   }
@@ -461,5 +467,56 @@ describe("Progreso.svelte - Intentos hasta superar (Issue #53)", () => {
     const col = columnaHastaSuperar();
     expect(celdaDe("Práctica continua", col)).toBe("—");
     expect(celdaDe("Las vocales que mandan", col)).toBe("—");
+  });
+});
+
+describe("Progreso.svelte - comparado con uno mismo (0.7 y 2.4)", () => {
+  function montarCon(sesiones: Sesion[], teclas = new Map()) {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones, lecciones: LESSONS, tipoAlmacen: "sqlite", teclas, onBorrar: () => {} },
+    });
+    flushSync();
+  }
+
+  const dominada = { intentos: 20, aciertos: 20, msTotal: 20 * 250 };
+
+  it("abre con un resumen en una frase y no repite el título del panel", () => {
+    montarCon([sesionPrueba], new Map([["KeyA", dominada], ["KeyS", dominada]]));
+    expect(document.querySelector(".progreso h2")).toBeNull();
+    const resumen = document.querySelector(".progreso > .resumen");
+    expect(resumen?.textContent).toContain("Has superado 1 de");
+    expect(resumen?.textContent).toContain("ya escribes 2 de 10 teclas sin mirar");
+  });
+
+  it("cuenta las teclas sin mirar y los días, y ya no hay racha que perder", () => {
+    montarCon([sesionPrueba], new Map([["KeyA", dominada]]));
+    const dts = [...document.querySelectorAll(".global dt")].map((dt) => dt.textContent);
+    expect(dts).toEqual(["Teclas que ya escribes sin mirar", "Esta semana", "Días practicados", "Tiempo total"]);
+    expect(document.querySelector(".progreso")?.textContent).not.toMatch(/racha/i);
+  });
+
+  it("la gráfica es una imagen con nombre y descripción, y tiene la tabla al lado", () => {
+    montarCon([
+      sesionPrueba,
+      { ...sesionPrueba, ppm: 30, terminadaEn: "2026-09-03T12:00:00.000Z" },
+    ]);
+    const svg = document.querySelector('svg[role="img"]')!;
+    const ids = svg.getAttribute("aria-labelledby")!.split(" ");
+    expect(document.getElementById(ids[0])?.textContent).toBe("Palabras por minuto, media de cada día");
+    expect(document.getElementById(ids[1])?.textContent).toContain("2 días con práctica");
+    expect(svg.querySelectorAll("rect.barra")).toHaveLength(2);
+    expect(svg.querySelector("rect.barra title")?.textContent).toContain("palabras por minuto");
+    const tabla = document.querySelector("details table");
+    expect(tabla?.querySelectorAll("tbody tr")).toHaveLength(2);
+  });
+
+  it("compara con los propios comienzos cuando hay historia para ello", () => {
+    montarCon([
+      { ...sesionPrueba, pctAcierto: 85, terminadaEn: "2020-01-01T12:00:00.000Z" },
+      { ...sesionPrueba, pctAcierto: 97, terminadaEn: new Date().toISOString() },
+    ]);
+    const frases = document.querySelector(".comparacion")?.textContent ?? "";
+    expect(frases).toContain("del 85% de tus primeros días al 97% de esta semana");
   });
 });

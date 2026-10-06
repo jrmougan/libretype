@@ -8,13 +8,24 @@
   import Perfiles from './lib/components/Perfiles.svelte';
   import Informe from './lib/components/Informe.svelte';
   import { leerPolitica } from './lib/politica';
+  import TamanoTexto from './lib/components/TamanoTexto.svelte';
+  import PruebaColocacion from './lib/components/PruebaColocacion.svelte';
+  import RecordatorioPausa from './lib/components/RecordatorioPausa.svelte';
+  import Temario, { type Modo } from './lib/components/Temario.svelte';
+  import { escucharAtajosTamano } from './lib/tamano';
+  import { avisoQuitados, caracteresQuitados } from './lib/texto-propio';
+  import {
+    explicacionFluidez, generarTanda, ID_FLUIDEZ, ritmoReferencia, valorarTanda,
+  } from './lib/fluidez';
   import { buildIndex, LAYOUTS, obtenerLayout } from './lib/keyboard/layouts';
   import {
     LESSONS,
     normalizarTextoLibre,
     type Lesson,
   } from './lib/lessons';
-  import { generarTextoPractica, semillaNueva, textoDeIntento } from './lib/generador';
+  import {
+    CARACTERES_POR_PALABRA, generarTextoPractica, semillaNueva, textoDeIntento,
+  } from './lib/generador';
   import {
     generarEjercicioRefuerzo, nivelEnsenado, teclasParaReforzar, type EjercicioRefuerzo,
   } from './lib/refuerzo';
@@ -27,13 +38,14 @@
   import {
     abrirAlmacen, mismoAlias, PERFIL_PRINCIPAL, type Almacen, type Perfil,
   } from './lib/storage/almacen';
+  import { recienDominadas } from './lib/storage/comparacion';
   import { leccionesOxidadas } from './lib/storage/repaso';
   import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
   import {
     leccionesSuperadas, nivelDisponible, OBJETIVO_PENDIENTE, objetivoLeccion,
   } from './lib/storage/objetivos';
   import {
-    aplicar, cargar, guardar as guardarPrefs, POR_DEFECTO,
+    aplicar, cargar, guardar as guardarPrefs, MINUTOS_PAUSA, PALABRAS_POR_LONGITUD, palabrasPorTexto, POR_DEFECTO,
     type Preferencias, type Tono,
   } from './lib/preferencias';
   import { QUE_ES_PPM, textosResultado, vozDe } from './lib/voz';
@@ -65,6 +77,8 @@
     costaron: TeclaConFallos[];
     /** Refuerzo de teclas flojas que se ofrece junto al resultado, si hay alguna. */
     refuerzo: EjercicioRefuerzo | null;
+    /** Teclas que este intento ha retirado del teclado en pantalla. */
+    sinMirar?: string[];
   } | null>(null);
   let dialogoResultado = $state<HTMLDialogElement | null>(null);
   let dialogoPanel = $state<HTMLDialogElement | null>(null);
@@ -80,18 +94,39 @@
   let verProgreso = $state(false);
   /**
    * 'perfil' es «¿Quién practica?», al abrir con más de un perfil; 'tono' solo
-   * aparece la primera vez; 'cero' es la colocación de manos; 'continua' y
-   * 'propio' son práctica libre.
+   * aparece la primera vez; 'cero' es la colocación de manos; 'continua',
+   * 'propio' y 'fluidez' son práctica libre.
    */
-  let vista = $state<'perfil' | 'tono' | 'cero' | 'leccion' | 'continua' | 'propio'>('leccion');
+  let vista = $state<
+    'perfil' | 'tono' | 'cero' | 'leccion' | 'continua' | 'propio' | 'fluidez' | 'colocacion'
+  >('leccion');
   /** Perfiles de este equipo. El progreso y el dominio van por perfil; las preferencias, no. */
   let perfiles = $state<Perfil[]>([]);
   let perfilActivo = $state(PERFIL_PRINCIPAL);
   const aliasActivo = $derived(perfiles.find((p) => p.id === perfilActivo)?.alias ?? '');
+  let verTemario = $state(false);
+  /** Cualquiera de los tres paneles superpuestos suspende la captura. */
+  const panelAbierto = $derived(settingsOpen || verProgreso || verTemario);
+  /** Para rehacer la prueba de colocación desde el principio si se vuelve a elegir. */
+  let colocacionKey = $state(0);
+
+  /** Tandas de fluidez (2.5): texto, clave para rehacer el Drill y su meta. */
+  let textoFluidez = $state('');
+  let fluidezKey = $state(0);
+  /** Tu ritmo de antes de esta tanda; se fija al empezarla, no al terminarla. */
+  let ritmoFluidez = $state<number | null>(null);
+  /** La valoración de la tanda recién terminada, contra ese ritmo. */
+  let valoracionFluidez = $state('');
 
   /** Variables para Práctica continua (Issue #19) */
   let nivelPractica = $state(0);
-  let textoContinua = $state(generarTextoPractica(0));
+  /**
+   * Lo que marca el `<select>` de vocabulario, que no se aplica hasta pulsar
+   * el botón: si cambiara el texto con cada flecha, recorrer la lista con el
+   * teclado iría tirando textos (WCAG 3.2.2).
+   */
+  let nivelElegido = $state(0);
+  let textoContinua = $state(textoPractica(0, prefsIniciales.longitudTexto));
   let continuaKey = $state(0);
 
   /** Variables para Texto propio (Issue #19) */
@@ -99,6 +134,8 @@
   let textoPropioActivo = $state('');
   let enEdicionPropio = $state(true);
   let errorTextoPropio = $state('');
+  /** Qué caracteres se quitaron al empezar, para que no parezca un fallo. */
+  let avisoTextoPropio = $state('');
   let propioKey = $state(0);
 
   /**
@@ -250,7 +287,7 @@
     function onWindowBlur(): void {
       // En todos los modos con ejercicio en marcha, no solo en las lecciones:
       // si no, el cronómetro de la práctica libre seguía corriendo (roadmap 0.2).
-      if (hayEjercicio() && !result && !settingsOpen && !verProgreso && ultimasStats.typed > 0) {
+      if (hayEjercicio() && !result && !panelAbierto && ultimasStats.typed > 0) {
         pausado = true;
       }
     }
@@ -258,10 +295,17 @@
     return () => window.removeEventListener('blur', onWindowBlur);
   });
 
-  /** Hay un `Drill` en pantalla: lección, práctica continua o texto propio ya elegido. */
+  /** Hay un `Drill` en pantalla: lección, práctica libre o tanda de fluidez. */
   function hayEjercicio(): boolean {
-    return vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio);
+    return enPractica;
   }
+
+  // Ctrl+ / Ctrl− / Ctrl+0 mueven --ui-scale (ver lib/tamano.ts).
+  onMount(() => escucharAtajosTamano(
+    window,
+    () => prefs.escala,
+    (escala) => { prefs = { ...prefs, escala }; },
+  ));
 
   function elegirTono(tono: Tono): void {
     prefs = { ...prefs, tono };
@@ -290,13 +334,24 @@
    * Prepara el texto del siguiente intento. El primer contacto con una lección
    * usa su texto revisado a mano; después, uno nuevo cada vez.
    */
+  /**
+   * Práctica continua con la longitud elegida. El generador mide en caracteres
+   * y la preferencia en palabras; cada texto lleva semilla nueva.
+   */
+  function textoPractica(nivel: number, longitud: Preferencias['longitudTexto']): string {
+    return generarTextoPractica(nivel, semillaNueva(), palabrasPorTexto(longitud) * CARACTERES_POR_PALABRA);
+  }
+
   function prepararTexto(): void {
     if (leccionPersonalizada) {
       textoLeccion = leccionPersonalizada.text;
       return;
     }
     const yaPracticada = porLeccion.has(LESSONS[lessonIx]?.id ?? '');
-    textoLeccion = textoDeIntento(lessonIx, yaPracticada, semillaNueva());
+    textoLeccion = textoDeIntento(
+      lessonIx, yaPracticada, semillaNueva(),
+      palabrasPorTexto(prefs.longitudTexto) / PALABRAS_POR_LONGITUD.normal,
+    );
   }
 
   async function terminada(stats: Stats): Promise<void> {
@@ -305,7 +360,10 @@
         ? 'practica-continua'
         : vista === 'propio'
           ? 'texto-propio'
-          : lesson.id;
+          : vista === 'fluidez'
+            ? ID_FLUIDEZ
+            : lesson.id;
+    if (vista === 'fluidez') valoracionFluidez = valorarTanda(stats.wpm, stats.accuracy, ritmoFluidez);
 
     const sesion: Sesion = {
       leccion: idLeccion,
@@ -327,7 +385,12 @@
     const refuerzo = teclasParaReforzar(teclas, nivel, layout).length > 0
       ? generarEjercicioRefuerzo(teclas, layout, { nivel })
       : null;
-    result = { stats, record, costaron: teclasConMasFallos(fallosIntento, 3, layout), refuerzo };
+    // Se compara con lo persistido antes de este intento: lo que cambia es lo
+    // que acaba de conseguir, y se cuenta como logro (2.4).
+    result = {
+      stats, record, costaron: teclasConMasFallos(fallosIntento, 3, layout), refuerzo,
+      sinMirar: recienDominadas(teclasBase, teclas, layout),
+    };
     if (prefs.sonido) sonido.fin(prefs.volumen);
 
     // Que falle el guardado no puede tumbar la práctica.
@@ -341,6 +404,23 @@
     } catch (err) {
       errorGuardado = true;
       console.warn('[libretype] no se pudo guardar la sesión:', err);
+    }
+  }
+
+  /**
+   * Un tramo de la prueba de colocación: se guarda como una sesión normal de
+   * su lección, sin diálogo de resultado (la prueba sigue sola al siguiente).
+   */
+  async function guardarTramo(sesion: Sesion): Promise<void> {
+    errorGuardado = false;
+    sesiones = [...sesiones, sesion];
+    try {
+      await almacen?.guardar(sesion);
+      await almacen?.guardarTeclas(teclas);
+      teclasBase = new Map(teclas);
+    } catch (err) {
+      errorGuardado = true;
+      console.warn('[libretype] no se pudo guardar el tramo:', err);
     }
   }
 
@@ -393,6 +473,7 @@
     vista = 'leccion';
     settingsOpen = false;
     verProgreso = false;
+    verTemario = false;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     drill?.restart();
     await tick();
@@ -406,13 +487,15 @@
       teclas = new Map(teclasBase);
     }
     nivelPractica = maxDesbloqueado;
-    textoContinua = generarTextoPractica(nivelPractica);
+    nivelElegido = nivelPractica;
+    textoContinua = textoPractica(nivelPractica, prefs.longitudTexto);
     continuaKey++;
     result = null;
     pausado = false;
     vista = 'continua';
     settingsOpen = false;
     verProgreso = false;
+    verTemario = false;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     await tick();
     drill?.restart();
@@ -425,10 +508,33 @@
       teclas = new Map(teclasBase);
     }
     nivelPractica = Math.min(Math.max(nivel, 0), maxDesbloqueado);
-    textoContinua = generarTextoPractica(nivelPractica);
+    nivelElegido = nivelPractica;
+    textoContinua = textoPractica(nivelPractica, prefs.longitudTexto);
     continuaKey++;
     result = null;
     pausado = false;
+    ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
+    await tick();
+    drill?.restart();
+    drill?.enfocar();
+  }
+
+  /** Empieza o repite una tanda de fluidez con el vocabulario abierto. */
+  async function nuevaFluidez(): Promise<void> {
+    dialogoResultado?.close();
+    dialogoPanel?.close();
+    if (!result) teclas = new Map(teclasBase);
+    textoFluidez = generarTanda(maxDesbloqueado, palabrasPorTexto(prefs.longitudTexto));
+    // La meta es tu ritmo anterior: se toma antes de la tanda, con lo guardado.
+    ritmoFluidez = ritmoReferencia(sesiones);
+    valoracionFluidez = '';
+    fluidezKey++;
+    result = null;
+    pausado = false;
+    vista = 'fluidez';
+    settingsOpen = false;
+    verProgreso = false;
+    verTemario = false;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     await tick();
     drill?.restart();
@@ -445,6 +551,7 @@
     pausado = false;
     settingsOpen = false;
     verProgreso = false;
+    verTemario = false;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     vista = 'propio';
     if (textoPropioActivo && !enEdicionPropio) {
@@ -466,6 +573,7 @@
       return;
     }
     textoPropioActivo = limpio;
+    avisoTextoPropio = avisoQuitados(caracteresQuitados(textoPropio, permitido));
     enEdicionPropio = false;
     pausado = false;
     propioKey++;
@@ -497,17 +605,18 @@
     drill?.enfocar();
   }
 
+  function pausar(): void { pausado = true; }
+
+  function reanudar(): void {
+    pausado = false;
+    tick().then(() => drill?.enfocar());
+  }
+
   function alternarPausa(): void {
     pausado = !pausado;
     if (!pausado) {
       tick().then(() => drill?.enfocar());
     }
-  }
-
-  /** Desde el cartel de pausa del propio ejercicio. */
-  function reanudar(): void {
-    pausado = false;
-    tick().then(() => drill?.enfocar());
   }
 
   async function practicarRefuerzo(ej: EjercicioRefuerzo): Promise<void> {
@@ -538,12 +647,62 @@
     return { destroy: () => dialogo.close() };
   }
 
+  /** Hay un ejercicio en pantalla (no el editor de texto propio ni un menú). */
+  const enPractica = $derived(
+    vista === 'leccion' || vista === 'continua' || vista === 'fluidez'
+      || (vista === 'propio' && !enEdicionPropio),
+  );
+
+  /** Lo que se está practicando, en los términos del temario. */
+  const modoActual = $derived<Modo | null>(vista === 'tono' || vista === 'perfil' ? null : vista);
+
+  /** Qué dice el botón del temario: dónde está ahora la persona. */
+  const rotuloActual = $derived(
+    vista === 'leccion'
+      ? (leccionPersonalizada ? leccionPersonalizada.title : `${lessonIx + 1}. ${lesson.title}`)
+      : vista === 'cero' ? 'Antes de empezar'
+      : vista === 'continua' ? 'Práctica continua'
+      : vista === 'fluidez' ? 'Fluidez'
+      : vista === 'colocacion' ? 'Prueba de colocación'
+      : vista === 'propio' ? 'Texto propio'
+      : '',
+  );
+
+  async function elegirModo(modo: Exclude<Modo, 'leccion'>): Promise<void> {
+    if (modo === 'continua') return activarContinua();
+    if (modo === 'propio') return activarPropio();
+    if (modo === 'fluidez') return nuevaFluidez();
+    if (modo === 'colocacion') {
+      dialogoPanel?.close();
+      if (!result) teclas = new Map(teclasBase);
+      result = null;
+      pausado = false;
+      settingsOpen = false;
+      verProgreso = false;
+      verTemario = false;
+      colocacionKey++;
+      vista = 'colocacion';
+      return;
+    }
+    if (modo === 'cero') {
+      dialogoPanel?.close();
+      if (!result) teclas = new Map(teclasBase);
+      result = null;
+      pausado = false;
+      settingsOpen = false;
+      verProgreso = false;
+      verTemario = false;
+      vista = 'cero';
+    }
+  }
+
   async function cerrarPanel(): Promise<void> {
     dialogoPanel?.close();
     settingsOpen = false;
     verProgreso = false;
+    verTemario = false;
     await tick();
-    if (vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio)) {
+    if (enPractica) {
       drill?.enfocar();
     }
   }
@@ -562,53 +721,33 @@
   <header class="barra">
     <h1>LibreType</h1>
 
-    <label class="selector">
-      <span class="sr-only">Lección o modo de práctica</span>
-      <select
-        disabled={!progresoCargado}
-        value={vista === 'leccion' ? (leccionPersonalizada ? 'refuerzo' : String(lessonIx)) : vista}
-        onchange={(e) => {
-          const v = e.currentTarget.value;
-          if (v === 'cero') vista = 'cero';
-          else if (v === 'continua') activarContinua();
-          else if (v === 'propio') activarPropio();
-          else if (v === 'refuerzo') { /* ya activa */ }
-          else pick(+v);
-        }}
-      >
-        <option value="cero">Antes de empezar · dónde van las manos</option>
-        {#if leccionPersonalizada}
-          <option value="refuerzo">{leccionPersonalizada.title}</option>
-        {/if}
-        {#each LESSONS as l, i (l.id)}
-          {@const marca = porLeccion.get(l.id)}
-          {@const esUltima = l.id === prefs.ultimaLeccion && sesiones.length > 0}
-          <option value={String(i)} disabled={i > maxDesbloqueado}>
-            {i + 1}. {l.title}{i > maxDesbloqueado ? ' · Bloqueada' : superadas.has(l.id) ? ' · Superada' : ' · Disponible'}{marca && marca.mejorPpm > 0 ? ` · ${marca.mejorPpm} ppm` : ''}{esUltima ? ' · Seguías por aquí' : ''}
-          </option>
-        {/each}
-        <option value="continua">Práctica continua · vocabulario acumulado</option>
-        <option value="propio">Texto propio · práctica libre</option>
-      </select>
-    </label>
+    <!-- El temario es un panel, no un <select>: con teclado, el desplegable
+         cambiaba de lección con cada flecha (WCAG 3.2.2). -->
+    <button
+      class="btn-temario"
+      disabled={!progresoCargado}
+      aria-expanded={verTemario}
+      aria-controls="panel-dialogo"
+      onclick={() => { verTemario = !verTemario; settingsOpen = false; verProgreso = false; }}
+    >
+      <span class="eti">Temario</span>
+      {#if rotuloActual}<span class="actual">{rotuloActual}</span>{/if}
+    </button>
 
-    {#if vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio)}
-      {@const textoObjetivo = vista === 'continua' ? textoContinua : vista === 'propio' ? textoPropioActivo : textoLeccion}
+    {#if enPractica}
+      {@const textoObjetivo = vista === 'continua' ? textoContinua : vista === 'propio' ? textoPropioActivo : vista === 'fluidez' ? textoFluidez : textoLeccion}
       <div class="controles-intento">
-        <button
-          type="button"
-          class="btn-intento"
-          onclick={reiniciarLeccion}
-          aria-label="Empezar de nuevo esta lección"
-        >
-          Reiniciar
+        <!-- El único «Empezar de nuevo»: había otro en la cabecera de la
+             lección y un tercero en Texto propio. -->
+        <button type="button" class="btn-intento" onclick={reiniciarLeccion}>
+          Empezar de nuevo
         </button>
         <button
           type="button"
           class="btn-intento"
           onclick={alternarPausa}
-          aria-label={pausado ? 'Reanudar lección' : 'Pausar lección'}
           aria-pressed={pausado}
+          title="También con Esc mientras escribes"
         >
           {pausado ? 'Reanudar' : 'Pausar'}
         </button>
@@ -658,14 +797,14 @@
       <button
         aria-expanded={verProgreso}
         aria-controls="panel-dialogo"
-        onclick={() => { verProgreso = !verProgreso; settingsOpen = false; }}
+        onclick={() => { verProgreso = !verProgreso; settingsOpen = false; verTemario = false; }}
       >
         Progreso
       </button>
       <button
         aria-expanded={settingsOpen}
         aria-controls="panel-dialogo"
-        onclick={() => { settingsOpen = !settingsOpen; verProgreso = false; }}
+        onclick={() => { settingsOpen = !settingsOpen; verProgreso = false; verTemario = false; }}
       >
         Ajustes
       </button>
@@ -684,34 +823,78 @@
     {:else if !progresoCargado}
       <p class="note" role="status">Cargando progreso…</p>
     {:else if vista === 'tono'}
-      <div class="centrado"><SelectorTono onElegir={elegirTono} /></div>
+      <div class="centrado primera">
+        <TamanoTexto id="tamano-inicio" escala={prefs.escala}
+                     onCambiar={(escala) => (prefs = { ...prefs, escala })} />
+        <SelectorTono onElegir={elegirTono} />
+      </div>
     {:else if vista === 'cero'}
       <LeccionCero {layout} onTerminar={() => pick(0)} />
     {:else if vista === 'continua'}
       <div class="barra-practica">
         <label for="selector-nivel-practica">Vocabulario desbloqueado hasta:</label>
-        <select
-          id="selector-nivel-practica"
-          bind:value={nivelPractica}
-          onchange={() => nuevaContinua(nivelPractica)}
-        >
+        <select id="selector-nivel-practica" bind:value={nivelElegido}>
           {#each LESSONS.slice(0, maxDesbloqueado + 1) as l, i}
             <option value={i}>{i + 1}. {l.title}</option>
           {/each}
         </select>
-        <button onclick={() => nuevaContinua(nivelPractica)}>Nuevo texto aleatorio</button>
+        <button onclick={() => nuevaContinua(nivelElegido)}>Nuevo texto</button>
       </div>
       {#key continuaKey}
         <Drill
           bind:this={drill}
           {layout}
-          activo={!settingsOpen && !verProgreso && !result}
+          activo={!panelAbierto && !result}
           {pausado}
+          onPausar={pausar}
           onReanudar={reanudar}
+          ignorarRepeticion={prefs.ignorarRepeticion}
           target={textoContinua}
           titulo="Práctica continua"
           explicacion={`Vocabulario acumulado hasta la lección ${nivelPractica + 1}: ${LESSONS[nivelPractica].title}.`}
           cobertura={pct(LESSONS[nivelPractica].cobertura)}
+          espacioJusto={prefs.escala >= 1.4}
+          movimiento={prefs.movimiento}
+          animaciones={prefs.movimiento === 'reducido' ? 'reducidas' : 'normales'}
+          {dominios}
+          onDone={terminada}
+          onTecla={anotarTecla}
+          onStats={(s) => (ultimasStats = s)}
+        />
+      {/key}
+    {:else if vista === 'colocacion'}
+      {#key colocacionKey}
+        <PruebaColocacion
+          lecciones={LESSONS}
+          desde={maxDesbloqueado}
+          {layout}
+          onTramo={guardarTramo}
+          onSeguir={(i) => void pick(i)}
+          activo={!panelAbierto && !result}
+          {pausado}
+          onPausar={pausar}
+          onReanudar={reanudar}
+          {dominios}
+          espacioJusto={prefs.escala >= 1.4}
+          movimiento={prefs.movimiento}
+          ignorarRepeticion={prefs.ignorarRepeticion}
+          onTecla={anotarTecla}
+          onStats={(s) => (ultimasStats = s)}
+        />
+      {/key}
+    {:else if vista === 'fluidez'}
+      {#key fluidezKey}
+        <Drill
+          bind:this={drill}
+          {layout}
+          activo={!panelAbierto && !result}
+          {pausado}
+          onPausar={pausar}
+          onReanudar={reanudar}
+          ignorarRepeticion={prefs.ignorarRepeticion}
+          target={textoFluidez}
+          titulo="Fluidez"
+          explicacion={explicacionFluidez(ritmoFluidez)}
           espacioJusto={prefs.escala >= 1.4}
           movimiento={prefs.movimiento}
           animaciones={prefs.movimiento === 'reducido' ? 'reducidas' : 'normales'}
@@ -745,15 +928,19 @@
         <div class="barra-practica">
           <span>Practicando tu propio texto ({textoPropioActivo.length} caracteres)</span>
           <button onclick={() => { enEdicionPropio = true; }}>Cambiar texto</button>
-          <button onclick={again}>Reiniciar</button>
+          {#if avisoTextoPropio}
+            <p class="aviso-quitados" role="status">{avisoTextoPropio}</p>
+          {/if}
         </div>
         {#key propioKey}
           <Drill
             bind:this={drill}
             {layout}
-            activo={!settingsOpen && !verProgreso && !result}
+            activo={!panelAbierto && !result}
             {pausado}
+            onPausar={pausar}
             onReanudar={reanudar}
+            ignorarRepeticion={prefs.ignorarRepeticion}
             target={textoPropioActivo}
             titulo="Texto propio"
             explicacion="Práctica libre con texto personalizado."
@@ -773,9 +960,11 @@
         <Drill
           bind:this={drill}
           {layout}
-          activo={!settingsOpen && !verProgreso && !result}
+          activo={!panelAbierto && !result}
           {pausado}
+          onPausar={pausar}
           onReanudar={reanudar}
+          ignorarRepeticion={prefs.ignorarRepeticion}
           target={textoLeccion}
           titulo={lesson.title}
           explicacion={leccionPersonalizada ? lesson.focus : objetivoLeccion(lesson.focus)}
@@ -836,6 +1025,17 @@
             {voz.costaron} {enumerar(result.costaron.map((t) => t.nombre))}. {voz.costaronAnimo}
           </p>
         {/if}
+        {#if vista === 'fluidez' && valoracionFluidez}
+          <p class="note">{valoracionFluidez}</p>
+        {/if}
+        {#if result.sinMirar && result.sinMirar.length > 0}
+          <p class="note logro">
+            {result.sinMirar.length === 1 ? 'Ya escribes sin mirar la tecla' : 'Ya escribes sin mirar las teclas'}
+            {result.sinMirar.map((c) => `«${c}»`).join(', ')}{prefs.ayudaTeclado === 'auto'
+              ? (result.sinMirar.length === 1 ? ': su letra deja el teclado de la pantalla.' : ': sus letras dejan el teclado de la pantalla.')
+              : '.'}
+          </p>
+        {/if}
         {#if errorGuardado}
           <p class="note">No se pudo guardar el resultado. El avance de este intento solo estará disponible durante esta sesión.</p>
         {/if}
@@ -844,6 +1044,8 @@
             <button class="primario" onclick={again}>{voz.repetir}</button>
             {#if vista === 'continua'}
               <button onclick={() => nuevaContinua()}>Nuevo texto</button>
+            {:else if vista === 'fluidez'}
+              <button onclick={() => nuevaFluidez()}>Otra tanda</button>
             {:else if vista === 'propio'}
               <button onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
             {:else if !leccionPersonalizada && lessonIx < maxDesbloqueado}
@@ -853,6 +1055,8 @@
             <button onclick={again}>{voz.repetir}</button>
             {#if vista === 'continua'}
               <button class="primario" onclick={() => nuevaContinua()}>Nuevo texto</button>
+            {:else if vista === 'fluidez'}
+              <button class="primario" onclick={() => nuevaFluidez()}>Otra tanda</button>
             {:else if vista === 'propio'}
               <button class="primario" onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
             {:else if !leccionPersonalizada && lessonIx < maxDesbloqueado}
@@ -873,27 +1077,31 @@
     </dialog>
   {/if}
 
-  {#if settingsOpen || verProgreso}
+  <RecordatorioPausa
+    minutos={prefs.recordatorioPausa}
+    practicando={(enPractica || vista === 'colocacion') && !pausado && !panelAbierto && !result}
+  />
+
+  {#if panelAbierto}
     <dialog
       id="panel-dialogo"
       class="panel"
+      class:ancho={verTemario}
       bind:this={dialogoPanel}
       use:abrirDialogo
-      aria-label={settingsOpen ? 'Ajustes' : 'Progreso'}
+      aria-label={settingsOpen ? 'Ajustes' : verTemario ? 'Temario' : 'Progreso'}
       oncancel={(e) => { e.preventDefault(); cerrarPanel(); }}
     >
       <div class="panel-cab">
-        <h2>{settingsOpen ? 'Ajustes' : voz.progreso}{#if !settingsOpen && perfiles.length > 1} · {aliasActivo}{/if}</h2>
+        <h2>{settingsOpen ? 'Ajustes' : verTemario ? 'Temario' : voz.progreso}{#if verProgreso && !settingsOpen && perfiles.length > 1} · {aliasActivo}{/if}</h2>
         <button onclick={cerrarPanel}>Cerrar</button>
       </div>
 
       <div class="panel-cuerpo">
         {#if settingsOpen}
           <div class="field">
-            <label for="scale">Tamaño del texto: {Math.round(prefs.escala * 100)}%</label>
-            <input id="scale" type="range" min="1" max="2" step="0.1"
-                   value={prefs.escala}
-                   oninput={(e) => (prefs = { ...prefs, escala: +e.currentTarget.value })} />
+            <TamanoTexto escala={prefs.escala} conDeslizador
+                         onCambiar={(escala) => (prefs = { ...prefs, escala })} />
           </div>
 
           <div class="field">
@@ -906,6 +1114,23 @@
                 </button>
               {/each}
             </div>
+          </div>
+
+          <div class="field">
+            <span id="contraste-l">Contraste</span>
+            <div class="group" role="group" aria-labelledby="contraste-l">
+              {#each [['auto', 'Sistema'], ['normal', 'Normal'], ['alto', 'Alto']] as [v, l] (v)}
+                <button aria-pressed={prefs.contraste === v}
+                        onclick={() => (prefs = { ...prefs, contraste: v as Preferencias['contraste'] })}>
+                  {l}
+                </button>
+              {/each}
+            </div>
+            <p class="note">
+              «Alto» pone negro sobre blanco (o al revés con el tema oscuro) y
+              bordes marcados. En «Sistema» se activa solo si tu equipo pide más
+              contraste.
+            </p>
           </div>
 
           <div class="field">
@@ -994,6 +1219,51 @@
           </div>
 
           <div class="field">
+            <span id="longitud-l">Longitud de los textos de práctica</span>
+            <div class="group" role="group" aria-labelledby="longitud-l">
+              {#each [['corto', 'Cortos'], ['normal', 'Normales'], ['largo', 'Largos']] as [v, l] (v)}
+                <button aria-pressed={prefs.longitudTexto === v}
+                        onclick={() => (prefs = { ...prefs, longitudTexto: v as Preferencias['longitudTexto'] })}>
+                  {l}
+                </button>
+              {/each}
+            </div>
+            <p class="note">Cortos si cansa llegar al final; largos para coger ritmo.</p>
+          </div>
+
+          <div class="field">
+            <span id="pausa-l">Recordarme descansar</span>
+            <div class="group" role="group" aria-labelledby="pausa-l">
+              {#each MINUTOS_PAUSA as m (m)}
+                <button aria-pressed={prefs.recordatorioPausa === m}
+                        onclick={() => (prefs = { ...prefs, recordatorioPausa: m })}>
+                  {m === 0 ? 'No' : `Cada ${m} min`}
+                </button>
+              {/each}
+            </div>
+            <p class="note">Un aviso en una esquina, que no interrumpe ni se lleva el foco.</p>
+          </div>
+
+          <div class="field">
+            <span id="temblor-l">Si a veces una tecla se repite sin querer</span>
+            <div class="group" role="group" aria-labelledby="temblor-l">
+              <button aria-pressed={!prefs.ignorarRepeticion}
+                      onclick={() => (prefs = { ...prefs, ignorarRepeticion: false })}>Contar todo</button>
+              <button aria-pressed={prefs.ignorarRepeticion}
+                      onclick={() => (prefs = { ...prefs, ignorarRepeticion: true })}>Ignorar repeticiones muy rápidas</button>
+            </div>
+            <p class="note">
+              Con temblor, el dedo puede rebotar y escribir dos veces la misma
+              letra. Esto ignora la segunda si llega casi a la vez. Para algo más
+              completo, el sistema tiene «teclas de rebote» (o «teclas lentas»):
+              en Windows, en Configuración › Accesibilidad › Teclado; en macOS,
+              en Ajustes del Sistema › Accesibilidad › Teclado; en GNOME, en
+              Configuración › Accesibilidad › Escritura; en KDE, en Preferencias
+              del sistema › Accesibilidad › Filtros de teclado.
+            </p>
+          </div>
+
+          <div class="field">
             <label for="layout">Distribución del teclado</label>
             <select
               id="layout"
@@ -1067,6 +1337,15 @@
               </div>
             </div>
           {/if}
+        {:else if verTemario}
+          <Temario
+            lecciones={LESSONS}
+            {sesiones}
+            modo={leccionPersonalizada ? null : modoActual}
+            leccionActual={lessonIx}
+            onLeccion={(i) => void pick(i)}
+            onModo={(m) => void elegirModo(m)}
+          />
         {:else}
           <Progreso
             {sesiones}
@@ -1075,6 +1354,7 @@
             {errorAlmacen}
             {almacen}
             {teclas}
+            {layout}
             onBorrar={borrarProgreso}
             onExportar={exportarProgreso}
             onImportar={importarProgreso}
@@ -1121,9 +1401,28 @@
     white-space: nowrap;
   }
 
-  /* El selector sustituye a los diez botones que ocupaban dos filas. */
-  .selector { flex: 1 1 260px; min-width: 0; }
-  .selector select, #layout {
+  /* El botón del temario sustituye a los diez botones que ocupaban dos filas
+     y al <select> que vino después. Dice dónde estás sin tener que abrirlo. */
+  .btn-temario {
+    flex: 1 1 260px;
+    min-width: 0;
+    min-height: var(--target-min);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: left;
+    padding: 0 var(--space-3);
+  }
+  .btn-temario .eti { font-weight: 700; }
+  .btn-temario .actual {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--fg-muted);
+  }
+  .btn-temario .actual::before { content: '·'; margin-right: var(--space-2); }
+  #layout {
     width: 100%;
     font: inherit;
     min-height: var(--target-min);
@@ -1186,6 +1485,7 @@
     overflow-y: auto;
   }
   .centrado { align-self: center; justify-self: center; max-width: 72ch; }
+  .primera { display: grid; gap: var(--space-6); }
 
   /* --- Superpuestos ------------------------------------------------------ */
   dialog {
@@ -1219,6 +1519,8 @@
     box-shadow: 0 12px 40px rgb(0 0 0 / 0.28);
   }
   #resultado-desc { display: grid; gap: var(--space-1); }
+  /* El logro se distingue por el texto y el borde, no solo por el color. */
+  .logro { color: var(--fg); border-left: 4px solid var(--ok); padding-left: var(--space-2); }
   .resultado strong { font-size: var(--text-lg); }
   .resultado .animo { color: var(--fg-muted); }
   .botones { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
@@ -1247,6 +1549,8 @@
     border-left: 1px solid var(--border);
     box-shadow: -12px 0 40px rgb(0 0 0 / 0.22);
   }
+  /* El temario necesita más ancho para que las tarjetas vayan de dos en dos. */
+  .panel.ancho { width: min(46rem, 100%); }
   .panel-cab {
     display: flex; align-items: center; justify-content: space-between;
     gap: var(--space-3);
@@ -1269,7 +1573,6 @@
     background: var(--accent); color: var(--accent-fg); border-color: var(--accent);
   }
   .note { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
-  input[type='range'] { min-height: var(--target-min); }
 
   /* Pantallas bajas: la barra se aprieta para dejarle sitio al teclado. */
   @media (max-height: 620px) {
@@ -1298,6 +1601,15 @@
   }
   .barra-practica button {
     min-height: var(--target-min);
+  }
+  .aviso-quitados {
+    flex-basis: 100%;
+    margin: 0;
+    padding: var(--space-1) var(--space-3);
+    background: var(--pending-bg);
+    color: var(--pending);
+    border-left: 4px solid var(--pending);
+    border-radius: 0 var(--radius) var(--radius) 0;
   }
   .editor-propio {
     display: grid;

@@ -51,11 +51,23 @@ export interface ResumenDia {
   pctMedio: number;
 }
 
+/**
+ * Constancia contada en positivo.
+ *
+ * Aquí había una racha que volvía a 0 tras un día sin practicar. Es la
+ * mecánica de aversión a la pérdida de las apps de idiomas, y en este público
+ * reprende con un número: quien se pierde un día por ir al médico encuentra un
+ * cero esperándole. Se cambió por dos cifras que no castigan:
+ *
+ * - `diasPracticados`: el total de días con alguna sesión. Nunca baja.
+ * - `diasEstaSemana`: días practicados en la semana en curso, de lunes a
+ *   domingo. Empieza cada lunes en blanco para todo el mundo, no por haber
+ *   fallado un día.
+ */
 export interface EvolucionTemporal {
   dias: ResumenDia[];
   diasPracticados: number;
-  rachaActual: number;
-  rachaMax: number;
+  diasEstaSemana: number;
 }
 
 /**
@@ -133,14 +145,16 @@ function diasEntre(fechaA: string, fechaB: string): number {
 }
 
 /**
- * Agrega las sesiones por fecha, calculando días practicados, evolución y rachas.
+ * Agrega las sesiones por fecha: evolución por día, total de días practicados
+ * y días de la semana en curso. `hoyISO` existe para poder probar el paso del
+ * tiempo.
  */
 export function resumirEvolucion(
   sesiones: readonly Sesion[],
   hoyISO?: string,
 ): EvolucionTemporal {
   if (sesiones.length === 0) {
-    return { dias: [], diasPracticados: 0, rachaActual: 0, rachaMax: 0 };
+    return { dias: [], diasPracticados: 0, diasEstaSemana: 0 };
   }
 
   const mapaDias = new Map<string, {
@@ -187,34 +201,26 @@ export function resumirEvolucion(
     };
   });
 
-  let rachaMax = 1;
-  let rachaAcum = 1;
-
-  for (let i = 1; i < fechasOrdenadas.length; i++) {
-    const diff = diasEntre(fechasOrdenadas[i - 1], fechasOrdenadas[i]);
-    if (diff === 1) {
-      rachaAcum++;
-      if (rachaAcum > rachaMax) rachaMax = rachaAcum;
-    } else if (diff > 1) {
-      rachaAcum = 1;
-    }
-  }
-
   const hoyStr = (hoyISO ?? new Date().toISOString()).slice(0, 10);
-  const ultimaFecha = fechasOrdenadas[fechasOrdenadas.length - 1];
-  const diffHoy = diasEntre(ultimaFecha, hoyStr);
-
-  let rachaActual = 0;
-  if (diffHoy === 0 || diffHoy === 1) {
-    rachaActual = rachaAcum;
-  }
+  const lunes = lunesDe(hoyStr);
+  const diasEstaSemana = fechasOrdenadas.filter((f) => {
+    const desdeLunes = diasEntre(lunes, f);
+    return desdeLunes >= 0 && desdeLunes < 7;
+  }).length;
 
   return {
     dias,
     diasPracticados: dias.length,
-    rachaActual,
-    rachaMax,
+    diasEstaSemana,
   };
+}
+
+/** El lunes de la semana de una fecha AAAA-MM-DD, en el mismo formato. */
+export function lunesDe(fecha: string): string {
+  const t = Date.UTC(+fecha.slice(0, 4), +fecha.slice(5, 7) - 1, +fecha.slice(8, 10));
+  // getUTCDay: 0 es domingo. La semana española empieza en lunes.
+  const desdeLunes = (new Date(t).getUTCDay() + 6) % 7;
+  return new Date(t - desdeLunes * 86400000).toISOString().slice(0, 10);
 }
 
 /** "12 min", "1 h 05 min". Para el panel de progreso. */

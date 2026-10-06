@@ -23,10 +23,11 @@ async function montar(prefs: Partial<Preferencias> = {}, sesiones: unknown[] = [
     close: { configurable: true, value: vi.fn(function (this: HTMLDialogElement) { this.open = false; }) },
   });
   app = mount(App, { target: document.body });
-  await vi.waitFor(() => expect(document.querySelector('header select')?.hasAttribute('disabled')).toBe(false));
-  const selector = document.querySelector<HTMLSelectElement>('header select')!;
-  selector.value = '0';
-  selector.dispatchEvent(new Event('change', { bubbles: true }));
+  await vi.waitFor(() => expect(document.querySelector('button.btn-temario')?.hasAttribute('disabled')).toBe(false));
+  // La lección se elige en el panel del temario, como haría la persona.
+  document.querySelector<HTMLButtonElement>('button.btn-temario')!.click();
+  await tick();
+  document.querySelector<HTMLButtonElement>('#panel-dialogo [data-leccion="0"]')!.click();
   await tick();
 }
 
@@ -80,7 +81,7 @@ describe('texto nuevo en cada intento (1.1)', () => {
     await montar({}, [sesion('reposo')]);
     const antes = textoEnPantalla();
     await escribir('la');
-    boton('Reiniciar')!.click();
+    boton('Empezar de nuevo')!.click();
     await tick();
     expect(campo().value).toBe('');
     expect(textoEnPantalla()).not.toBe(antes);

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  azar, construirTexto, formatearFrase, generarTextoLeccion, generarTextoPractica,
+  azar, CARACTERES_POR_PALABRA, construirTexto, formatearFrase, generarTextoLeccion, generarTextoPractica,
   piezasHasta, textoDeIntento,
 } from './generador';
 import { alfabetoHasta, LESSONS } from './lessons';
@@ -174,5 +174,25 @@ describe('frases cortas y práctica continua', () => {
   it('con piezas vacías no se cuelga', () => {
     expect(construirTexto([], 1, { largo: 50 })).toBe('');
     expect(construirTexto(['la'], 1, { largo: 20 }).length).toBeGreaterThan(0);
+  });
+});
+
+describe('longitud de los textos (preferencia de la fase 2)', () => {
+  it('la escala alarga los intentos generados de una lección, sin bajar del mínimo', () => {
+    const indice = 3;
+    const corto = generarTextoLeccion(indice, 7, 0.5).length;
+    const normal = generarTextoLeccion(indice, 7).length;
+    const largo = generarTextoLeccion(indice, 7, 2).length;
+    // Por debajo de 50 caracteres no caben siempre todas las teclas que se
+    // estrenan, así que «corto» acorta poco una lección que ya es corta.
+    expect(corto).toBeLessThanOrEqual(normal);
+    expect(corto).toBeGreaterThanOrEqual(50);
+    expect(largo).toBeGreaterThan(normal);
+  });
+
+  it('la práctica continua mide en caracteres y cambia con la semilla', () => {
+    const largo = 40 * CARACTERES_POR_PALABRA;
+    expect(generarTextoPractica(4, 1, largo).length).toBeGreaterThanOrEqual(largo);
+    expect(generarTextoPractica(4, 1, largo)).not.toBe(generarTextoPractica(4, 2, largo));
   });
 });

@@ -22,11 +22,27 @@ beforeEach(async () => {
   });
   app = mount(App, { target: document.body });
   await vi.waitFor(() => expect(document.querySelector('.cero')).not.toBeNull());
-  const selector = document.querySelector('select')!;
-  selector.value = '0';
-  selector.dispatchEvent(new Event('change', { bubbles: true }));
-  await tick();
+  await elegirLeccion(0);
 });
+
+/** Abre el temario de la barra, como haría alguien con el ratón o el teclado. */
+async function abrirTemario(): Promise<void> {
+  const boton = document.querySelector<HTMLButtonElement>('button.btn-temario')!;
+  if (boton.getAttribute('aria-expanded') !== 'true') boton.click();
+  await tick();
+}
+
+async function elegirLeccion(i: number): Promise<void> {
+  await abrirTemario();
+  document.querySelector<HTMLButtonElement>(`#panel-dialogo [data-leccion="${i}"]`)!.click();
+  await tick();
+}
+
+async function elegirModo(modo: string): Promise<void> {
+  await abrirTemario();
+  document.querySelector<HTMLButtonElement>(`#panel-dialogo [data-modo="${modo}"]`)!.click();
+  await tick();
+}
 
 afterEach(async () => {
   await unmount(app);
@@ -181,30 +197,21 @@ describe('captura y paneles', () => {
     await tick();
 
     // Vuelve a empezar la lección disponible sin haber completado el intento.
-    const selector = document.querySelector('select')!;
-    selector.value = '0';
-    selector.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
+    await elegirLeccion(0);
 
     // La lección se ha reiniciado sin persistir intentos incompletos
     expect(campo().value).toBe('');
     expect(document.querySelector('h2')?.textContent).toBe(LESSONS[0].title);
   });
   it('permite acceder al modo de práctica continua (Issue #19)', async () => {
-    const selector = document.querySelector('select')!;
-    selector.value = 'continua';
-    selector.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
+    await elegirModo('continua');
 
     expect(document.querySelector('h2')?.textContent).toBe('Práctica continua');
     expect(campo()).not.toBeNull();
   });
 
   it('permite introducir texto propio para práctica libre (Issue #19)', async () => {
-    const selector = document.querySelector('select')!;
-    selector.value = 'propio';
-    selector.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
+    await elegirModo('propio');
 
     expect(document.querySelector('h2')?.textContent).toContain('texto propio');
     const inputTexto = document.querySelector('textarea.input-texto-propio') as HTMLTextAreaElement;
@@ -237,11 +244,14 @@ describe('captura y paneles', () => {
 });
 
 describe('experiencia de producto (#21, #23, #24)', () => {
-  it('impide saltarse una lección bloqueada incluso mediante un cambio programático', async () => {
-    const selector = document.querySelector('select')!;
-    expect(selector.querySelector<HTMLOptionElement>('option[value="1"]')?.disabled).toBe(true);
-    selector.value = '1';
-    selector.dispatchEvent(new Event('change', { bubbles: true }));
+  it('impide saltarse una lección bloqueada aunque se pulse su tarjeta', async () => {
+    await abrirTemario();
+    const cerrada = document.querySelector<HTMLButtonElement>('[data-leccion="1"]')!;
+    expect(cerrada.getAttribute('aria-disabled')).toBe('true');
+    cerrada.click();
+    await tick();
+    expect(document.querySelector('#panel-dialogo')).not.toBeNull();
+    boton('Cerrar').click();
     await tick();
     expect(document.querySelector('h2')?.textContent).toBe(LESSONS[0].title);
   });
@@ -253,17 +263,17 @@ describe('experiencia de producto (#21, #23, #24)', () => {
     guardar({ ...POR_DEFECTO, tono: 'sobrio', ultimaLeccion: LESSONS[5].id });
     app = mount(App, { target: document.body });
     await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title));
-    expect(document.querySelector<HTMLOptionElement>('header option[value="1"]')?.disabled).toBe(false);
-    expect(document.querySelector<HTMLOptionElement>('header option[value="2"]')?.disabled).toBe(true);
+    await abrirTemario();
+    expect(document.querySelector('[data-leccion="1"]')?.hasAttribute('aria-disabled')).toBe(false);
+    expect(document.querySelector('[data-leccion="2"]')?.getAttribute('aria-disabled')).toBe('true');
   });
 
   it('actualiza la ultimaLeccion en preferencias al cambiar de lección (#21)', async () => {
     completar();
     await tick();
-    const selector = document.querySelector('select')!;
-    selector.value = '1';
-    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('dialog')!.dispatchEvent(new Event('cancel', { cancelable: true }));
     await tick();
+    await elegirLeccion(1);
 
     const guardado = JSON.parse(localStorage.getItem('libretype.preferencias')!);
     expect(guardado.ultimaLeccion).toBe(LESSONS[1].id);
@@ -286,7 +296,10 @@ describe('experiencia de producto (#21, #23, #24)', () => {
     const btnPrimario = dialogo?.querySelector('button.primario');
     expect(btnPrimario?.textContent).toContain('Repetir');
     expect(boton('Siguiente lección')).toBeUndefined();
-    expect(document.querySelector<HTMLOptionElement>('header option[value="1"]')?.disabled).toBe(true);
+    boton('Repetir').click();
+    await tick();
+    await abrirTemario();
+    expect(document.querySelector('[data-leccion="1"]')?.getAttribute('aria-disabled')).toBe('true');
   });
 
   it('criterio de superación dinámico: accuracy >= 90% hace que Siguiente sea primario (#23)', async () => {
@@ -305,7 +318,7 @@ describe('experiencia de producto (#21, #23, #24)', () => {
     flushSync();
     expect(campo().value).toBe('la');
 
-    boton('Reiniciar').click();
+    boton('Empezar de nuevo').click();
     await tick();
 
     expect(campo().value).toBe('');
@@ -373,10 +386,7 @@ describe('el objetivo de precisión nunca es un número aislado (#54)', () => {
 });
 
 async function irAModo(modo: 'continua' | 'propio'): Promise<void> {
-  const selector = document.querySelector('select')!;
-  selector.value = modo;
-  selector.dispatchEvent(new Event('change', { bubbles: true }));
-  await tick();
+  await elegirModo(modo);
   if (modo === 'propio') {
     const entrada = document.querySelector<HTMLTextAreaElement>('textarea.input-texto-propio')!;
     entrada.value = 'hola mundo';
@@ -392,10 +402,7 @@ describe('el titular del resultado cuenta lo que ha pasado (roadmap 0.1)', () =>
     guardar({ ...POR_DEFECTO, tono: 'juego' });
     app = mount(App, { target: document.body });
     await vi.waitFor(() => expect(document.querySelector('.cero')).not.toBeNull());
-    const selector = document.querySelector('select')!;
-    selector.value = '0';
-    selector.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
+    await elegirLeccion(0);
   }
 
   it('con el tono lúdico no dice «superada» si el intento no llega al objetivo', async () => {
@@ -459,5 +466,122 @@ describe('la pausa funciona en todos los modos (roadmap 0.2)', () => {
     await irAModo('continua');
     expect(document.querySelector('.pausa-cartel')).toBeNull();
     expect(campo().disabled).toBe(false);
+  });
+});
+
+describe('temario y selectores operables con teclado (0.3)', () => {
+  it('el botón del temario dice dónde estás y abre el panel compartido', async () => {
+    const temario = document.querySelector<HTMLButtonElement>('button.btn-temario')!;
+    expect(temario.textContent).toContain('Temario');
+    expect(temario.textContent).toContain(`1. ${LESSONS[0].title}`);
+    expect(temario.getAttribute('aria-controls')).toBe('panel-dialogo');
+    await abrirTemario();
+    expect(temario.getAttribute('aria-expanded')).toBe('true');
+    expect(document.querySelector('#panel-dialogo')?.getAttribute('aria-label')).toBe('Temario');
+    expect(campo().disabled).toBe(true);
+  });
+
+  it('cambiar el vocabulario de la práctica continua no tira el texto hasta pulsar el botón', async () => {
+    await elegirModo('continua');
+    const antes = document.querySelector('.drill .text')!.textContent;
+    const selector = document.querySelector<HTMLSelectElement>('#selector-nivel-practica')!;
+    // Lo que hace una flecha en un <select> cerrado en Chromium/WebView2.
+    selector.value = '0';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    selector.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    expect(document.querySelector('.drill .text')!.textContent).toBe(antes);
+    boton('Nuevo texto').click();
+    await tick();
+    expect(document.querySelector<HTMLSelectElement>('#selector-nivel-practica')!.value).toBe('0');
+  });
+});
+
+describe('pausa y un solo «Empezar de nuevo» (2.6)', () => {
+  it.each(['leccion', 'continua'])('Esc en el campo pausa también en %s', async (modo) => {
+    if (modo === 'continua') await elegirModo('continua');
+    campo().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await tick();
+    expect(document.querySelector('.pausa-cartel')).not.toBeNull();
+    expect(campo().disabled).toBe(true);
+    expect(boton('Reanudar')).toBeDefined();
+    document.querySelector<HTMLButtonElement>('.btn-reanudar')!.click();
+    await tick();
+    expect(campo().disabled).toBe(false);
+  });
+
+  it('solo hay un «Empezar de nuevo» en pantalla, también en Texto propio', async () => {
+    const cuantos = () => [...document.querySelectorAll('button')]
+      .filter((b) => /empezar de nuevo|reiniciar/i.test(b.textContent ?? '')).length;
+    expect(cuantos()).toBe(1);
+    await elegirModo('propio');
+    const entrada = document.querySelector<HTMLTextAreaElement>('textarea.input-texto-propio')!;
+    entrada.value = '“Hola” — mundo';
+    entrada.dispatchEvent(new Event('input', { bubbles: true }));
+    boton('Empezar a teclear').click();
+    await tick();
+    expect(cuantos()).toBe(1);
+    // Y avisa de lo que quitó, en vez de comérselo en silencio.
+    const aviso = document.querySelector('.aviso-quitados');
+    expect(aviso?.getAttribute('role')).toBe('status');
+    expect(aviso?.textContent).toContain('«“» «”» «—»');
+  });
+});
+
+describe('fase de fluidez (2.5)', () => {
+  it('se llega desde el temario y compara la tanda con el propio ritmo', async () => {
+    await elegirModo('fluidez');
+    expect(document.querySelector('h2')?.textContent).toBe('Fluidez');
+    expect(document.querySelector('button.btn-temario')?.textContent).toContain('Fluidez');
+    const texto = [...document.querySelectorAll('.drill .ch')].map((c) => c.textContent).join('').replace(/ /g, ' ');
+    campo().value = texto;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    const dialogo = document.querySelector('dialog#dialogo-resultado')!;
+    expect(dialogo.textContent).toContain('Primera tanda limpia');
+    await vi.waitFor(() => expect(localStorage.getItem('libretype.sesiones')).toContain('"fluidez"'));
+
+    // La siguiente tanda ya tiene ritmo de referencia: el de la anterior.
+    boton('Otra tanda').click();
+    await tick();
+    expect(document.querySelector('p.focus')?.textContent ?? '').toMatch(/ritmo habitual|primera tanda/i);
+    expect(document.querySelector('#dialogo-resultado')).toBeNull();
+    expect(document.activeElement).toBe(campo());
+  });
+});
+
+describe('prueba de colocación (2.9)', () => {
+  function escribirTramo(conFallos = false): void {
+    const texto = [...document.querySelectorAll('.drill .ch')].map((c) => c.textContent).join('').replace(/ /g, ' ');
+    campo().value = conFallos ? [...texto].map((c, i) => (i % 2 ? 'x' : c)).join('') : texto;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+  }
+
+  it('se elige desde el temario, abre lo demostrado y se para sin reproches', async () => {
+    await elegirModo('colocacion');
+    boton('Empezar la prueba').click();
+    await tick();
+    expect(document.querySelector('h2')?.textContent).toContain(LESSONS[0].title);
+
+    escribirTramo();
+    await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toContain(LESSONS[1].title));
+    // Sin diálogo de resultado entre tramos: la prueba sigue sola.
+    expect(document.querySelector('#dialogo-resultado')).toBeNull();
+
+    escribirTramo(true);
+    await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toBe('Prueba terminada'));
+    const fin = document.querySelector('main')!.textContent!;
+    expect(fin).toContain('Se ha abierto una lección');
+    expect(fin).not.toMatch(/\d+\s*%/);
+
+    // El desbloqueo es el de siempre: una sesión normal de la lección.
+    const guardadas = JSON.parse(localStorage.getItem('libretype.sesiones')!);
+    expect(guardadas.map((s: { leccion: string }) => s.leccion)).toEqual([LESSONS[0].id, LESSONS[1].id]);
+
+    boton(`Ir a «${LESSONS[1].title}»`).click();
+    await tick();
+    expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
   });
 });

@@ -13,6 +13,8 @@
   import { TypingEngine, computeStats, diffAgainstTarget, UMBRAL_PAUSA_MS, type CharState, type Stats }
     from '../keyboard/engine';
   import { MS_RAPIDO, type MapaDominio } from '../keyboard/dominio';
+  import { crearFiltroTemblor } from '../keyboard/temblor';
+  import { desplazamientoLectura, trocearEnPalabras } from '../keyboard/lectura';
   import { buildIndex, FINGER_NAMES, type KeyStep, type Layout }
     from '../keyboard/layouts';
 
@@ -51,16 +53,30 @@
     pausado?: boolean;
     /** Callback para reanudar desde el cartel de pausa. */
     onReanudar?: () => void;
+    /**
+     * Esc desde el propio campo. Se escucha en el `<textarea>` y no en la
+     * ventana: un manejador global de teclas es justo lo que descartaron los
+     * spikes, y además así Esc solo pausa cuando se está escribiendo.
+     */
+    onPausar?: () => void;
+    /**
+     * Ignorar el rebote de una tecla por temblor. Actúa antes de que el
+     * carácter llegue al campo, así que el motor no se entera (ver
+     * `keyboard/temblor.ts`, que explica dónde y por qué ahí).
+     */
+    ignorarRepeticion?: boolean;
   }
 
   let {
     layout, target, activo = true, onDone, onTecla, dominios, onStats,
     titulo = '', explicacion = '', cobertura = '', espacioJusto = false,
-    movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar,
+    movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar, onPausar,
+    ignorarRepeticion = false,
   }: Props = $props();
 
   /** Para enlazar el campo con la descripción que lleva el texto entero. */
   const uid = $props.id();
+  const filtroTemblor = crearFiltroTemblor();
 
   const sinAnimaciones = $derived(movimiento === 'reducido' || animaciones === 'reducidas');
 
@@ -87,6 +103,9 @@
   });
 
   const index = $derived(buildIndex(layout));
+  /** El texto por palabras, para que el salto de línea no parta ninguna. */
+  const palabras = $derived(trocearEnPalabras(target));
+  let caja = $state<HTMLElement | null>(null);
   const states = $derived<CharState[]>(diffAgainstTarget(typed, target));
   const stampsEfectivos = $derived(
     tiempoDescontado > 0
@@ -127,6 +146,24 @@
   );
 
   $effect(() => { onStats?.(stats); });
+
+  // Al avanzar, la línea del cursor sube a lo alto de la caja: lo que se ve
+  // debajo es lo que viene, que es lo que hay que poder leer por delante. Sin
+  // esto, al 200% el cursor se salía por abajo (ver keyboard/lectura.ts).
+  $effect(() => {
+    void typed.length;
+    if (!caja) return;
+    const primero = caja.querySelector<HTMLElement>('.ch');
+    const cursor = caja.querySelector<HTMLElement>('.ch.current');
+    if (!primero || !cursor) return;
+    const nuevo = desplazamientoLectura({
+      scrollTop: caja.scrollTop,
+      primeroTop: primero.getBoundingClientRect().top,
+      cursorTop: cursor.getBoundingClientRect().top,
+      cabeEntero: caja.scrollHeight <= caja.clientHeight,
+    });
+    if (nuevo !== null) caja.scrollTop = nuevo;
+  });
 
   const lastWrong = $derived(
     typed.length > 0 && typed[typed.length - 1] !== target[typed.length - 1],
@@ -259,10 +296,11 @@
     avisado = false;
     tiempoDescontado = 0;
     pausadoEn = null;
+    filtroTemblor.olvidar();
   }
 </script>
 
-<div class="drill" class:sin-animaciones={sinAnimaciones}>
+<div class="drill" class:sin-animaciones={sinAnimaciones} class:justo={espacioJusto}>
   <header class="cab">
     <h2>{titulo}</h2>
     {#if cobertura}
@@ -278,9 +316,7 @@
       </button>
     {/if}
     <button onclick={enfocar} disabled={!activo || pausado}>Seguir escribiendo</button>
-    <button type="button" class="reiniciar" onclick={restart} aria-label="Empezar de nuevo esta lección">
-      Empezar de nuevo
-    </button>
+    <!-- «Empezar de nuevo» vive solo en la barra de arriba: había tres. -->
   </header>
 
   {#if explicacionAbierta && explicacion}
@@ -303,7 +339,7 @@
     {/if}
     <!-- La etiqueta devuelve el foco al pulsar el texto sin interceptar teclas.
          El campo real conserva la composición del método de entrada del sistema. -->
-    <label class="text">
+    <label class="text" bind:this={caja}>
       <textarea
         bind:this={field}
         class="capture"
@@ -314,15 +350,32 @@
         aria-label={titulo ? `Campo de práctica: ${titulo}` : 'Campo de práctica'}
         aria-describedby="{uid}-texto"
         onpaste={(e) => e.preventDefault()}
+        onkeydown={(e) => {
+          if (e.key !== 'Escape' || !onPausar) return;
+          // A mitad de un acento, Esc es del método de entrada: cancela la
+          // composición. Robárselo dejaría el ´ colgado en el campo. 229 es el
+          // keyCode que dan algunos motores mientras compone el IME.
+          if (e.isComposing || composing || e.keyCode === 229) return;
+          e.preventDefault();
+          onPausar();
+        }}
         onbeforeinput={(e) => {
-          if ((e as InputEvent).inputType === 'insertFromPaste') {
+          const ev = e as InputEvent;
+          if (ev.inputType === 'insertFromPaste') {
+            e.preventDefault();
+            return;
+          }
+          // Capa aparte del motor: si se cancela aquí, el carácter no llega al
+          // campo y el canal B (que lee el valor) no tiene nada que deshacer.
+          if (ignorarRepeticion && filtroTemblor.debeIgnorar(ev, performance.now())) {
             e.preventDefault();
           }
         }}
       ></textarea>
       <span aria-hidden="true">
-        {#each [...target] as ch, i (i)}
-          <span class="ch {states[i]}">{ch === ' ' ? '\u00a0' : ch}</span>
+        {#each palabras as p (p.inicio)}
+          <span class="palabra">{#each [...p.texto] as ch, k (k)}<span
+            class="ch {states[p.inicio + k]}">{ch === ' ' ? '\u00a0' : ch}</span>{/each}</span><wbr />
         {/each}
       </span>
     </label>
@@ -394,6 +447,18 @@
     min-height: 0;
   }
 
+  /* Con la letra grande, el suelo de la caja del texto pasa de una línea a
+     dos (sin pasar del 30vh de siempre): la del cursor y la siguiente. Con
+     una sola, al llegar al final de una línea no se ve nada de lo que viene, y
+     leer por delante es como compensan los mecanógrafos mayores (2.8). El
+     interlineado baja algo para que las dos líneas quepan en ese 30vh. */
+  .drill.justo {
+    grid-template-rows: auto auto
+      minmax(min(calc(2 * 1.5 * var(--text-drill) + 2 * var(--space-3) + 2px), 30vh), auto)
+      auto minmax(min(34vh, 230px), 1fr);
+  }
+  .justo .text { line-height: 1.5; }
+
   .capture {
     position: absolute;
     width: 1px; height: 1px;
@@ -445,12 +510,16 @@
     border-radius: var(--radius);
     padding: var(--space-3) var(--space-4);
     margin: 0;
-    word-break: break-word;
+    overflow-wrap: anywhere;
     /* Si el texto es largo o la letra muy grande, se desplaza aquí dentro y no
        arrastra a la página entera. */
     overflow-y: auto;
     max-height: 30vh;
   }
+
+  /* Cada palabra es un bloque que no se parte, salvo que no quepa entera en
+     una línea (overflow-wrap). Entre palabras, <wbr> deja saltar de línea. */
+  .palabra { display: inline-block; }
 
   .text:has(.capture:focus-visible) {
     outline: 3px solid var(--accent);

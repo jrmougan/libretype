@@ -10,8 +10,12 @@
     normalizarTextoLibre,
     type Lesson,
   } from './lib/lessons';
-  import { generarTextoPractica } from './lib/generador';
-  import type { EjercicioRefuerzo } from './lib/refuerzo';
+  import { generarTextoPractica, semillaNueva, textoDeIntento } from './lib/generador';
+  import {
+    generarEjercicioRefuerzo, nivelEnsenado, teclasParaReforzar, type EjercicioRefuerzo,
+  } from './lib/refuerzo';
+  import { anotarFallo, enumerar, teclasConMasFallos, type TeclaConFallos } from './lib/fallos';
+  import { crearSonido } from './lib/sonido';
   import type { Stats } from './lib/keyboard/engine';
   import {
     contarDominadas, mapaDeDominio, registrar, type EstadoTecla,
@@ -26,7 +30,7 @@
     aplicar, cargar, guardar as guardarPrefs, POR_DEFECTO,
     type Preferencias, type Tono,
   } from './lib/preferencias';
-  import { PRECISION_ALTA, vozDe } from './lib/voz';
+  import { PRECISION_ALTA, QUE_ES_PPM, vozDe } from './lib/voz';
   import {
     crearActualizador, detectarEntorno,
     type Actualizador, type EstadoActualizacion,
@@ -48,7 +52,14 @@
   let leccionPersonalizada = $state<Lesson | null>(null);
   let pausado = $state(false);
   let drill = $state<ReturnType<typeof Drill> | null>(null);
-  let result = $state<{ stats: Stats; record: boolean } | null>(null);
+  let result = $state<{
+    stats: Stats;
+    record: boolean;
+    /** Las teclas con más fallos de este intento, para decirlo al terminar. */
+    costaron: TeclaConFallos[];
+    /** Refuerzo de teclas flojas que se ofrece junto al resultado, si hay alguna. */
+    refuerzo: EjercicioRefuerzo | null;
+  } | null>(null);
   let dialogoResultado = $state<HTMLDialogElement | null>(null);
   let dialogoPanel = $state<HTMLDialogElement | null>(null);
   /** Métricas en vivo, que ahora viven en la barra de arriba. */
@@ -75,6 +86,15 @@
   let enEdicionPropio = $state(true);
   let errorTextoPropio = $state('');
   let propioKey = $state(0);
+
+  /**
+   * Texto del intento en curso. Cambia en cada intento (`generador.ts`); el
+   * identificador de la lección no, que es lo que guardan récords y repaso.
+   */
+  let textoLeccion = $state(LESSONS[0].text);
+  /** Fallos por tecla del intento en curso; se vacía al empezar otro. */
+  let fallosIntento = $state<Map<string, number>>(new Map());
+  const sonido = crearSonido();
 
   /** Intentos acumulados por tecla, que deciden cuánta ayuda visual retirar. */
   let teclas = $state<Map<string, EstadoTecla>>(new Map());
@@ -133,6 +153,7 @@
       const ix = LESSONS.findIndex((l) => l.id === prefs.ultimaLeccion);
       if (ix >= 0) lessonIx = Math.min(ix, nivelDisponible(sesiones));
     }
+    prepararTexto();
     progresoCargado = true;
 
   });
@@ -172,6 +193,30 @@
     const m = new Map(teclas);
     m.set(code, registrar(m.get(code), acierto, ms));
     teclas = m;
+    fallosIntento = anotarFallo(fallosIntento, code, acierto);
+    if (prefs.sonido) {
+      if (acierto) sonido.acierto(prefs.volumen);
+      else sonido.fallo(prefs.volumen);
+    }
+  }
+
+  // Un intento empieza con el campo vacío, venga de donde venga el reinicio
+  // (barra, diálogo, botón del propio ejercicio): ahí se vacía la cuenta.
+  $effect(() => {
+    if (ultimasStats.typed === 0) fallosIntento = new Map();
+  });
+
+  /**
+   * Prepara el texto del siguiente intento. El primer contacto con una lección
+   * usa su texto revisado a mano; después, uno nuevo cada vez.
+   */
+  function prepararTexto(): void {
+    if (leccionPersonalizada) {
+      textoLeccion = leccionPersonalizada.text;
+      return;
+    }
+    const yaPracticada = porLeccion.has(LESSONS[lessonIx]?.id ?? '');
+    textoLeccion = textoDeIntento(lessonIx, yaPracticada, semillaNueva());
   }
 
   async function terminada(stats: Stats): Promise<void> {
@@ -196,7 +241,14 @@
     const record = esRecord(porLeccion.get(idLeccion), sesion);
     errorGuardado = false;
     sesiones = [...sesiones, sesion];
-    result = { stats, record };
+    // Solo se ofrece reforzar con teclas enseñadas, y solo si alguna cuesta de
+    // verdad (con intentos suficientes para saberlo).
+    const nivel = nivelEnsenado(sesiones);
+    const refuerzo = teclasParaReforzar(teclas, nivel, layout).length > 0
+      ? generarEjercicioRefuerzo(teclas, layout, { nivel })
+      : null;
+    result = { stats, record, costaron: teclasConMasFallos(fallosIntento, 3, layout), refuerzo };
+    if (prefs.sonido) sonido.fin(prefs.volumen);
 
     // Que falle el guardado no puede tumbar la práctica.
     // El dominio por tecla se persiste al terminar la lección, no en cada
@@ -254,6 +306,7 @@
     }
     leccionPersonalizada = null;
     lessonIx = i;
+    prepararTexto();
     prefs = { ...prefs, ultimaLeccion: LESSONS[i]?.id ?? LESSONS[0].id };
     result = null;
     pausado = false;
@@ -345,6 +398,7 @@
     }
     result = null;
     pausado = false;
+    if (vista === 'leccion') prepararTexto();
     drill?.restart();
     await tick();
     drill?.enfocar();
@@ -353,6 +407,7 @@
   async function reiniciarLeccion(): Promise<void> {
     pausado = false;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
+    if (vista === 'leccion') prepararTexto();
     drill?.restart();
     await tick();
     drill?.enfocar();
@@ -366,6 +421,7 @@
   }
 
   async function practicarRefuerzo(ej: EjercicioRefuerzo): Promise<void> {
+    dialogoResultado?.close();
     await cerrarPanel();
     leccionPersonalizada = {
       id: ej.id,
@@ -375,6 +431,7 @@
       cobertura: 100,
       text: ej.text,
     };
+    prepararTexto();
     result = null;
     pausado = false;
     vista = 'leccion';
@@ -446,7 +503,7 @@
     </label>
 
     {#if vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio)}
-      {@const textoObjetivo = vista === 'continua' ? textoContinua : vista === 'propio' ? textoPropioActivo : lesson.text}
+      {@const textoObjetivo = vista === 'continua' ? textoContinua : vista === 'propio' ? textoPropioActivo : textoLeccion}
       <div class="controles-intento">
         <button
           type="button"
@@ -467,11 +524,18 @@
         </button>
       </div>
 
-      <dl class="metricas">
-        <div><dt>Velocidad</dt><dd>{ultimasStats.wpm}<small>ppm</small></dd></div>
-        <div><dt>Precisión</dt><dd>{ultimasStats.accuracy}<small>%</small></dd></div>
-        <div><dt>Avance</dt><dd>{ultimasStats.typed}<small>/{textoObjetivo.length}</small></dd></div>
-      </dl>
+      <!-- Se pueden ocultar en Ajustes: a quien le distraen o le agobian, el
+           resultado se le sigue enseñando al terminar. -->
+      {#if !prefs.ocultarMetricas}
+        <dl class="metricas">
+          <div title={QUE_ES_PPM}>
+            <dt>Velocidad</dt>
+            <dd>{ultimasStats.wpm}<small aria-hidden="true">ppm</small><span class="sr-only"> palabras por minuto</span></dd>
+          </div>
+          <div><dt>Precisión</dt><dd>{ultimasStats.accuracy}<small>%</small></dd></div>
+          <div><dt>Avance</dt><dd>{ultimasStats.typed}<small>/{textoObjetivo.length}</small></dd></div>
+        </dl>
+      {/if}
     {/if}
 
     <div class="acciones">
@@ -610,7 +674,7 @@
           activo={!settingsOpen && !verProgreso && !result}
           {pausado}
           onReanudar={() => { pausado = false; tick().then(() => drill?.enfocar()); }}
-          target={lesson.text}
+          target={textoLeccion}
           titulo={lesson.title}
           explicacion={leccionPersonalizada ? lesson.focus : objetivoLeccion(lesson.focus)}
           cobertura={pct(lesson.cobertura)}
@@ -662,6 +726,14 @@
             {/if}
           </p>
         {/if}
+        {#if vista === 'leccion' && !leccionPersonalizada && !superadas.has(lesson.id)}
+          <p class="note">{voz.horizonte}</p>
+        {/if}
+        {#if result.costaron.length > 0}
+          <p class="note costaron">
+            {voz.costaron} {enumerar(result.costaron.map((t) => t.nombre))}. {voz.costaronAnimo}
+          </p>
+        {/if}
         {#if errorGuardado}
           <p class="note" role="status">No se pudo guardar el resultado. El avance de este intento solo estará disponible durante esta sesión.</p>
         {/if}
@@ -689,6 +761,11 @@
         {#if vista === 'leccion' && !leccionPersonalizada && leccionesOxidadas(sesiones, undefined, lesson.id).length > 0}
           <p class="note">{voz.repaso} Puedes practicar a tu ritmo con vocabulario conocido.</p>
           <button onclick={() => { vista = 'continua'; nuevaContinua(maxDesbloqueado); }}>Repasar con práctica continua</button>
+        {/if}
+        {#if result.refuerzo}
+          {@const refuerzo = result.refuerzo}
+          <p class="note">{voz.refuerzo}</p>
+          <button onclick={() => practicarRefuerzo(refuerzo)}>Practicar las teclas que más cuestan</button>
         {/if}
       </div>
     </dialog>
@@ -776,6 +853,41 @@
               Las teclas que ya dominas dejan de mostrar su letra, para que dejes de
               mirar el teclado. {#if aprendidas > 0}Llevas {aprendidas}
               {aprendidas === 1 ? 'tecla aprendida' : 'teclas aprendidas'}.{/if}
+            </p>
+          </div>
+
+          <div class="field">
+            <span id="metricas-l">Mientras practicas</span>
+            <div class="group" role="group" aria-labelledby="metricas-l">
+              <button aria-pressed={!prefs.ocultarMetricas}
+                      onclick={() => (prefs = { ...prefs, ocultarMetricas: false })}>Ver velocidad y precisión</button>
+              <button aria-pressed={prefs.ocultarMetricas}
+                      onclick={() => (prefs = { ...prefs, ocultarMetricas: true })}>Ocultarlas</button>
+            </div>
+            <p class="note">
+              Si ver los números a cada tecla te distrae o te agobia, puedes
+              ocultarlos: al terminar se siguen enseñando. {QUE_ES_PPM}
+            </p>
+          </div>
+
+          <div class="field">
+            <span id="sonido-l">Sonido</span>
+            <div class="group" role="group" aria-labelledby="sonido-l">
+              <button aria-pressed={!prefs.sonido}
+                      onclick={() => (prefs = { ...prefs, sonido: false })}>Sin sonido</button>
+              <button aria-pressed={prefs.sonido}
+                      onclick={() => { prefs = { ...prefs, sonido: true }; sonido.fin(prefs.volumen); }}>Con sonido</button>
+            </div>
+            {#if prefs.sonido}
+              <label for="volumen">Volumen: {Math.round(prefs.volumen * 100)}%</label>
+              <input id="volumen" type="range" min="0.1" max="1" step="0.1"
+                     value={prefs.volumen}
+                     oninput={(e) => (prefs = { ...prefs, volumen: +e.currentTarget.value })}
+                     onchange={() => sonido.acierto(prefs.volumen)} />
+            {/if}
+            <p class="note">
+              Un toque suave al acertar, una nota grave al fallar y un acorde al
+              terminar. Se genera en el equipo: no descarga nada.
             </p>
           </div>
 

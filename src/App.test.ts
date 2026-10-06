@@ -44,6 +44,15 @@ function campo(): HTMLTextAreaElement {
   return document.querySelector('textarea.capture')!;
 }
 
+/**
+ * El texto del intento en curso, leído de la pantalla. Desde que cada intento
+ * trae un texto nuevo, solo el primer contacto con una lección usa `text`.
+ */
+function textoEnPantalla(): string {
+  return [...document.querySelectorAll('.drill .ch')]
+    .map((s) => s.textContent ?? '').join('').replace(/\u00a0/g, ' ');
+}
+
 function completar(): void {
   campo().value = LESSONS[0].text;
   campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
@@ -63,7 +72,8 @@ describe('captura y paneles', () => {
     guardar({ ...POR_DEFECTO, tono: 'sobrio', ultimaLeccion: LESSONS[1].id });
     app = mount(App, { target: document.body });
     await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title));
-    campo().value = LESSONS[1].text;
+    // Lección ya practicada: el texto es uno generado, no el fijo.
+    campo().value = textoEnPantalla();
     campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
     flushSync();
     await tick();

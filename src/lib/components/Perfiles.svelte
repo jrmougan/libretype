@@ -63,6 +63,7 @@
     e.preventDefault();
     if (editando === null) return;
     const id = editando;
+    error = '';
     try {
       await onRenombrar(id, aliasEditado);
       editando = null;

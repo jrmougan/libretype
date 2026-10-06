@@ -194,8 +194,8 @@
     <dl class="global">
       <div><dt>Lecciones practicadas</dt><dd>{tocadasActuales} <small>de {lecciones.length}</small></dd></div>
       <div><dt>Sesiones</dt><dd>{global.sesiones}</dd></div>
+      <div><dt>Esta semana</dt><dd>{evolucion.diasEstaSemana} <small>{evolucion.diasEstaSemana === 1 ? 'día' : 'días'}</small></dd></div>
       <div><dt>Días practicados</dt><dd>{evolucion.diasPracticados}</dd></div>
-      <div><dt>Racha</dt><dd>{evolucion.rachaActual} <small>{evolucion.rachaActual === 1 ? 'día' : 'días'}</small></dd></div>
       <div><dt>Tiempo total</dt><dd>{formatearDuracion(global.msTotales)}</dd></div>
       <div><dt>Mejor marca</dt><dd>{global.mejorPpm} <small>ppm</small></dd></div>
     </dl>

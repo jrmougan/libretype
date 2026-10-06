@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   esRecord, formatearDuracion, PCT_MINIMO_PARA_RECORD,
-  resumirEvolucion, resumirGlobal, resumirLecciones, type Sesion,
+  lunesDe, resumirEvolucion, resumirGlobal, resumirLecciones, type Sesion,
 } from './progreso';
 import { AlmacenLocal, AlmacenMemoria, AlmacenSqlite, type DbSql } from './almacen';
 import type { EstadoTecla } from '../keyboard/dominio';
@@ -323,15 +323,10 @@ describe('almacén sqlite (Issue #38)', () => {
   });
 });
 
-describe('resumen de evolución y racha', () => {
-  it('vacío da 0 días y racha 0', () => {
+describe('resumen de evolución y constancia (0.7)', () => {
+  it('vacío da 0 días', () => {
     const e = resumirEvolucion([]);
-    expect(e).toEqual({
-      dias: [],
-      diasPracticados: 0,
-      rachaActual: 0,
-      rachaMax: 0,
-    });
+    expect(e).toEqual({ dias: [], diasPracticados: 0, diasEstaSemana: 0 });
   });
 
   it('agrupa sesiones del mismo día y calcula mejor ppm limpia', () => {
@@ -341,8 +336,7 @@ describe('resumen de evolución y racha', () => {
 
     const e = resumirEvolucion([s1, s2, s3], '2026-09-01');
     expect(e.diasPracticados).toBe(1);
-    expect(e.rachaActual).toBe(1);
-    expect(e.rachaMax).toBe(1);
+    expect(e.diasEstaSemana).toBe(1);
     expect(e.dias).toHaveLength(1);
     expect(e.dias[0]).toEqual({
       fecha: '2026-09-01',
@@ -354,29 +348,46 @@ describe('resumen de evolución y racha', () => {
     });
   });
 
-  it('calcula rachas consecutivas y racha máxima', () => {
-    const sesiones = [
-      sesion({ terminadaEn: '2026-09-01T10:00:00.000Z' }),
-      sesion({ terminadaEn: '2026-09-02T10:00:00.000Z' }),
-      sesion({ terminadaEn: '2026-09-03T10:00:00.000Z' }),
-      // Hueco
-      sesion({ terminadaEn: '2026-09-06T10:00:00.000Z' }),
-      sesion({ terminadaEn: '2026-09-07T10:00:00.000Z' }),
-    ];
+  it('la semana va de lunes a domingo', () => {
+    expect(lunesDe('2026-09-07')).toBe('2026-09-07'); // lunes
+    expect(lunesDe('2026-09-13')).toBe('2026-09-07'); // domingo
+    expect(lunesDe('2026-09-06')).toBe('2026-08-31'); // domingo anterior
+    expect(lunesDe('2026-01-01')).toBe('2025-12-29'); // cruza el año
+  });
 
-    // Hoy es 2026-09-07 (la racha actual es 2 días: 06 y 07; la racha max histórica es 3 días: 01, 02, 03)
-    const e = resumirEvolucion(sesiones, '2026-09-07');
-    expect(e.diasPracticados).toBe(5);
-    expect(e.rachaActual).toBe(2);
-    expect(e.rachaMax).toBe(3);
+  const sesiones = [
+    sesion({ terminadaEn: '2026-09-01T10:00:00.000Z' }),
+    sesion({ terminadaEn: '2026-09-02T10:00:00.000Z' }),
+    sesion({ terminadaEn: '2026-09-03T10:00:00.000Z' }),
+    // Hueco de dos días
+    sesion({ terminadaEn: '2026-09-06T10:00:00.000Z' }),
+    sesion({ terminadaEn: '2026-09-07T10:00:00.000Z' }),
+    sesion({ terminadaEn: '2026-09-07T18:00:00.000Z' }),
+  ];
 
-    // Si hoy fuera 2026-09-08 (ayer practicó), la racha sigue activa
-    const eAyer = resumirEvolucion(sesiones, '2026-09-08');
-    expect(eAyer.rachaActual).toBe(2);
+  it('cuenta los días de la semana en curso, no los consecutivos', () => {
+    // Lunes 7: la semana acaba de empezar y solo cuenta ese día.
+    expect(resumirEvolucion(sesiones, '2026-09-07').diasEstaSemana).toBe(1);
+    // Domingo 6: semana del 31 al 6, con el hueco incluido.
+    expect(resumirEvolucion(sesiones, '2026-09-06').diasEstaSemana).toBe(4);
+  });
 
-    // Si hoy fuera 2026-09-10 (pasaron 3 días), la racha actual se rompió
-    const eRoto = resumirEvolucion(sesiones, '2026-09-10');
-    expect(eRoto.rachaActual).toBe(0);
-    expect(eRoto.rachaMax).toBe(3);
+  it('un día sin practicar no le quita nada a nadie (no hay racha que perder)', () => {
+    const antes = resumirEvolucion(sesiones, '2026-09-07');
+    // Tres días sin practicar después: los dos números siguen donde estaban.
+    const despues = resumirEvolucion(sesiones, '2026-09-10');
+    expect(despues.diasPracticados).toBe(antes.diasPracticados);
+    expect(despues.diasPracticados).toBe(5);
+    expect(despues.diasEstaSemana).toBe(antes.diasEstaSemana);
+    expect(Object.keys(despues).join(' ')).not.toMatch(/racha/i);
+  });
+
+  it('el total de días nunca baja al añadir sesiones', () => {
+    let previo = 0;
+    for (let i = 1; i <= sesiones.length; i++) {
+      const total = resumirEvolucion(sesiones.slice(0, i), '2026-09-30').diasPracticados;
+      expect(total).toBeGreaterThanOrEqual(previo);
+      previo = total;
+    }
   });
 });

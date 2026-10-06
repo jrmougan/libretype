@@ -246,8 +246,8 @@ describe("Tipografía para dislexia (roadmap 0.9)", () => {
 
   it("los ficheros existen, son woff2 de verdad y llevan la licencia OFL al lado", () => {
     for (const url of urls) {
-      const binario = readFileSync(`src/${url}`);
-      expect(binario.subarray(0, 4).toString("latin1"), url).toBe("wOF2");
+      const binario = readFileSync(`src/${url}`, "latin1");
+      expect(binario.slice(0, 4), url).toBe("wOF2");
     }
     const licencia = readFileSync("src/assets/fonts/OFL.txt", "utf8");
     expect(licencia).toContain("SIL OPEN FONT LICENSE Version 1.1");

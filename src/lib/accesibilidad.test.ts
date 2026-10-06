@@ -185,7 +185,7 @@ describe("Accesibilidad visual (WCAG 2.2)", () => {
     });
 
     it("Drill.svelte: elementos decorativos tienen aria-hidden='true'", () => {
-      expect(drillSvelte).toMatch(/<p\s+class="hint"\s+aria-hidden="true">/);
+      expect(drillSvelte).toMatch(/<div\s+class="hint"\s+aria-hidden="true">/);
       expect(drillSvelte).toMatch(/<div\s+class="teclado"\s+aria-hidden="true">/);
     });
   });

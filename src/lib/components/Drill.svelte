@@ -10,6 +10,7 @@
    */
   import { onMount, type Snippet } from 'svelte';
   import Keyboard from './Keyboard.svelte';
+  import PistaDedo from './PistaDedo.svelte';
   import { TypingEngine, computeStats, diffAgainstTarget, UMBRAL_PAUSA_MS, type CharState, type Stats }
     from '../keyboard/engine';
   import { MS_RAPIDO, type MapaDominio } from '../keyboard/dominio';
@@ -413,14 +414,16 @@
        repetía completo cada vez que el foco volvía al campo. -->
   <p class="sr-only" id="{uid}-texto">Texto: {target}</p>
 
-  <p class="hint" aria-hidden="true">
-    {#if nextStep}
-      <span class="swatch" style="background: var(--finger-{nextStep.finger})"
-            aria-hidden="true"></span>{hint}
-    {:else}
-      Lección terminada.
-    {/if}
-  </p>
+  <!-- Lo mismo que la región viva de arriba, para la vista. Con la letra
+       grande se pliega la tarjeta de manos para que el teclado conserve su
+       suelo (orden de sacrificio en PistaDedo.svelte). -->
+  <div class="hint" aria-hidden="true">
+    <PistaDedo
+      paso={nextStep}
+      despues={nextStep?.dead && nextChar ? (index.get(nextChar)?.[1] ?? null) : null}
+      compacta={espacioJusto}
+    />
+  </div>
 
   <div class="teclado" aria-hidden="true">
     <Keyboard {layout} {held} next={nextStep} {lastWrong} {dominios} />
@@ -618,18 +621,7 @@
     outline: 2px solid var(--fg);
   }
 
-  .hint {
-    grid-area: pista;
-    display: flex; align-items: center; gap: var(--space-2);
-    margin: 0; min-height: 1.6em;
-    font-size: var(--text-lg);
-    color: var(--fg-muted);
-  }
-  .swatch {
-    width: 1em; height: 1em; border-radius: 3px;
-    border: 1px solid var(--border-strong);
-    flex: none;
-  }
+  .hint { grid-area: pista; min-width: 0; }
 
   /* El teclado se adapta a la altura disponible, pero con suelo: por debajo de
      esto las letras dejan de leerse y un teclado ilegible es peor que uno al

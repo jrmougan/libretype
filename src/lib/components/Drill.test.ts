@@ -68,11 +68,26 @@ describe('foco de la lección', () => {
 });
 
 describe('accesibilidad de la lección (#15, #16)', () => {
-  it('proporciona un aria-label descriptivo con el texto de la lección al textarea', () => {
+  it('el campo tiene un nombre corto y el texto entero va como descripción (roadmap 0.11)', () => {
     const campo = montar();
-    expect(campo.getAttribute('aria-label')).toBe('Escribe el texto de la lección: ás');
-    const contenedor = campo.closest('label');
-    expect(contenedor?.getAttribute('aria-label')).toBe('Texto de la lección: ás');
+    expect(campo.getAttribute('aria-label')).toBe('Campo de práctica: Tildes');
+    expect(campo.getAttribute('aria-label')).not.toContain('ás');
+    const idDesc = campo.getAttribute('aria-describedby')!;
+    expect(document.getElementById(idDesc)?.textContent).toBe('Texto: ás');
+    // La etiqueta que envuelve el campo no le pisa el nombre con otro aria-label.
+    expect(campo.closest('label')?.hasAttribute('aria-label')).toBe(false);
+  });
+
+  it('el botón Reanudar queda fuera de la etiqueta del campo (roadmap 0.11)', () => {
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'ás', titulo: 'Tildes', pausado: true, onReanudar: () => {} },
+    });
+    flushSync();
+    const reanudar = document.querySelector<HTMLButtonElement>('.btn-reanudar')!;
+    expect(reanudar).not.toBeNull();
+    expect(reanudar.closest('label')).toBeNull();
+    expect(document.querySelector('label.text')?.querySelector('button')).toBeNull();
   });
 
   it('mantiene elementos decorativos con aria-hidden para no inundar el lector de pantalla', () => {
@@ -190,7 +205,7 @@ describe('reporte de tiempos por tecla (issue #9)', () => {
 });
 
 describe('reiniciar y pausar lección (issue #24)', () => {
-  it('el botón Empezar de nuevo reinicia el texto y las métricas', async () => {
+  it('restart() reinicia el texto y las métricas', async () => {
     let statsReportadas: any = null;
     componente = mount(Drill, {
       target: document.body,
@@ -210,12 +225,12 @@ describe('reiniciar y pausar lección (issue #24)', () => {
     expect(campo.value).toBe('a');
     expect(statsReportadas.typed).toBe(1);
 
-    const botonReiniciar = [...document.querySelectorAll('button')].find(
+    // El botón vive en la barra de la aplicación (2.6: había tres); la lección
+    // solo expone la operación.
+    expect([...document.querySelectorAll('button')].some(
       (b) => b.textContent?.includes('Empezar de nuevo'),
-    );
-    expect(botonReiniciar).not.toBeNull();
-
-    botonReiniciar?.click();
+    )).toBe(false);
+    componente!.restart();
     flushSync();
     await tick();
 
@@ -242,5 +257,126 @@ describe('reiniciar y pausar lección (issue #24)', () => {
     const cartel = document.querySelector('.pausa-cartel');
     expect(cartel).not.toBeNull();
     expect(cartel?.textContent).toContain('Ejercicio pausado');
+  });
+});
+
+describe('Esc pausa desde el campo (2.6)', () => {
+  function montarConPausa() {
+    const onPausar = vi.fn();
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'ás', titulo: 'Tildes', onPausar },
+    });
+    flushSync();
+    return { campo: document.querySelector('textarea')!, onPausar };
+  }
+
+  const esc = (init: KeyboardEventInit = {}) =>
+    new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true, ...init });
+
+  it('Esc en el campo pide la pausa y no deja que el motor haga nada más', () => {
+    const { campo, onPausar } = montarConPausa();
+    const ev = esc();
+    campo.dispatchEvent(ev);
+    expect(onPausar).toHaveBeenCalledTimes(1);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it('a mitad de un acento, Esc es del método de entrada y no pausa', () => {
+    const { campo, onPausar } = montarConPausa();
+    campo.dispatchEvent(esc({ isComposing: true }));
+    campo.dispatchEvent(esc({ keyCode: 229 }));
+    // Composición en curso según el propio motor (el ´ ya está en el campo).
+    campo.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    campo.value = '´';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+    flushSync();
+    campo.dispatchEvent(esc());
+    expect(onPausar).not.toHaveBeenCalled();
+  });
+
+  it('Esc fuera del campo no lo escucha nadie: no hay manejador global', () => {
+    const { onPausar } = montarConPausa();
+    document.body.dispatchEvent(esc());
+    window.dispatchEvent(esc());
+    expect(onPausar).not.toHaveBeenCalled();
+  });
+
+  it('las demás teclas pasan sin tocar', () => {
+    const { campo, onPausar } = montarConPausa();
+    const ev = new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', bubbles: true, cancelable: true });
+    campo.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    expect(onPausar).not.toHaveBeenCalled();
+  });
+});
+
+describe('filtro de temblor en el campo (2.7)', () => {
+  function montarFiltro(ignorarRepeticion: boolean) {
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'aab', titulo: 'Prueba', ignorarRepeticion },
+    });
+    flushSync();
+    return document.querySelector('textarea')!;
+  }
+
+  function escribe(campo: HTMLTextAreaElement, data: string, t: number): boolean {
+    vi.spyOn(performance, 'now').mockReturnValue(t);
+    const ev = new InputEvent('beforeinput', { inputType: 'insertText', data, bubbles: true, cancelable: true });
+    campo.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  }
+
+  it('activado, cancela el rebote antes de que llegue al campo', () => {
+    const campo = montarFiltro(true);
+    expect(escribe(campo, 'a', 1000)).toBe(false);
+    expect(escribe(campo, 'a', 1040)).toBe(true);
+    expect(escribe(campo, 'a', 1200)).toBe(false);
+  });
+
+  it('apagado (por defecto) no toca nada', () => {
+    const campo = montarFiltro(false);
+    expect(escribe(campo, 'a', 1000)).toBe(false);
+    expect(escribe(campo, 'a', 1010)).toBe(false);
+  });
+});
+
+describe('leer por delante al 200% (2.8)', () => {
+  it('agrupa por palabras para que el salto de línea no parta ninguna', () => {
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'uno dos tres', titulo: 'Prueba' },
+    });
+    flushSync();
+    const palabras = [...document.querySelectorAll('.palabra')].map((p) => p.textContent);
+    expect(palabras).toEqual(['uno ', 'dos ', 'tres']);
+    // Cada carácter sigue siendo suyo, con su estado.
+    expect(document.querySelectorAll('.ch')).toHaveLength('uno dos tres'.length);
+  });
+
+  it('al avanzar de línea, sube la caja para que se vea lo que viene', () => {
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'uno dos tres cua', titulo: 'Prueba' },
+    });
+    flushSync();
+    const caja = document.querySelector<HTMLElement>('label.text')!;
+    Object.defineProperty(caja, 'scrollHeight', { configurable: true, value: 300 });
+    Object.defineProperty(caja, 'clientHeight', { configurable: true, value: 120 });
+    // Maquetación simulada: cuatro caracteres por línea, 50 px por línea, y
+    // lo que se ve se mueve con el scroll como en un navegador.
+    const chs = [...document.querySelectorAll<HTMLElement>('.ch')];
+    chs.forEach((ch, i) => {
+      ch.getBoundingClientRect = () =>
+        ({ top: 100 + 50 * Math.floor(i / 4) - caja.scrollTop } as DOMRect);
+    });
+
+    const campo = document.querySelector('textarea')!;
+    campo.value = 'uno dos ';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    // El cursor está en el carácter 8, tercera línea: la caja sube dos líneas.
+    expect(caja.scrollTop).toBe(100);
   });
 });

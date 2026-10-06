@@ -203,6 +203,12 @@ Reglas que están ahí por algo y no son parámetros que tocar a ojo:
 
 El dominio se persiste al terminar cada lección, no en cada pulsación.
 
+**El dominio mira lo reciente** (`VENTANA`): al llegar a dos ventanas de
+intentos, intentos, aciertos y milisegundos se reescalan a una en la misma
+proporción. Es una media que olvida sin tocar el esquema, que guarda enteros.
+Así el niño que mejora no arrastra los fallos de la primera semana, y una tecla
+dominada hace meses vuelve a enseñar su letra si hoy se falla.
+
 Los intentos se atribuyen a la tecla del carácter **objetivo**, no al `keydown`:
 los spikes demostraron que no se puede emparejar un carácter confirmado con la
 tecla que lo produjo. En una vocal con tilde cuentan las dos teclas —el acento y
@@ -253,6 +259,16 @@ Los textos son palabras reales ordenadas por frecuencia, generadas con
 lección, `lessons.test.ts` comprueba lo que importa: que no use teclas sin
 enseñar, que practique las que estrena, que ninguna meta más de cinco de golpe
 y que las tildes lleguen con las cinco vocales ya dadas.
+
+**Ese texto fijo solo se ve en el primer intento.** A partir del segundo,
+`generador.ts` construye uno nuevo con el vocabulario desbloqueado y las
+`frases` de cada lección, dando más peso a las teclas que estrena; si no, al
+tercer intento el 90% mide memoria y no destreza. Es determinista con semilla,
+y `generador.test.ts` exige a cientos de semillas lo mismo que `lessons.test.ts`
+a los textos fijos. Las frases van en minúscula y sin signos hasta que esas
+teclas se enseñan; el generador les pone la mayúscula y el punto en cuanto
+están dadas. El refuerzo de teclas flojas (`refuerzo.ts`) sale del mismo
+generador y tampoco se sale de lo enseñado.
 
 ## Compilación continua
 
@@ -379,7 +395,36 @@ localStorage no tiene migraciones: en TypeScript se arreglan los dos backends
 con el mismo código, y sin tocar lo que ya está escrito en disco.
 
 El esquema está en `src-tauri/src/lib.rs` como migración versionada. Al cambiarlo
-hay que añadir una migración nueva, no editar la que ya se aplicó.
+hay que añadir una migración nueva, no editar la que ya se aplicó: sqlx guarda
+una suma de cada una y se niega a arrancar si cambia, aunque sea un espacio. El
+SQL va entre comillas de Rust **sin escapes**, porque `storage/sqlite-de-prueba.ts`
+lo lee de ahí y lo aplica a un SQLite real (`node:sqlite`) en los tests;
+`migraciones.test.ts` comprueba que los datos de la versión anterior
+sobreviven. Antes de una migración nueva, `setup` copia `libretype.db` a
+`libretype-antes-de-esquema-N.db`.
+
+### Perfiles
+
+Desde la migración 3, el progreso y el dominio de teclas van **por perfil**
+(`sesiones.perfil`, clave `(perfil, code)` en `teclas`). Las preferencias no:
+son del equipo. Un perfil es un alias, **sin contraseña y sin edad**, y la
+interfaz dice que no son privados entre sí. El perfil 1 es el dueño de lo que
+había antes y no se borra; en localStorage usa las claves de siempre para no
+mover nada.
+
+### Importar
+
+- **Combinar es idempotente.** Las sesiones se identifican por fecha y
+  lección; en las teclas se queda el estado con más intentos, **nunca la
+  suma**: no se sabe qué sesión produjo cada intento, y sumar una copia
+  antigua del mismo alumno duplicaría lo que ya estaba.
+- **Reemplazar es atómico.** Se valida la copia entera antes de tocar nada, y
+  en SQLite se escribe en **un solo `execute`** con `BEGIN…COMMIT`:
+  tauri-plugin-sql reparte las llamadas entre conexiones de un pool, así que
+  un `BEGIN` y un `COMMIT` en llamadas separadas no son una transacción. Por
+  eso ese lote lleva los valores como literales (`literalSql`).
+- Si SQLite falló y se guardó en localStorage, al volver se traspasa en modo
+  combinar (`reconciliarRespaldoLocal`).
 
 ## Accesibilidad
 

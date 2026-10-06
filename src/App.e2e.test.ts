@@ -37,6 +37,16 @@ function campoCaptura(): HTMLTextAreaElement {
   return document.querySelector('textarea.capture')!;
 }
 
+/** Elige una lección desde el temario de la barra. */
+async function elegirLeccion(i: number): Promise<void> {
+  const temario = document.querySelector<HTMLButtonElement>('button.btn-temario')!;
+  if (temario.getAttribute('aria-expanded') !== 'true') temario.click();
+  await tick();
+  document.querySelector<HTMLButtonElement>(`#panel-dialogo [data-leccion="${i}"]`)!.click();
+  await tick();
+  flushSync();
+}
+
 function botonPorTexto(texto: string): HTMLButtonElement | undefined {
   return Array.from(document.querySelectorAll('button')).find(
     (b) => b.textContent?.trim() === texto || b.textContent?.includes(texto),
@@ -63,13 +73,10 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
     await vi.waitFor(() => expect(document.querySelector('.cero')).not.toBeNull());
     expect(document.querySelector('.cero h2')?.textContent).toBeTruthy();
 
-    // 4. Desde la lección cero, el usuario pasa al ejercicio usando el selector superior
-    const selectorLeccion = document.querySelector('header select') as HTMLSelectElement;
-    expect(selectorLeccion).not.toBeNull();
-    selectorLeccion.value = '0';
-    selectorLeccion.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
-    flushSync();
+    // 4. Desde la lección cero, el usuario pasa al ejercicio desde el temario
+    const botonTemario = document.querySelector('header button.btn-temario') as HTMLButtonElement;
+    expect(botonTemario).not.toBeNull();
+    await elegirLeccion(0);
 
     // 5. Verifica que la primera lección está activa y lista para teclear
     await vi.waitFor(() => expect(document.querySelector('.drill')).not.toBeNull());
@@ -137,7 +144,7 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
 
     // 10. Verifica que el resultado se ha cerrado y la lección 2 está activa
     expect(document.querySelector('#dialogo-resultado')).toBeNull();
-    expect(selectorLeccion.value).toBe('1');
+    expect(botonTemario.textContent).toContain(`2. ${LESSONS[1].title}`);
     expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
 
     const campoNuevo = campoCaptura();
@@ -159,12 +166,8 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
     localStorage.setItem('libretype.preferencias', JSON.stringify({ tono: 'sobrio' }));
     app = mount(App, { target: document.body });
 
-    await vi.waitFor(() => expect(document.querySelector('select')?.disabled).toBe(false));
-    const selector = document.querySelector('select')!;
-    selector.value = '0';
-    selector.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
-    flushSync();
+    await vi.waitFor(() => expect(document.querySelector<HTMLButtonElement>('button.btn-temario')?.disabled).toBe(false));
+    await elegirLeccion(0);
 
     const campo = campoCaptura();
     campo.value = LESSONS[0].text;
@@ -194,12 +197,8 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
     localStorage.setItem('libretype.preferencias', JSON.stringify({ tono: 'sobrio' }));
     app = mount(App, { target: document.body });
 
-    await vi.waitFor(() => expect(document.querySelector('select')?.disabled).toBe(false));
-    const selector = document.querySelector('select')!;
-    selector.value = '0';
-    selector.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
-    flushSync();
+    await vi.waitFor(() => expect(document.querySelector<HTMLButtonElement>('button.btn-temario')?.disabled).toBe(false));
+    await elegirLeccion(0);
 
     // Completa la lección
     campoCaptura().value = LESSONS[0].text;

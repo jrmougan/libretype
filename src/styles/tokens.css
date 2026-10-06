@@ -1,3 +1,26 @@
+/* OpenDyslexic, incluida con la app (OFL 1.1, licencia en assets/fonts/OFL.txt).
+ * Sale de github.com/antijingoist/opendyslexic, carpeta compiled/, commit
+ * 1824da5c. Va en el paquete y no se pide a ningún servidor: la app promete no
+ * hablar con nadie salvo para buscar actualizaciones. Antes solo se nombraba
+ * en la pila de fuentes, sin incluirla, y en Linux no cargaba nada (la de respaldo
+ * tampoco existe allí): el ajuste «Para dislexia» no cambiaba la letra.
+ * La negrita del fichero es de peso 800; se declara como 700 para que la use
+ * cualquier `font-weight: bold`. */
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("../assets/fonts/OpenDyslexic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("../assets/fonts/OpenDyslexic-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Tokens de diseño de LibreType.
  *
  * Todo color, tamaño y duración sale de aquí. La razón no es estética: la
@@ -45,9 +68,15 @@
 
   --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-drill: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* Las letras del teclado van siempre en la monoespaciada: la geometría de la
+   * tecla (ver --factor-tecla y geometria.test.ts) está medida con sus
+   * métricas, y OpenDyslexic es más ancha y más alta. Por eso es un token
+   * aparte que la fuente para dislexia no toca. */
+  --font-key: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   /* Fuente para dislexia: se activa poniendo data-font="dyslexic" en <html>.
-   * Se degrada a una sans normal si la fuente no está instalada. */
+   * La fuente viene incluida (@font-face de arriba); la sans del sistema solo
+   * queda como respaldo si el fichero no llegase a cargar. */
   --font-stack: var(--font-ui);
 
   /* --- Espaciado y forma --- */
@@ -68,6 +97,11 @@
   --bg: #faf9f7;
   --surface: #ffffff;
   --surface-sunken: #f0eee9;
+  /* Dos bordes con usos distintos. --border es para separadores decorativos
+   * (líneas entre zonas), que no identifican nada y pueden ser tenues.
+   * --border-strong es para el contorno de cualquier control o de las teclas:
+   * eso sí lo exige WCAG 1.4.11 a 3:1, y --border se queda en 1,4:1. Lo
+   * comprueba accesibilidad.test.ts. */
   --border: #d9d5cd;
   --border-strong: #8c867b;
 
@@ -182,14 +216,22 @@
   --finger-index: var(--finger-l-index);
 }
 
-/* Alto contraste del sistema. forced-colors lo aplica Windows por su cuenta;
- * aquí solo nos aseguramos de que los bordes no desaparezcan. */
+/* Alto contraste del sistema. forced-colors lo aplica Windows por su cuenta a
+ * HTML, pero el teclado es SVG y pinta con atributos fill/stroke que toman
+ * estos tokens: se mapean a colores del sistema para que las teclas no
+ * desaparezcan ni la objetivo se confunda con las demás. (Antes había aquí un
+ * `border` sobre `.key`, que es un <g> de SVG y no tiene caja: no hacía nada.) */
 @media (forced-colors: active) {
   :root {
     --border: CanvasText;
     --border-strong: CanvasText;
+    --surface: Canvas;
+    --surface-sunken: Canvas;
+    --fg: CanvasText;
+    --fg-muted: CanvasText;
+    --accent: Highlight;
+    --accent-fg: HighlightText;
   }
-  .key { forced-color-adjust: none; border: 2px solid CanvasText; }
 }
 
 /* Movimiento reducido: se respeta la preferencia del sistema, y además el
@@ -270,8 +312,8 @@
 }
 
 :root[data-font="dyslexic"] {
-  --font-stack: "OpenDyslexic", "Comic Sans MS", var(--font-ui);
-  --font-drill: "OpenDyslexic Mono", "OpenDyslexic", var(--font-ui);
+  --font-stack: "OpenDyslexic", var(--font-ui);
+  --font-drill: "OpenDyslexic", var(--font-ui);
   letter-spacing: 0.02em;
 }
 
@@ -327,4 +369,232 @@ button:hover { background: var(--surface-sunken); }
   position: absolute; width: 1px; height: 1px;
   padding: 0; margin: -1px; overflow: hidden;
   clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+
+/* --- Alto contraste (2.2) ----------------------------------------------------
+ * `forced-colors` solo existe en Windows. En Linux y macOS, si la aplicación
+ * no trae su propio alto contraste, quien lo necesita no lo tiene. Hay dos
+ * paletas, clara y oscura, que se combinan con el tema elegido, y se activan
+ * de dos maneras:
+ *
+ * - `data-contrast="alto"`, la preferencia de Ajustes;
+ * - `prefers-contrast: more` del sistema, mientras la preferencia esté en
+ *   «Sistema» (sin atributo). `data-contrast="normal"` lo apaga a propósito.
+ *
+ * Los valores están medidos en `accesibilidad.test.ts`: texto a 7:1 o más
+ * (AAA), bordes y colores de dedo a 3:1 o más frente al fondo. Los bloques se
+ * repiten porque CSS no deja juntar un atributo y una media query en un solo
+ * selector; el test comprueba que las seis copias digan lo mismo.
+ *
+ * Va al final del fichero a propósito: con la misma especificidad gana el
+ * último, y tiene que ganarle también al color del tono de juego.
+ */
+:root[data-contrast="alto"] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-sunken: #ededed;
+  --border: #000000;
+  --border-strong: #000000;
+  --fg: #000000;
+  --fg-muted: #2e2e2e;
+  --accent: #0033a0;
+  --accent-fg: #ffffff;
+  --accent-soft: #e5ebf7;
+  --ok: #005c1f;
+  --ok-bg: #e3f5e9;
+  --error: #a30000;
+  --error-bg: #fde9e9;
+  --pending: #6a3200;
+  --pending-bg: #fff2d4;
+  --celebracion: #6a3200;
+  --finger-l-pinky: #5b21b6;
+  --finger-l-ring: #1d4ed8;
+  --finger-l-middle: #0e7490;
+  --finger-l-index: #047857;
+  --finger-r-index: #854d0e;
+  --finger-r-middle: #c2410c;
+  --finger-r-ring: #b91c1c;
+  --finger-r-pinky: #9d174d;
+  --finger-thumb: #334155;
+  --finger-pinky: var(--finger-l-pinky);
+  --finger-ring: var(--finger-l-ring);
+  --finger-middle: var(--finger-l-middle);
+  --finger-index: var(--finger-l-index);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-contrast="alto"]:not([data-theme="light"]) {
+    --bg: #000000;
+    --surface: #000000;
+    --surface-sunken: #161616;
+    --border: #ffffff;
+    --border-strong: #ffffff;
+    --fg: #ffffff;
+    --fg-muted: #d9d9d9;
+    --accent: #ffd60a;
+    --accent-fg: #000000;
+    --accent-soft: #2e2700;
+    --ok: #6dff9b;
+    --ok-bg: #00290f;
+    --error: #ff9b9b;
+    --error-bg: #3d0000;
+    --pending: #ffd27a;
+    --pending-bg: #2e2000;
+    --celebracion: #ffd60a;
+    --finger-l-pinky: #d8ccff;
+    --finger-l-ring: #a9d1ff;
+    --finger-l-middle: #8af0ff;
+    --finger-l-index: #8cf5c8;
+    --finger-r-index: #fff07a;
+    --finger-r-middle: #ffc896;
+    --finger-r-ring: #ffb3b3;
+    --finger-r-pinky: #ffbfe3;
+    --finger-thumb: #c7d2e0;
+    --finger-pinky: var(--finger-l-pinky);
+    --finger-ring: var(--finger-l-ring);
+    --finger-middle: var(--finger-l-middle);
+    --finger-index: var(--finger-l-index);
+  }
+}
+:root[data-contrast="alto"][data-theme="dark"] {
+  --bg: #000000;
+  --surface: #000000;
+  --surface-sunken: #161616;
+  --border: #ffffff;
+  --border-strong: #ffffff;
+  --fg: #ffffff;
+  --fg-muted: #d9d9d9;
+  --accent: #ffd60a;
+  --accent-fg: #000000;
+  --accent-soft: #2e2700;
+  --ok: #6dff9b;
+  --ok-bg: #00290f;
+  --error: #ff9b9b;
+  --error-bg: #3d0000;
+  --pending: #ffd27a;
+  --pending-bg: #2e2000;
+  --celebracion: #ffd60a;
+  --finger-l-pinky: #d8ccff;
+  --finger-l-ring: #a9d1ff;
+  --finger-l-middle: #8af0ff;
+  --finger-l-index: #8cf5c8;
+  --finger-r-index: #fff07a;
+  --finger-r-middle: #ffc896;
+  --finger-r-ring: #ffb3b3;
+  --finger-r-pinky: #ffbfe3;
+  --finger-thumb: #c7d2e0;
+  --finger-pinky: var(--finger-l-pinky);
+  --finger-ring: var(--finger-l-ring);
+  --finger-middle: var(--finger-l-middle);
+  --finger-index: var(--finger-l-index);
+}
+
+@media (prefers-contrast: more) {
+  :root:not([data-contrast]) {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-sunken: #ededed;
+    --border: #000000;
+    --border-strong: #000000;
+    --fg: #000000;
+    --fg-muted: #2e2e2e;
+    --accent: #0033a0;
+    --accent-fg: #ffffff;
+    --accent-soft: #e5ebf7;
+    --ok: #005c1f;
+    --ok-bg: #e3f5e9;
+    --error: #a30000;
+    --error-bg: #fde9e9;
+    --pending: #6a3200;
+    --pending-bg: #fff2d4;
+    --celebracion: #6a3200;
+    --finger-l-pinky: #5b21b6;
+    --finger-l-ring: #1d4ed8;
+    --finger-l-middle: #0e7490;
+    --finger-l-index: #047857;
+    --finger-r-index: #854d0e;
+    --finger-r-middle: #c2410c;
+    --finger-r-ring: #b91c1c;
+    --finger-r-pinky: #9d174d;
+    --finger-thumb: #334155;
+    --finger-pinky: var(--finger-l-pinky);
+    --finger-ring: var(--finger-l-ring);
+    --finger-middle: var(--finger-l-middle);
+    --finger-index: var(--finger-l-index);
+  }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root:not([data-contrast]):not([data-theme="light"]) {
+    --bg: #000000;
+    --surface: #000000;
+    --surface-sunken: #161616;
+    --border: #ffffff;
+    --border-strong: #ffffff;
+    --fg: #ffffff;
+    --fg-muted: #d9d9d9;
+    --accent: #ffd60a;
+    --accent-fg: #000000;
+    --accent-soft: #2e2700;
+    --ok: #6dff9b;
+    --ok-bg: #00290f;
+    --error: #ff9b9b;
+    --error-bg: #3d0000;
+    --pending: #ffd27a;
+    --pending-bg: #2e2000;
+    --celebracion: #ffd60a;
+    --finger-l-pinky: #d8ccff;
+    --finger-l-ring: #a9d1ff;
+    --finger-l-middle: #8af0ff;
+    --finger-l-index: #8cf5c8;
+    --finger-r-index: #fff07a;
+    --finger-r-middle: #ffc896;
+    --finger-r-ring: #ffb3b3;
+    --finger-r-pinky: #ffbfe3;
+    --finger-thumb: #c7d2e0;
+    --finger-pinky: var(--finger-l-pinky);
+    --finger-ring: var(--finger-l-ring);
+    --finger-middle: var(--finger-l-middle);
+    --finger-index: var(--finger-l-index);
+  }
+}
+@media (prefers-contrast: more) {
+  :root:not([data-contrast])[data-theme="dark"] {
+    --bg: #000000;
+    --surface: #000000;
+    --surface-sunken: #161616;
+    --border: #ffffff;
+    --border-strong: #ffffff;
+    --fg: #ffffff;
+    --fg-muted: #d9d9d9;
+    --accent: #ffd60a;
+    --accent-fg: #000000;
+    --accent-soft: #2e2700;
+    --ok: #6dff9b;
+    --ok-bg: #00290f;
+    --error: #ff9b9b;
+    --error-bg: #3d0000;
+    --pending: #ffd27a;
+    --pending-bg: #2e2000;
+    --celebracion: #ffd60a;
+    --finger-l-pinky: #d8ccff;
+    --finger-l-ring: #a9d1ff;
+    --finger-l-middle: #8af0ff;
+    --finger-l-index: #8cf5c8;
+    --finger-r-index: #fff07a;
+    --finger-r-middle: #ffc896;
+    --finger-r-ring: #ffb3b3;
+    --finger-r-pinky: #ffbfe3;
+    --finger-thumb: #c7d2e0;
+    --finger-pinky: var(--finger-l-pinky);
+    --finger-ring: var(--finger-l-ring);
+    --finger-middle: var(--finger-l-middle);
+    --finger-index: var(--finger-l-index);
+  }
+}
+
+/* Con alto contraste el foco se ve todavía más: un contorno de 3px puede
+ * perderse sobre un fondo negro con bordes blancos por todas partes. */
+:root[data-contrast="alto"] :focus-visible { outline-width: 4px; }
+@media (prefers-contrast: more) {
+  :root:not([data-contrast]) :focus-visible { outline-width: 4px; }
 }

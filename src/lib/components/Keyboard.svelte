@@ -121,7 +121,7 @@
           : st === 'next' || isMod || enGuia ? 'var(--surface)' : 'var(--surface-sunken)'}
         stroke={st === 'next' || isMod || enGuia
           ? 'var(--accent)'
-          : st === 'pressed' && lastWrong ? 'var(--error)' : 'var(--border)'}
+          : st === 'pressed' && lastWrong ? 'var(--error)' : 'var(--border-strong)'}
         stroke-width={st === 'next' || isMod || enGuia ? 3.5 : 1.5}
         stroke-dasharray={isMod && st !== 'pressed' ? '7 4' : undefined}
       />
@@ -193,7 +193,7 @@
   .key rect { transition: fill var(--motion-fast) var(--ease); }
 
   .lbl {
-    font-family: var(--font-drill);
+    font-family: var(--font-key);
     pointer-events: none;
     user-select: none;
   }

@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { aplicar, cargar, guardar, normalizar, POR_DEFECTO } from './preferencias';
+import {
+  aplicar, cargar, guardar, normalizar, PALABRAS_POR_LONGITUD, palabrasPorTexto, POR_DEFECTO,
+} from './preferencias';
 
 describe('normalizar', () => {
   it('sin nada guardado devuelve los valores por defecto', () => {
@@ -43,6 +45,26 @@ describe('normalizar', () => {
     // puede encontrársela encendida otra vez.
     expect(normalizar({ buscarActualizaciones: false }).buscarActualizaciones).toBe(false);
     expect(normalizar({ buscarActualizaciones: 'no' }).buscarActualizaciones).toBe(true);
+  });
+
+  it('el sonido viene apagado y solo un true explícito lo enciende', () => {
+    // En un aula con veinte equipos, un valor corrupto no puede ponerlos a sonar.
+    expect(normalizar({}).sonido).toBe(false);
+    expect(normalizar({ sonido: 'sí' }).sonido).toBe(false);
+    expect(normalizar({ sonido: true }).sonido).toBe(true);
+  });
+
+  it('acota el volumen y lo recupera si viene corrupto', () => {
+    expect(normalizar({ volumen: 5 }).volumen).toBe(1);
+    expect(normalizar({ volumen: 0 }).volumen).toBe(0.1);
+    expect(normalizar({ volumen: 'alto' }).volumen).toBe(POR_DEFECTO.volumen);
+    expect(normalizar({ volumen: 0.3 }).volumen).toBe(0.3);
+  });
+
+  it('las métricas se ven salvo que se pida ocultarlas', () => {
+    expect(normalizar({}).ocultarMetricas).toBe(false);
+    expect(normalizar({ ocultarMetricas: true }).ocultarMetricas).toBe(true);
+    expect(normalizar({ ocultarMetricas: 1 }).ocultarMetricas).toBe(false);
   });
 
   it('normaliza animaciones reducidas a movimiento reducido', () => {
@@ -93,9 +115,11 @@ describe('aplicar al documento', () => {
 
   it('vuelca cada preferencia a su atributo', () => {
     aplicar({
+      ...POR_DEFECTO,
       escala: 1.8, tema: 'oscuro', movimiento: 'reducido',
       fuente: 'dislexia', tono: 'juego', ayudaTeclado: 'siempre',
       buscarActualizaciones: true, layout: 'es-iso',
+      sonido: false, volumen: 0.6, ocultarMetricas: false,
     }, raiz);
     expect(raiz.getAttribute('data-theme')).toBe('dark');
     expect(raiz.getAttribute('data-motion')).toBe('reducido');
@@ -114,5 +138,45 @@ describe('aplicar al documento', () => {
     aplicar(POR_DEFECTO, raiz);
     expect(raiz.hasAttribute('data-theme')).toBe(false);
     expect(raiz.hasAttribute('data-tono')).toBe(false);
+  });
+});
+
+describe('preferencias de la fase 2', () => {
+  it('traen valores por defecto prudentes', () => {
+    const p = normalizar({});
+    expect(p.contraste).toBe('auto');
+    expect(p.longitudTexto).toBe('normal');
+    expect(p.recordatorioPausa).toBe(20);
+    // Apagado: a quien no tiene temblor le podría comer una doble letra.
+    expect(p.ignorarRepeticion).toBe(false);
+  });
+
+  it('un valor corrupto cae al de por defecto', () => {
+    const p = normalizar({ contraste: 'máximo', longitudTexto: 7, recordatorioPausa: 13, ignorarRepeticion: 'sí' });
+    expect(p.contraste).toBe('auto');
+    expect(p.longitudTexto).toBe('normal');
+    expect(p.recordatorioPausa).toBe(20);
+    expect(p.ignorarRepeticion).toBe(false);
+  });
+
+  it('respeta lo elegido, también apagar el recordatorio', () => {
+    const p = normalizar({ contraste: 'alto', longitudTexto: 'corto', recordatorioPausa: 0, ignorarRepeticion: true });
+    expect(p).toMatchObject({ contraste: 'alto', longitudTexto: 'corto', recordatorioPausa: 0, ignorarRepeticion: true });
+  });
+
+  it('la longitud del texto se traduce a palabras en un solo sitio', () => {
+    expect(palabrasPorTexto('corto')).toBeLessThan(palabrasPorTexto('normal'));
+    expect(palabrasPorTexto('normal')).toBeLessThan(palabrasPorTexto('largo'));
+    expect(palabrasPorTexto('raro' as never)).toBe(PALABRAS_POR_LONGITUD.normal);
+  });
+
+  it('el contraste va al atributo de la raíz, y en auto se lo deja al sistema', () => {
+    const raiz = document.createElement('html');
+    aplicar({ ...POR_DEFECTO, contraste: 'alto' }, raiz);
+    expect(raiz.getAttribute('data-contrast')).toBe('alto');
+    aplicar({ ...POR_DEFECTO, contraste: 'normal' }, raiz);
+    expect(raiz.getAttribute('data-contrast')).toBe('normal');
+    aplicar({ ...POR_DEFECTO, contraste: 'auto' }, raiz);
+    expect(raiz.hasAttribute('data-contrast')).toBe(false);
   });
 });

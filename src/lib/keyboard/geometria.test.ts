@@ -27,7 +27,7 @@
  * ## Las constantes de aquí abajo están MEDIDAS, no supuestas
  *
  * No se pueden calcular: dependen de la métrica real de la fuente
- * monoespaciada del sistema (`--font-drill`). Se midieron sobre el SVG real en
+ * monoespaciada del sistema (`--font-key`). Se midieron sobre el SVG real en
  * Chrome con la app corriendo, tomando el peor caso de todas las teclas del
  * layout ES-ISO. Para remedirlas: `pnpm dev`, abrir una lección y en la consola
  *

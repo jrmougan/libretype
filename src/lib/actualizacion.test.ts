@@ -303,11 +303,12 @@ describe('reiniciar', () => {
 
 describe('detectarEntorno', () => {
   /** Carga el módulo con un `@tauri-apps/api/core` de mentira. */
-  async function conTauri(isTauri: boolean, empaquetado = '') {
+  async function conTauri(isTauri: boolean, empaquetado = '', politica = '') {
     vi.resetModules();
     vi.doMock('@tauri-apps/api/core', () => ({
       isTauri: () => isTauri,
-      invoke: async () => empaquetado,
+      invoke: async (comando: string) =>
+        comando === 'politica_del_sistema' ? politica : empaquetado,
     }));
     const { detectarEntorno } = await import('./actualizacion');
     const entorno = await detectarEntorno();
@@ -335,5 +336,27 @@ describe('detectarEntorno', () => {
       const entorno = await conTauri(true, empaquetado);
       expect(entorno.tipo, `empaquetado ${empaquetado}`).toBe('propio');
     }
+  });
+
+  it('si la política del equipo las apaga, no hay actualizador aunque sea AppImage (3.4)', async () => {
+    expect(await conTauri(true, 'appimage', '{ "actualizaciones": false }'))
+      .toEqual({ tipo: 'gestionado', gestor: 'politica' });
+    // Una política que no las menciona no cambia nada.
+    expect((await conTauri(true, 'appimage', '{ "perfilPorDefecto": "Aula" }')).tipo).toBe('propio');
+  });
+
+  it('un binario anterior sin el comando de política sigue actualizando', async () => {
+    vi.resetModules();
+    vi.doMock('@tauri-apps/api/core', () => ({
+      isTauri: () => true,
+      invoke: async (comando: string) => {
+        if (comando === 'politica_del_sistema') throw new Error('command not found');
+        return 'msi';
+      },
+    }));
+    const { detectarEntorno } = await import('./actualizacion');
+    expect((await detectarEntorno()).tipo).toBe('propio');
+    vi.doUnmock('@tauri-apps/api/core');
+    vi.resetModules();
   });
 });

@@ -1,6 +1,6 @@
 import { LESSONS, nivelDesbloqueado } from '../lessons';
 import { idCanonico } from './equivalencias';
-import { type Sesion } from './progreso';
+import { PCT_MINIMO_PARA_RECORD, type Sesion } from './progreso';
 
 /**
  * Se prima la precisión; cada persona puede practicar a su ritmo.
@@ -44,6 +44,32 @@ export const OBJETIVO_PANEL =
  * un examen.
  */
 export const FILA_DISPONIBLE = 'Disponible · a tu ritmo';
+
+/**
+ * Nota del panel de progreso sobre qué intentos cuentan para la marca.
+ *
+ * Es el otro umbral de la aplicación (`PCT_MINIMO_PARA_RECORD`) y se cuenta
+ * con el mismo cuidado que `PCT_OBJETIVO`: la cifra va siempre junto a lo que
+ * quita presión. Antes vivía escrita a mano en `Progreso.svelte` como «90% de
+ * acierto» a secas, y por eso el guardián de los tests no la veía.
+ */
+export const NOTA_MARCA =
+  `Para tu mejor marca cuentan los intentos con al menos un ${PCT_MINIMO_PARA_RECORD}% ` +
+  'de acierto: aquí se premia escribir bien, a tu ritmo, no ir rápido fallando.';
+
+/**
+ * Por qué una lección del temario está todavía cerrada.
+ *
+ * Sin número: el umbral ya está explicado una vez, con `OBJETIVO_PANEL`, en la
+ * cabecera del temario. Repetirlo en cada tarjeta cerrada convertiría la lista
+ * entera en una fila de exámenes pendientes. Lo que sí dice es cuál es la
+ * lección que la abre, que es lo único accionable.
+ */
+export function motivoBloqueo(pendiente: string, esLaSiguiente: boolean): string {
+  return esLaSiguiente
+    ? `Se abre al superar «${pendiente}». A tu ritmo.`
+    : `Se abre al superar las anteriores, empezando por «${pendiente}». A tu ritmo.`;
+}
 
 /** Las sesiones solo se registran al terminar un ejercicio. */
 export function leccionesSuperadas(sesiones: readonly Sesion[]): Set<string> {

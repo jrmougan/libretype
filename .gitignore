@@ -25,7 +25,6 @@ dist-ssr
 
 # Build
 src-tauri/target/
-coverage/
 
 # Cobertura de tests
 coverage/
@@ -39,3 +38,8 @@ __pycache__/
 # Spike binaries
 spike-deadkeys/driver
 spike-deadkeys/wkhost
+
+# Ficheros de trabajo de agentes de código
+.qwen/
+.claude/
+.gemini/

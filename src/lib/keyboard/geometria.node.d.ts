@@ -16,4 +16,6 @@
  */
 declare module 'node:fs' {
   export function readFileSync(ruta: string, codificacion: 'utf8'): string;
+  /** Para mirar la firma de un binario (accesibilidad.test.ts, la fuente woff2). */
+  export function readFileSync(ruta: string, codificacion: 'latin1'): string;
 }

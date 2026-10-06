@@ -861,15 +861,6 @@
     {:else if vista === 'cero'}
       <LeccionCero {layout} onTerminar={() => pick(0)} />
     {:else if vista === 'continua'}
-      <div class="barra-practica">
-        <label for="selector-nivel-practica">Vocabulario desbloqueado hasta:</label>
-        <select id="selector-nivel-practica" bind:value={nivelElegido}>
-          {#each LESSONS.slice(0, maxDesbloqueado + 1) as l, i}
-            <option value={i}>{i + 1}. {l.title}</option>
-          {/each}
-        </select>
-        <button onclick={() => nuevaContinua(nivelElegido)}>Nuevo texto</button>
-      </div>
       {#key continuaKey}
         <Drill
           bind:this={drill}
@@ -883,6 +874,7 @@
           titulo="Práctica continua"
           explicacion={`Vocabulario acumulado hasta la lección ${nivelPractica + 1}: ${LESSONS[nivelPractica].title}.`}
           cobertura={pct(LESSONS[nivelPractica].cobertura)}
+          coberturaRotulo="Este vocabulario:"
           espacioJusto={prefs.escala >= 1.4}
           movimiento={prefs.movimiento}
           animaciones={prefs.movimiento === 'reducido' ? 'reducidas' : 'normales'}
@@ -890,7 +882,19 @@
           onDone={terminada}
           onTecla={anotarTecla}
           onStats={(s) => (ultimasStats = s)}
-        />
+        >
+          {#snippet controles()}
+            <div class="barra-practica">
+              <label for="selector-nivel-practica">Vocabulario desbloqueado hasta:</label>
+              <select id="selector-nivel-practica" bind:value={nivelElegido}>
+                {#each LESSONS.slice(0, maxDesbloqueado + 1) as l, i}
+                  <option value={i}>{i + 1}. {l.title}</option>
+                {/each}
+              </select>
+              <button onclick={() => nuevaContinua(nivelElegido)}>Nuevo texto</button>
+            </div>
+          {/snippet}
+        </Drill>
       {/key}
     {:else if vista === 'colocacion'}
       {#key colocacionKey}
@@ -955,13 +959,6 @@
           </div>
         </div>
       {:else}
-        <div class="barra-practica">
-          <span>Practicando tu propio texto ({textoPropioActivo.length} caracteres)</span>
-          <button onclick={() => { enEdicionPropio = true; }}>Cambiar texto</button>
-          {#if avisoTextoPropio}
-            <p class="aviso-quitados" role="status">{avisoTextoPropio}</p>
-          {/if}
-        </div>
         {#key propioKey}
           <Drill
             bind:this={drill}
@@ -982,7 +979,17 @@
             onDone={terminada}
             onTecla={anotarTecla}
             onStats={(s) => (ultimasStats = s)}
-          />
+          >
+            {#snippet controles()}
+              <div class="barra-practica">
+                <span class="chip neutro">{textoPropioActivo.length} caracteres</span>
+                <button onclick={() => { enEdicionPropio = true; }}>Cambiar texto</button>
+                {#if avisoTextoPropio}
+                  <p class="aviso-quitados" role="status">{avisoTextoPropio}</p>
+                {/if}
+              </div>
+            {/snippet}
+          </Drill>
         {/key}
       {/if}
     {:else}
@@ -1463,7 +1470,7 @@
   }
   .tm-tramo { grid-area: tramo; font-size: var(--text-xs); font-weight: 500; color: var(--fg-muted); }
   .tm-titulo { grid-area: titulo; font-weight: 700; }
-  .tm-tramo .sep { margin-inline: 0.35em; }
+  .tm-tramo .sep { margin-left: 0.35em; }
   .tm-flecha { grid-area: flecha; color: var(--fg-muted); }
   .tm-pista {
     grid-area: pista;
@@ -1680,11 +1687,13 @@
     .metricas { gap: var(--space-3); }
   }
 
+  /* Controles de la práctica libre. Viven en la cabecera del ejercicio (el
+     snippet `controles` de Drill), no en una fila propia que restase alto al
+     teclado. */
   .barra-practica {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-2);
+    gap: var(--space-2);
     font-size: var(--text-sm);
     color: var(--fg-muted);
     flex-wrap: wrap;

@@ -23,6 +23,8 @@
  * tiene dos backends.
  */
 
+import { leerPolitica } from './politica';
+
 /** Lo que la interfaz necesita saber. Un solo valor, sin banderas sueltas que puedan contradecirse. */
 export type EstadoActualizacion =
   /** Ni se ha buscado ni se va a buscar (navegador, o desactivado en Ajustes). */
@@ -193,8 +195,11 @@ export function crearActualizador(
 export type Entorno =
   /** Navegador: no hay nada que actualizar. */
   | { tipo: 'sin-actualizador' }
-  /** Instalado con apt o dnf; actualiza el sistema. */
-  | { tipo: 'gestionado'; gestor: 'deb' | 'rpm' }
+  /**
+   * Instalado con apt o dnf, que actualizan con el sistema; o 'politica',
+   * cuando quien administra el equipo apagó las actualizaciones.
+   */
+  | { tipo: 'gestionado'; gestor: 'deb' | 'rpm' | 'politica' }
   /** AppImage, .app, msi o nsis: se actualiza a sí misma. */
   | { tipo: 'propio'; api: ApiActualizador };
 
@@ -212,6 +217,11 @@ export async function detectarEntorno(): Promise<Entorno> {
   try {
     const { isTauri, invoke } = await import('@tauri-apps/api/core');
     if (!isTauri()) return { tipo: 'sin-actualizador' };
+
+    // Antes que nada, la política del equipo: si el centro las apagó, no se
+    // carga ni el plugin. Ver `politica.ts`.
+    const politica = await leerPolitica((comando) => invoke<string>(comando));
+    if (!politica.actualizaciones) return { tipo: 'gestionado', gestor: 'politica' };
 
     // Lo estampa el bundler al empaquetar, así que dice cómo se instaló esto
     // de verdad y no lo que se pueda deducir del sistema operativo.

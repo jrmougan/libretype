@@ -395,7 +395,36 @@ localStorage no tiene migraciones: en TypeScript se arreglan los dos backends
 con el mismo código, y sin tocar lo que ya está escrito en disco.
 
 El esquema está en `src-tauri/src/lib.rs` como migración versionada. Al cambiarlo
-hay que añadir una migración nueva, no editar la que ya se aplicó.
+hay que añadir una migración nueva, no editar la que ya se aplicó: sqlx guarda
+una suma de cada una y se niega a arrancar si cambia, aunque sea un espacio. El
+SQL va entre comillas de Rust **sin escapes**, porque `storage/sqlite-de-prueba.ts`
+lo lee de ahí y lo aplica a un SQLite real (`node:sqlite`) en los tests;
+`migraciones.test.ts` comprueba que los datos de la versión anterior
+sobreviven. Antes de una migración nueva, `setup` copia `libretype.db` a
+`libretype-antes-de-esquema-N.db`.
+
+### Perfiles
+
+Desde la migración 3, el progreso y el dominio de teclas van **por perfil**
+(`sesiones.perfil`, clave `(perfil, code)` en `teclas`). Las preferencias no:
+son del equipo. Un perfil es un alias, **sin contraseña y sin edad**, y la
+interfaz dice que no son privados entre sí. El perfil 1 es el dueño de lo que
+había antes y no se borra; en localStorage usa las claves de siempre para no
+mover nada.
+
+### Importar
+
+- **Combinar es idempotente.** Las sesiones se identifican por fecha y
+  lección; en las teclas se queda el estado con más intentos, **nunca la
+  suma**: no se sabe qué sesión produjo cada intento, y sumar una copia
+  antigua del mismo alumno duplicaría lo que ya estaba.
+- **Reemplazar es atómico.** Se valida la copia entera antes de tocar nada, y
+  en SQLite se escribe en **un solo `execute`** con `BEGIN…COMMIT`:
+  tauri-plugin-sql reparte las llamadas entre conexiones de un pool, así que
+  un `BEGIN` y un `COMMIT` en llamadas separadas no son una transacción. Por
+  eso ese lote lleva los valores como literales (`literalSql`).
+- Si SQLite falló y se guardó en localStorage, al volver se traspasa en modo
+  combinar (`reconciliarRespaldoLocal`).
 
 ## Accesibilidad
 

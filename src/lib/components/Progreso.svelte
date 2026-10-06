@@ -9,6 +9,7 @@
   } from "../storage/objetivos";
   import type { Lesson } from "../lessons";
   import type { Almacen } from "../storage/almacen";
+  import { abrirCopiasNativas, guardarCopia } from "../storage/copia";
   import type { EstadoTecla } from "../keyboard/dominio";
   import {
     generarEjercicioRefuerzo, nivelEnsenado, obtenerTeclasOrdenadas, type EjercicioRefuerzo,
@@ -92,16 +93,7 @@
 
       if (!json) return;
 
-      const blob = new Blob([json], { type: "application/json;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const enlace = document.createElement("a");
-      const fechaHoy = new Date().toISOString().slice(0, 10);
-      enlace.href = url;
-      enlace.download = `libretype-progreso-${fechaHoy}.json`;
-      document.body.appendChild(enlace);
-      enlace.click();
-      document.body.removeChild(enlace);
-      URL.revokeObjectURL(url);
+      if (!(await guardarCopia(json))) return;
       mensajeEstado = {
         tipo: "exito",
         texto: "Copia de seguridad exportada correctamente.",
@@ -146,19 +138,34 @@
     if (!archivo) return;
 
     try {
-      const texto = await archivo.text();
-      if (sesiones.length > 0) {
-        archivoPendiente = texto;
-        confirmandoImportar = true;
-      } else {
-        await procesarImportacion(texto);
-      }
+      await recibirCopia(await archivo.text());
     } catch {
       mensajeEstado = {
         tipo: "error",
         texto: "No se pudo leer el archivo seleccionado.",
       };
       if (inputArchivo) inputArchivo.value = "";
+    }
+  }
+
+  async function recibirCopia(texto: string): Promise<void> {
+    if (sesiones.length > 0) {
+      archivoPendiente = texto;
+      confirmandoImportar = true;
+    } else {
+      await procesarImportacion(texto);
+    }
+  }
+
+  /** En escritorio, el diálogo nativo; en el navegador, el `<input type="file">`. */
+  async function elegirArchivo(): Promise<void> {
+    mensajeEstado = null;
+    try {
+      const elegidos = await abrirCopiasNativas(false);
+      if (elegidos === null) inputArchivo?.click();
+      else if (elegidos[0]) await recibirCopia(elegidos[0].contenido);
+    } catch {
+      mensajeEstado = { tipo: "error", texto: "No se pudo leer el archivo seleccionado." };
     }
   }
 
@@ -388,7 +395,7 @@
 
       <button
         type="button"
-        onclick={() => inputArchivo?.click()}
+        onclick={elegirArchivo}
         aria-label="Importar copia de seguridad desde un archivo JSON"
       >
         Importar copia de seguridad

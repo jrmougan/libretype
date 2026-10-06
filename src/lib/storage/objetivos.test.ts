@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { LESSONS } from '../lessons';
 import { PCT_MINIMO_PARA_RECORD, type Sesion } from './progreso';
 import {
-  conservarLogros, FILA_DISPONIBLE, leccionesSuperadas, nivelDisponible, NOTA_MARCA, OBJETIVO_PANEL,
+  conservarLogros, FILA_DISPONIBLE, leccionesSuperadas, motivoBloqueo, nivelDisponible, NOTA_MARCA, OBJETIVO_PANEL,
   OBJETIVO_PENDIENTE, objetivoLeccion, PCT_OBJETIVO, SIN_PRESION,
 } from './objetivos';
 
@@ -76,6 +76,14 @@ describe('cómo se comunica el objetivo (issue #54)', () => {
       expect(texto).toMatch(RE_SIN_PRESION);
     });
   }
+
+  it('el motivo de una lección cerrada no lleva número y sí quita presión (0.3)', () => {
+    for (const texto of [motivoBloqueo('Las vocales', true), motivoBloqueo('Las vocales', false)]) {
+      expect(texto).not.toMatch(/\d/);
+      expect(texto).toMatch(RE_SIN_PRESION);
+      expect(texto).toContain('«Las vocales»');
+    }
+  });
 
   it('la nota de la marca lleva su umbral y lenguaje que quita presión (0.8)', () => {
     expect(NOTA_MARCA).toContain(`${PCT_MINIMO_PARA_RECORD}%`);

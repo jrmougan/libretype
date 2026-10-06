@@ -57,6 +57,20 @@ export const NOTA_MARCA =
   `Para tu mejor marca cuentan los intentos con al menos un ${PCT_MINIMO_PARA_RECORD}% ` +
   'de acierto: aquí se premia escribir bien, a tu ritmo, no ir rápido fallando.';
 
+/**
+ * Por qué una lección del temario está todavía cerrada.
+ *
+ * Sin número: el umbral ya está explicado una vez, con `OBJETIVO_PANEL`, en la
+ * cabecera del temario. Repetirlo en cada tarjeta cerrada convertiría la lista
+ * entera en una fila de exámenes pendientes. Lo que sí dice es cuál es la
+ * lección que la abre, que es lo único accionable.
+ */
+export function motivoBloqueo(pendiente: string, esLaSiguiente: boolean): string {
+  return esLaSiguiente
+    ? `Se abre al superar «${pendiente}». A tu ritmo.`
+    : `Se abre al superar las anteriores, empezando por «${pendiente}». A tu ritmo.`;
+}
+
 /** Las sesiones solo se registran al terminar un ejercicio. */
 export function leccionesSuperadas(sesiones: readonly Sesion[]): Set<string> {
   const actuales = new Set(LESSONS.map((l) => l.id));

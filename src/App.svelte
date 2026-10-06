@@ -5,6 +5,7 @@
   import Progreso from './lib/components/Progreso.svelte';
   import SelectorTono from './lib/components/SelectorTono.svelte';
   import TamanoTexto from './lib/components/TamanoTexto.svelte';
+  import Temario, { type Modo } from './lib/components/Temario.svelte';
   import { escucharAtajosTamano } from './lib/tamano';
   import { buildIndex, LAYOUTS, obtenerLayout } from './lib/keyboard/layouts';
   import {
@@ -63,11 +64,20 @@
   let tipoAlmacen = $state<'sqlite' | 'local'>('local');
   let errorAlmacen = $state(false);
   let verProgreso = $state(false);
+  let verTemario = $state(false);
+  /** Cualquiera de los tres paneles superpuestos suspende la captura. */
+  const panelAbierto = $derived(settingsOpen || verProgreso || verTemario);
   /** 'tono' solo aparece la primera vez; 'cero' es la colocación de manos; 'continua' y 'propio' son práctica libre. */
   let vista = $state<'tono' | 'cero' | 'leccion' | 'continua' | 'propio'>('leccion');
 
   /** Variables para Práctica continua (Issue #19) */
   let nivelPractica = $state(0);
+  /**
+   * Lo que marca el `<select>` de vocabulario, que no se aplica hasta pulsar
+   * el botón: si cambiara el texto con cada flecha, recorrer la lista con el
+   * teclado iría tirando textos (WCAG 3.2.2).
+   */
+  let nivelElegido = $state(0);
   let textoContinua = $state(generarTextoPractica(0));
   let continuaKey = $state(0);
 
@@ -156,7 +166,7 @@
 
   onMount(() => {
     function onWindowBlur(): void {
-      if (vista === 'leccion' && !result && !settingsOpen && !verProgreso && ultimasStats.typed > 0) {
+      if (vista === 'leccion' && !result && !panelAbierto && ultimasStats.typed > 0) {
         pausado = true;
       }
     }
@@ -269,6 +279,7 @@
     vista = 'leccion';
     settingsOpen = false;
     verProgreso = false;
+    verTemario = false;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     drill?.restart();
     await tick();
@@ -282,12 +293,14 @@
       teclas = new Map(teclasBase);
     }
     nivelPractica = maxDesbloqueado;
+    nivelElegido = nivelPractica;
     textoContinua = generarTextoPractica(nivelPractica);
     continuaKey++;
     result = null;
     vista = 'continua';
     settingsOpen = false;
     verProgreso = false;
+    verTemario = false;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     await tick();
     drill?.restart();
@@ -300,6 +313,7 @@
       teclas = new Map(teclasBase);
     }
     nivelPractica = Math.min(Math.max(nivel, 0), maxDesbloqueado);
+    nivelElegido = nivelPractica;
     textoContinua = generarTextoPractica(nivelPractica);
     continuaKey++;
     result = null;
@@ -318,6 +332,7 @@
     result = null;
     settingsOpen = false;
     verProgreso = false;
+    verTemario = false;
     ultimasStats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
     vista = 'propio';
     if (textoPropioActivo && !enEdicionPropio) {
@@ -400,10 +415,39 @@
     return { destroy: () => dialogo.close() };
   }
 
+  /** Lo que se está practicando, en los términos del temario. */
+  const modoActual = $derived<Modo | null>(vista === 'tono' ? null : vista);
+
+  /** Qué dice el botón del temario: dónde está ahora la persona. */
+  const rotuloActual = $derived(
+    vista === 'leccion'
+      ? (leccionPersonalizada ? leccionPersonalizada.title : `${lessonIx + 1}. ${lesson.title}`)
+      : vista === 'cero' ? 'Antes de empezar'
+      : vista === 'continua' ? 'Práctica continua'
+      : vista === 'propio' ? 'Texto propio'
+      : '',
+  );
+
+  async function elegirModo(modo: Exclude<Modo, 'leccion'>): Promise<void> {
+    if (modo === 'continua') return activarContinua();
+    if (modo === 'propio') return activarPropio();
+    if (modo === 'cero') {
+      dialogoPanel?.close();
+      if (!result) teclas = new Map(teclasBase);
+      result = null;
+      pausado = false;
+      settingsOpen = false;
+      verProgreso = false;
+      verTemario = false;
+      vista = 'cero';
+    }
+  }
+
   async function cerrarPanel(): Promise<void> {
     dialogoPanel?.close();
     settingsOpen = false;
     verProgreso = false;
+    verTemario = false;
     await tick();
     if (vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio)) {
       drill?.enfocar();
@@ -424,35 +468,18 @@
   <header class="barra">
     <h1>LibreType</h1>
 
-    <label class="selector">
-      <span class="sr-only">Lección o modo de práctica</span>
-      <select
-        disabled={!progresoCargado}
-        value={vista === 'leccion' ? (leccionPersonalizada ? 'refuerzo' : String(lessonIx)) : vista}
-        onchange={(e) => {
-          const v = e.currentTarget.value;
-          if (v === 'cero') vista = 'cero';
-          else if (v === 'continua') activarContinua();
-          else if (v === 'propio') activarPropio();
-          else if (v === 'refuerzo') { /* ya activa */ }
-          else pick(+v);
-        }}
-      >
-        <option value="cero">Antes de empezar · dónde van las manos</option>
-        {#if leccionPersonalizada}
-          <option value="refuerzo">{leccionPersonalizada.title}</option>
-        {/if}
-        {#each LESSONS as l, i (l.id)}
-          {@const marca = porLeccion.get(l.id)}
-          {@const esUltima = l.id === prefs.ultimaLeccion && sesiones.length > 0}
-          <option value={String(i)} disabled={i > maxDesbloqueado}>
-            {i + 1}. {l.title}{i > maxDesbloqueado ? ' · Bloqueada' : superadas.has(l.id) ? ' · Superada' : ' · Disponible'}{marca && marca.mejorPpm > 0 ? ` · ${marca.mejorPpm} ppm` : ''}{esUltima ? ' · Seguías por aquí' : ''}
-          </option>
-        {/each}
-        <option value="continua">Práctica continua · vocabulario acumulado</option>
-        <option value="propio">Texto propio · práctica libre</option>
-      </select>
-    </label>
+    <!-- El temario es un panel, no un <select>: con teclado, el desplegable
+         cambiaba de lección con cada flecha (WCAG 3.2.2). -->
+    <button
+      class="btn-temario"
+      disabled={!progresoCargado}
+      aria-expanded={verTemario}
+      aria-controls="panel-dialogo"
+      onclick={() => { verTemario = !verTemario; settingsOpen = false; verProgreso = false; }}
+    >
+      <span class="eti">Temario</span>
+      {#if rotuloActual}<span class="actual">{rotuloActual}</span>{/if}
+    </button>
 
     {#if vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio)}
       {@const textoObjetivo = vista === 'continua' ? textoContinua : vista === 'propio' ? textoPropioActivo : lesson.text}
@@ -513,14 +540,14 @@
       <button
         aria-expanded={verProgreso}
         aria-controls="panel-dialogo"
-        onclick={() => { verProgreso = !verProgreso; settingsOpen = false; }}
+        onclick={() => { verProgreso = !verProgreso; settingsOpen = false; verTemario = false; }}
       >
         Progreso
       </button>
       <button
         aria-expanded={settingsOpen}
         aria-controls="panel-dialogo"
-        onclick={() => { settingsOpen = !settingsOpen; verProgreso = false; }}
+        onclick={() => { settingsOpen = !settingsOpen; verProgreso = false; verTemario = false; }}
       >
         Ajustes
       </button>
@@ -541,22 +568,18 @@
     {:else if vista === 'continua'}
       <div class="barra-practica">
         <label for="selector-nivel-practica">Vocabulario desbloqueado hasta:</label>
-        <select
-          id="selector-nivel-practica"
-          bind:value={nivelPractica}
-          onchange={() => nuevaContinua(nivelPractica)}
-        >
+        <select id="selector-nivel-practica" bind:value={nivelElegido}>
           {#each LESSONS.slice(0, maxDesbloqueado + 1) as l, i}
             <option value={i}>{i + 1}. {l.title}</option>
           {/each}
         </select>
-        <button onclick={() => nuevaContinua(nivelPractica)}>Nuevo texto aleatorio</button>
+        <button onclick={() => nuevaContinua(nivelElegido)}>Nuevo texto</button>
       </div>
       {#key continuaKey}
         <Drill
           bind:this={drill}
           {layout}
-          activo={!settingsOpen && !verProgreso && !result}
+          activo={!panelAbierto && !result}
           target={textoContinua}
           titulo="Práctica continua"
           explicacion={`Vocabulario acumulado hasta la lección ${nivelPractica + 1}: ${LESSONS[nivelPractica].title}.`}
@@ -600,7 +623,7 @@
           <Drill
             bind:this={drill}
             {layout}
-            activo={!settingsOpen && !verProgreso && !result}
+            activo={!panelAbierto && !result}
             target={textoPropioActivo}
             titulo="Texto propio"
             explicacion="Práctica libre con texto personalizado."
@@ -620,7 +643,7 @@
         <Drill
           bind:this={drill}
           {layout}
-          activo={!settingsOpen && !verProgreso && !result}
+          activo={!panelAbierto && !result}
           {pausado}
           onReanudar={() => { pausado = false; tick().then(() => drill?.enfocar()); }}
           target={lesson.text}
@@ -707,17 +730,18 @@
     </dialog>
   {/if}
 
-  {#if settingsOpen || verProgreso}
+  {#if panelAbierto}
     <dialog
       id="panel-dialogo"
       class="panel"
+      class:ancho={verTemario}
       bind:this={dialogoPanel}
       use:abrirDialogo
-      aria-label={settingsOpen ? 'Ajustes' : 'Progreso'}
+      aria-label={settingsOpen ? 'Ajustes' : verTemario ? 'Temario' : 'Progreso'}
       oncancel={(e) => { e.preventDefault(); cerrarPanel(); }}
     >
       <div class="panel-cab">
-        <h2>{settingsOpen ? 'Ajustes' : voz.progreso}</h2>
+        <h2>{settingsOpen ? 'Ajustes' : verTemario ? 'Temario' : voz.progreso}</h2>
         <button onclick={cerrarPanel}>Cerrar</button>
       </div>
 
@@ -875,6 +899,15 @@
               </div>
             </div>
           {/if}
+        {:else if verTemario}
+          <Temario
+            lecciones={LESSONS}
+            {sesiones}
+            modo={leccionPersonalizada ? null : modoActual}
+            leccionActual={lessonIx}
+            onLeccion={(i) => void pick(i)}
+            onModo={(m) => void elegirModo(m)}
+          />
         {:else}
           <Progreso
             {sesiones}
@@ -920,9 +953,28 @@
     white-space: nowrap;
   }
 
-  /* El selector sustituye a los diez botones que ocupaban dos filas. */
-  .selector { flex: 1 1 260px; min-width: 0; }
-  .selector select, #layout {
+  /* El botón del temario sustituye a los diez botones que ocupaban dos filas
+     y al <select> que vino después. Dice dónde estás sin tener que abrirlo. */
+  .btn-temario {
+    flex: 1 1 260px;
+    min-width: 0;
+    min-height: var(--target-min);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: left;
+    padding: 0 var(--space-3);
+  }
+  .btn-temario .eti { font-weight: 700; }
+  .btn-temario .actual {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--fg-muted);
+  }
+  .btn-temario .actual::before { content: '·'; margin-right: var(--space-2); }
+  #layout {
     width: 100%;
     font: inherit;
     min-height: var(--target-min);
@@ -1047,6 +1099,8 @@
     border-left: 1px solid var(--border);
     box-shadow: -12px 0 40px rgb(0 0 0 / 0.22);
   }
+  /* El temario necesita más ancho para que las tarjetas vayan de dos en dos. */
+  .panel.ancho { width: min(46rem, 100%); }
   .panel-cab {
     display: flex; align-items: center; justify-content: space-between;
     gap: var(--space-3);

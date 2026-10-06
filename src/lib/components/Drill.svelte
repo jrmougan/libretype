@@ -440,7 +440,8 @@
     font-size: var(--text-drill);
     line-height: 1.7;
     background: var(--surface);
-    border: 1px solid var(--border);
+    /* Es la caja que se pulsa para escribir: cuenta como contorno de control. */
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius);
     padding: var(--space-3) var(--space-4);
     margin: 0;
@@ -474,6 +475,16 @@
     color: var(--accent-fg);
     border-radius: 3px;
     animation: blink 1.1s var(--ease) infinite;
+  }
+
+  /* En alto contraste del sistema el fondo del cursor se pierde (lo fuerza a
+     Canvas): el contorno con Highlight es lo que lo deja ver. */
+  @media (forced-colors: active) {
+    .ch.current {
+      outline: 3px solid Highlight;
+      outline-offset: 1px;
+      animation: none;
+    }
   }
 
   @keyframes blink { 50% { opacity: 0.62; } }

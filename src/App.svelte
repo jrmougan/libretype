@@ -1089,7 +1089,7 @@
     font: inherit;
     min-height: var(--target-min);
     padding: 0 var(--space-2);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius);
     background: var(--surface);
     color: var(--fg);

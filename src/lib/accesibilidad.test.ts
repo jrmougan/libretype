@@ -2,6 +2,7 @@ import appSvelte from "../App.svelte?raw";
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import drillSvelte from "./components/Drill.svelte?raw";
+import keyboardSvelte from "./components/Keyboard.svelte?raw";
 import leccionCeroSvelte from "./components/LeccionCero.svelte?raw";
 import { DOMINADA, opacidadEtiqueta } from "./keyboard/dominio";
 
@@ -178,5 +179,55 @@ describe("Accesibilidad visual (WCAG 2.2)", () => {
       expect(drillSvelte).toMatch(/<p\s+class="hint"\s+aria-hidden="true">/);
       expect(drillSvelte).toMatch(/<div\s+class="teclado"\s+aria-hidden="true">/);
     });
+  });
+});
+
+describe("Contraste de controles y teclas (roadmap 0.10, WCAG 1.4.11)", () => {
+  /** Valor de un token en el primer bloque que lo define a partir de `desde`. */
+  function token(nombre: string, desde: string): string {
+    const bloque = tokensCss.slice(tokensCss.indexOf(desde));
+    const m = bloque.match(new RegExp(`${nombre}:\\s*(#[0-9a-fA-F]{6});`));
+    if (!m) throw new Error(`no encuentro ${nombre} tras ${desde}`);
+    return m[1];
+  }
+
+  const temas = {
+    claro: ":root {",
+    "oscuro del sistema": "@media (prefers-color-scheme: dark)",
+    "oscuro elegido": ':root[data-theme="dark"] {',
+  };
+
+  for (const [tema, desde] of Object.entries(temas)) {
+    it(`${tema}: el contorno de controles y teclas llega a 3:1 con lo que tiene al lado`, () => {
+      const borde = token("--border-strong", desde);
+      // La tecla en reposo se rellena con --surface-sunken y está sobre --bg;
+      // los controles se pintan sobre --surface o --bg.
+      for (const fondo of ["--bg", "--surface", "--surface-sunken"]) {
+        expect(contrast(borde, token(fondo, desde)), `${tema}: --border-strong vs ${fondo}`)
+          .toBeGreaterThanOrEqual(3.0);
+      }
+    });
+  }
+
+  it("las teclas en reposo se perfilan con --border-strong y no con el borde decorativo", () => {
+    expect(keyboardSvelte).toMatch(/'var\(--border-strong\)'\}/);
+    expect(keyboardSvelte).not.toMatch(/'var\(--border\)'/);
+  });
+
+  it("la caja del texto de práctica y el selector de nivel usan el contorno de control", () => {
+    expect(drillSvelte).toMatch(/\.text\s*\{[^}]*border:\s*1px solid var\(--border-strong\)/);
+    expect(appSvelte).toMatch(/\.barra-practica select\s*\{[^}]*border:\s*1px solid var\(--border-strong\)/);
+  });
+
+  it("el cursor de práctica se ve en alto contraste del sistema (forced-colors)", () => {
+    expect(drillSvelte).toMatch(
+      /@media\s*\(\s*forced-colors:\s*active\s*\)\s*\{[^@]*\.ch\.current\s*\{[^}]*outline:[^;]*Highlight/,
+    );
+  });
+
+  it("tokens.css no pone border a un <g> de SVG, que no tiene caja", () => {
+    expect(tokensCss).not.toMatch(/\.key\s*\{[^}]*border:/);
+    const forzado = tokensCss.slice(tokensCss.indexOf("@media (forced-colors: active)"));
+    expect(forzado).toMatch(/--accent:\s*Highlight/);
   });
 });

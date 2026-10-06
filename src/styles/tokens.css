@@ -68,6 +68,11 @@
   --bg: #faf9f7;
   --surface: #ffffff;
   --surface-sunken: #f0eee9;
+  /* Dos bordes con usos distintos. --border es para separadores decorativos
+   * (líneas entre zonas), que no identifican nada y pueden ser tenues.
+   * --border-strong es para el contorno de cualquier control o de las teclas:
+   * eso sí lo exige WCAG 1.4.11 a 3:1, y --border se queda en 1,4:1. Lo
+   * comprueba accesibilidad.test.ts. */
   --border: #d9d5cd;
   --border-strong: #8c867b;
 
@@ -182,14 +187,22 @@
   --finger-index: var(--finger-l-index);
 }
 
-/* Alto contraste del sistema. forced-colors lo aplica Windows por su cuenta;
- * aquí solo nos aseguramos de que los bordes no desaparezcan. */
+/* Alto contraste del sistema. forced-colors lo aplica Windows por su cuenta a
+ * HTML, pero el teclado es SVG y pinta con atributos fill/stroke que toman
+ * estos tokens: se mapean a colores del sistema para que las teclas no
+ * desaparezcan ni la objetivo se confunda con las demás. (Antes había aquí un
+ * `border` sobre `.key`, que es un <g> de SVG y no tiene caja: no hacía nada.) */
 @media (forced-colors: active) {
   :root {
     --border: CanvasText;
     --border-strong: CanvasText;
+    --surface: Canvas;
+    --surface-sunken: Canvas;
+    --fg: CanvasText;
+    --fg-muted: CanvasText;
+    --accent: Highlight;
+    --accent-fg: HighlightText;
   }
-  .key { forced-color-adjust: none; border: 2px solid CanvasText; }
 }
 
 /* Movimiento reducido: se respeta la preferencia del sistema, y además el

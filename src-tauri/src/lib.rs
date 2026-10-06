@@ -132,6 +132,38 @@ fn copiar_antes_de_migrar(dir: &Path, version: i64) -> std::io::Result<Option<Pa
     Ok(copia)
 }
 
+/// Dónde deja el administrador la política del equipo. Ver
+/// `docs/instalacion-gestionada.md`.
+#[cfg(target_os = "windows")]
+fn ruta_politica() -> PathBuf {
+    std::env::var_os("ProgramData")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\ProgramData"))
+        .join("LibreType")
+        .join("politica.json")
+}
+
+#[cfg(target_os = "macos")]
+fn ruta_politica() -> PathBuf {
+    PathBuf::from("/Library/Application Support/LibreType/politica.json")
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+fn ruta_politica() -> PathBuf {
+    PathBuf::from("/etc/libretype/politica.json")
+}
+
+/// El contenido de la política del sistema, o "" si no hay.
+///
+/// Solo lee: interpretar el JSON se hace en `src/lib/politica.ts`, que se
+/// puede probar sin compilar Rust. La ruta es fija y fuera del alcance del
+/// usuario normal a propósito: una variable de entorno la podría cambiar
+/// cualquiera, y entonces no sería una política.
+#[tauri::command]
+fn politica_del_sistema() -> String {
+    std::fs::read_to_string(ruta_politica()).unwrap_or_default()
+}
+
 /// Cómo se empaquetó este binario: "deb", "rpm", "appimage", "msi", "nsis",
 /// "app" o "" si no se sabe.
 ///
@@ -162,7 +194,7 @@ fn tipo_de_paquete() -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![tipo_de_paquete])
+        .invoke_handler(tauri::generate_handler![tipo_de_paquete, politica_del_sistema])
         // Guardar y abrir copias de seguridad con el diálogo del sistema. El
         // `<a download>` de siempre no guarda nada en WKWebView ni en
         // WebKitGTK. El diálogo añade al ámbito de fs solo el fichero elegido.

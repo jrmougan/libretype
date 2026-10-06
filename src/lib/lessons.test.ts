@@ -5,7 +5,8 @@
  * próxima persona que añada una lección no pueda romperlas sin enterarse.
  */
 import { describe, it, expect } from 'vitest';
-import { alfabetoHasta, generarTextoPractica, LESSONS, nivelDesbloqueado, normalizarTextoLibre, vocabularioHasta } from './lessons';
+import { alfabetoHasta, LESSONS, nivelDesbloqueado, normalizarTextoLibre, vocabularioHasta } from './lessons';
+import { generarTextoPractica } from './generador';
 import { buildIndex, ES_ISO } from './keyboard/layouts';
 
 describe('coherencia del temario', () => {
@@ -106,6 +107,34 @@ describe('progresión', () => {
   });
 });
 
+describe('las frases cortas', () => {
+  it('ninguna frase usa una tecla que su lección no haya enseñado', () => {
+    LESSONS.forEach((l, i) => {
+      const permitidas = alfabetoHasta(i);
+      for (const f of l.frases ?? []) {
+        const intrusas = [...f].filter((ch) => ch !== ' ' && !permitidas.has(ch));
+        expect(intrusas, `"${f}" en "${l.title}"`).toEqual([]);
+      }
+    });
+  });
+
+  it('hay frases desde que el vocabulario da para ellas', () => {
+    // Desde «oclusivas» ya se escribe dos de cada tres palabras del español:
+    // teclear palabras sueltas a partir de ahí es desaprovecharlo.
+    const iOclusivas = LESSONS.findIndex((l) => l.id === 'oclusivas');
+    LESSONS.slice(iOclusivas).forEach((l) => {
+      expect(l.frases?.length ?? 0, `"${l.title}" no tiene frases`).toBeGreaterThanOrEqual(8);
+    });
+  });
+
+  it('antes de las mayúsculas van en minúscula y sin puntuación', () => {
+    const iMayus = LESSONS.findIndex((l) => l.id === 'mayusculas');
+    for (const l of LESSONS.slice(0, iMayus)) {
+      for (const f of l.frases ?? []) expect(f).toMatch(/^[a-zñáéíóúü ]+$/);
+    }
+  });
+});
+
 describe('los textos son español de verdad', () => {
   it('nada de relleno de una sola letra repetida', () => {
     LESSONS.forEach((l) => {
@@ -163,13 +192,35 @@ describe('temario ampliado: mayúsculas, puntuación y números (Issue #20)', ()
     }
   });
 
-  it('la lección de números practica los diez dígitos', () => {
-    const l = LESSONS.find((x) => x.id === 'numeros')!;
-    expect(l).toBeDefined();
+  it('los números se reparten en dos lecciones, una por mano', () => {
+    const izquierda = LESSONS.find((x) => x.id === 'numeros')!;
+    const derecha = LESSONS.find((x) => x.id === 'numeros-2')!;
+    expect(izquierda.nuevas).toBe('12345');
+    expect(derecha.nuevas).toBe('67890');
+    expect(LESSONS.indexOf(derecha)).toBe(LESSONS.indexOf(izquierda) + 1);
     for (const digito of '0123456789') {
-      expect(l.text).toContain(digito);
+      expect(izquierda.text + derecha.text).toContain(digito);
       expect(index.has(digito)).toBe(true);
     }
+  });
+
+  it('los símbolos del día a día llegan al final y ES-ISO los produce todos', () => {
+    // Escribir el propio correo es el primer uso real de un adulto.
+    const enseñados = LESSONS.slice(LESSONS.findIndex((l) => l.id === 'numeros-2') + 1)
+      .map((l) => l.nuevas).join('');
+    for (const signo of [':', ';', '-', '"', '(', ')', '/', '%', '€', '@']) {
+      expect(enseñados, `falta enseñar ${signo}`).toContain(signo);
+      expect(index.has(signo), `ES-ISO no produce ${signo}`).toBe(true);
+    }
+  });
+
+  it('después de las mayúsculas ninguna lección estrena más de cinco teclas, salvo la puntuación', () => {
+    // La puntuación va por parejas (¿? ¡!) y se queda en seis. Los números,
+    // que eran diez de golpe, ya no.
+    const iMayus = LESSONS.findIndex((l) => l.id === 'mayusculas');
+    LESSONS.slice(iMayus + 1).filter((l) => l.id !== 'puntuacion').forEach((l) => {
+      expect(l.nuevas.length, `"${l.title}" estrena ${l.nuevas.length} teclas`).toBeLessThanOrEqual(5);
+    });
   });
 });
 
@@ -188,7 +239,7 @@ describe('práctica continua y vocabulario desbloqueado (Issue #19)', () => {
   });
 
   it('generarTextoPractica genera texto válido para el nivel', () => {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < LESSONS.length; i++) {
       const texto = generarTextoPractica(i, 10);
       const permitidas = alfabetoHasta(i);
       const intrusas = [...new Set([...texto])].filter((c) => c !== ' ' && !permitidas.has(c));

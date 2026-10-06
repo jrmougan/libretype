@@ -203,6 +203,12 @@ Reglas que están ahí por algo y no son parámetros que tocar a ojo:
 
 El dominio se persiste al terminar cada lección, no en cada pulsación.
 
+**El dominio mira lo reciente** (`VENTANA`): al llegar a dos ventanas de
+intentos, intentos, aciertos y milisegundos se reescalan a una en la misma
+proporción. Es una media que olvida sin tocar el esquema, que guarda enteros.
+Así el niño que mejora no arrastra los fallos de la primera semana, y una tecla
+dominada hace meses vuelve a enseñar su letra si hoy se falla.
+
 Los intentos se atribuyen a la tecla del carácter **objetivo**, no al `keydown`:
 los spikes demostraron que no se puede emparejar un carácter confirmado con la
 tecla que lo produjo. En una vocal con tilde cuentan las dos teclas —el acento y
@@ -253,6 +259,16 @@ Los textos son palabras reales ordenadas por frecuencia, generadas con
 lección, `lessons.test.ts` comprueba lo que importa: que no use teclas sin
 enseñar, que practique las que estrena, que ninguna meta más de cinco de golpe
 y que las tildes lleguen con las cinco vocales ya dadas.
+
+**Ese texto fijo solo se ve en el primer intento.** A partir del segundo,
+`generador.ts` construye uno nuevo con el vocabulario desbloqueado y las
+`frases` de cada lección, dando más peso a las teclas que estrena; si no, al
+tercer intento el 90% mide memoria y no destreza. Es determinista con semilla,
+y `generador.test.ts` exige a cientos de semillas lo mismo que `lessons.test.ts`
+a los textos fijos. Las frases van en minúscula y sin signos hasta que esas
+teclas se enseñan; el generador les pone la mayúscula y el punto en cuanto
+están dadas. El refuerzo de teclas flojas (`refuerzo.ts`) sale del mismo
+generador y tampoco se sale de lo enseñado.
 
 ## Compilación continua
 

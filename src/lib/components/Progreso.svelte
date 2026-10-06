@@ -11,7 +11,7 @@
   import type { Almacen } from "../storage/almacen";
   import type { EstadoTecla } from "../keyboard/dominio";
   import {
-    generarEjercicioRefuerzo, obtenerTeclasOrdenadas, type EjercicioRefuerzo,
+    generarEjercicioRefuerzo, nivelEnsenado, obtenerTeclasOrdenadas, type EjercicioRefuerzo,
   } from "../refuerzo";
 
   interface Props {
@@ -176,7 +176,8 @@
 
   function iniciarRefuerzo(): void {
     if (!teclas || !onPracticarRefuerzo) return;
-    const ej = generarEjercicioRefuerzo(teclas);
+    // Solo con las teclas enseñadas hasta la lección a la que ha llegado.
+    const ej = generarEjercicioRefuerzo(teclas, undefined, { nivel: nivelEnsenado(sesiones) });
     if (ej) onPracticarRefuerzo(ej);
   }
 </script>

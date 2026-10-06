@@ -4,6 +4,10 @@
   import LeccionCero from './lib/components/LeccionCero.svelte';
   import Progreso from './lib/components/Progreso.svelte';
   import SelectorTono from './lib/components/SelectorTono.svelte';
+  import QuienPractica from './lib/components/QuienPractica.svelte';
+  import Perfiles from './lib/components/Perfiles.svelte';
+  import Informe from './lib/components/Informe.svelte';
+  import { leerPolitica } from './lib/politica';
   import { buildIndex, LAYOUTS, obtenerLayout } from './lib/keyboard/layouts';
   import {
     generarTextoPractica,
@@ -16,7 +20,9 @@
   import {
     contarDominadas, mapaDeDominio, registrar, type EstadoTecla,
   } from './lib/keyboard/dominio';
-  import { abrirAlmacen, type Almacen } from './lib/storage/almacen';
+  import {
+    abrirAlmacen, mismoAlias, PERFIL_PRINCIPAL, type Almacen, type Perfil,
+  } from './lib/storage/almacen';
   import { leccionesOxidadas } from './lib/storage/repaso';
   import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
   import {
@@ -61,8 +67,16 @@
   let tipoAlmacen = $state<'sqlite' | 'local'>('local');
   let errorAlmacen = $state(false);
   let verProgreso = $state(false);
-  /** 'tono' solo aparece la primera vez; 'cero' es la colocación de manos; 'continua' y 'propio' son práctica libre. */
-  let vista = $state<'tono' | 'cero' | 'leccion' | 'continua' | 'propio'>('leccion');
+  /**
+   * 'perfil' es «¿Quién practica?», al abrir con más de un perfil; 'tono' solo
+   * aparece la primera vez; 'cero' es la colocación de manos; 'continua' y
+   * 'propio' son práctica libre.
+   */
+  let vista = $state<'perfil' | 'tono' | 'cero' | 'leccion' | 'continua' | 'propio'>('leccion');
+  /** Perfiles de este equipo. El progreso y el dominio van por perfil; las preferencias, no. */
+  let perfiles = $state<Perfil[]>([]);
+  let perfilActivo = $state(PERFIL_PRINCIPAL);
+  const aliasActivo = $derived(perfiles.find((p) => p.id === perfilActivo)?.alias ?? '');
 
   /** Variables para Práctica continua (Issue #19) */
   let nivelPractica = $state(0);
@@ -92,8 +106,11 @@
    */
   let actualizador = $state<Actualizador | null>(null);
   let estadoAct = $state<EstadoActualizacion>({ fase: 'inactivo' });
-  /** 'deb' o 'rpm' cuando el paquete lo gestiona apt o dnf, y no la app. */
-  let gestorDelSistema = $state<'deb' | 'rpm' | null>(null);
+  /**
+   * 'deb' o 'rpm' cuando el paquete lo gestiona apt o dnf, y no la app;
+   * 'politica' cuando quien administra el equipo apagó las actualizaciones.
+   */
+  let gestorDelSistema = $state<'deb' | 'rpm' | 'politica' | null>(null);
   /**
    * En la barra solo aparecen las tres fases que piden algo de la persona.
    * «Buscando», «al día» y los errores viven en Ajustes: son la respuesta a
@@ -120,22 +137,72 @@
     almacen = await abrirAlmacen();
     tipoAlmacen = almacen.tipo;
     errorAlmacen = Boolean(almacen.errorAlmacen);
+    perfiles = await almacen.listarPerfiles();
+
+    // En un equipo gestionado, el administrador puede fijar el perfil con el
+    // que se abre (ver politica.ts). Si no, con más de uno se pregunta.
+    const { perfilPorDefecto } = await leerPolitica();
+    if (perfilPorDefecto) {
+      const fijado = perfiles.find((p) => mismoAlias(p.alias, perfilPorDefecto))
+        ?? await crearPerfil(perfilPorDefecto).catch(() => null);
+      if (fijado) return abrirPerfil(fijado.id, true);
+    }
+    if (perfiles.length > 1) { vista = 'perfil'; return; }
+    await abrirPerfil(almacen.perfil, true);
+  });
+
+  /**
+   * Carga el progreso de un perfil y decide por dónde se sigue.
+   *
+   * @param alArrancar en el arranque no hay lección montada que reiniciar.
+   */
+  async function abrirPerfil(id: number, alArrancar = false): Promise<void> {
+    if (!almacen) return;
+    almacen.usarPerfil(id);
+    perfilActivo = id;
     sesiones = await almacen.leerTodas();
     lessonIx = Math.min(Math.max(ixGuardada, 0), nivelDisponible(sesiones));
     teclas = await almacen.leerTeclas();
     teclasBase = new Map(teclas);
+    leccionPersonalizada = null;
+    result = null;
 
     // Primera vez: primero cómo quiere la aplicación, luego dónde van las
     // manos. Nunca soltarle un ejercicio a alguien que no ha tecleado nunca.
     if (prefs.tono === null) vista = 'tono';
     else if (sesiones.length === 0) vista = 'cero';
     else {
+      vista = 'leccion';
       const ix = LESSONS.findIndex((l) => l.id === prefs.ultimaLeccion);
       if (ix >= 0) lessonIx = Math.min(ix, nivelDisponible(sesiones));
     }
     progresoCargado = true;
+    if (!alArrancar && vista === 'leccion') await pick(lessonIx);
+  }
 
-  });
+  async function crearPerfil(alias: string): Promise<Perfil> {
+    if (!almacen) throw new Error('El almacén todavía no está listo.');
+    const nuevo = await almacen.crearPerfil(alias);
+    perfiles = await almacen.listarPerfiles();
+    return nuevo;
+  }
+
+  async function renombrarPerfil(id: number, alias: string): Promise<void> {
+    await almacen?.renombrarPerfil(id, alias);
+    if (almacen) perfiles = await almacen.listarPerfiles();
+  }
+
+  async function borrarPerfil(id: number): Promise<void> {
+    if (!almacen) return;
+    await almacen.borrarPerfil(id);
+    perfiles = await almacen.listarPerfiles();
+    if (id === perfilActivo) await abrirPerfil(almacen.perfil);
+  }
+
+  async function cambiarPerfil(id: number): Promise<void> {
+    await cerrarPanel();
+    await abrirPerfil(id);
+  }
 
   onMount(() => {
     let temporizador: ReturnType<typeof setTimeout> | null = null;
@@ -519,7 +586,15 @@
   </header>
 
   <main class="escena">
-    {#if !progresoCargado}
+    {#if vista === 'perfil'}
+      <div class="centrado">
+        <QuienPractica
+          {perfiles}
+          onElegir={(id) => abrirPerfil(id, true)}
+          onCrear={async (alias) => { await abrirPerfil((await crearPerfil(alias)).id, true); }}
+        />
+      </div>
+    {:else if !progresoCargado}
       <p class="note" role="status">Cargando progreso…</p>
     {:else if vista === 'tono'}
       <div class="centrado"><SelectorTono onElegir={elegirTono} /></div>
@@ -704,7 +779,7 @@
       oncancel={(e) => { e.preventDefault(); cerrarPanel(); }}
     >
       <div class="panel-cab">
-        <h2>{settingsOpen ? 'Ajustes' : voz.progreso}</h2>
+        <h2>{settingsOpen ? 'Ajustes' : voz.progreso}{#if !settingsOpen && perfiles.length > 1} · {aliasActivo}{/if}</h2>
         <button onclick={cerrarPanel}>Cerrar</button>
       </div>
 
@@ -802,11 +877,17 @@
             <div class="field">
               <span id="act-l">Actualizaciones</span>
               <p class="note">
-                LibreType se instaló con
-                {gestorDelSistema === 'deb' ? 'apt' : 'dnf'}, así que las
-                actualizaciones llegan con las del resto del sistema. La
-                aplicación no las descarga por su cuenta ni consulta nada por
-                internet.
+                {#if gestorDelSistema === 'politica'}
+                  Quien administra este equipo ha desactivado las
+                  actualizaciones automáticas: se encarga de instalar las
+                  versiones nuevas. La aplicación no consulta nada por internet.
+                {:else}
+                  LibreType se instaló con
+                  {gestorDelSistema === 'deb' ? 'apt' : 'dnf'}, así que las
+                  actualizaciones llegan con las del resto del sistema. La
+                  aplicación no las descarga por su cuenta ni consulta nada por
+                  internet.
+                {/if}
               </p>
             </div>
           {:else if actualizador}
@@ -860,6 +941,15 @@
             onImportar={importarProgreso}
             onPracticarRefuerzo={practicarRefuerzo}
           />
+          <Perfiles
+            {perfiles}
+            activo={perfilActivo}
+            onCambiar={cambiarPerfil}
+            onCrear={async (alias) => { await crearPerfil(alias); }}
+            onRenombrar={renombrarPerfil}
+            onBorrar={borrarPerfil}
+          />
+          <Informe alias={aliasActivo} {sesiones} {teclas} />
         {/if}
       </div>
     </dialog>

@@ -21,12 +21,22 @@ export interface ArchivoLeido {
 /** Lo que hace falta del sistema de ficheros. */
 export interface ApiArchivos {
   /** Pregunta dónde guardar y escribe. Devuelve la ruta, o null si se canceló. */
-  guardar(nombreSugerido: string, contenido: string): Promise<string | null>;
+  guardar(nombreSugerido: string, contenido: string, tipo?: TipoArchivo): Promise<string | null>;
   /** Pregunta qué abrir. Devuelve [] si se canceló. */
   abrir(multiple: boolean): Promise<ArchivoLeido[]>;
 }
 
-const FILTRO = [{ name: 'Copia de LibreType', extensions: ['json'] }];
+/** Copias de seguridad (JSON) o informes para el docente (una página HTML). */
+export type TipoArchivo = 'json' | 'html';
+
+const FILTROS: Record<TipoArchivo, { name: string; extensions: string[] }[]> = {
+  json: [{ name: 'Copia de LibreType', extensions: ['json'] }],
+  html: [{ name: 'Página web', extensions: ['html'] }],
+};
+const MIME: Record<TipoArchivo, string> = {
+  json: 'application/json;charset=utf-8',
+  html: 'text/html;charset=utf-8',
+};
 
 /** `libretype-progreso-2026-10-06.json`, o con el alias si lo hay. */
 export function nombreCopia(alias?: string, hoy = new Date()): string {
@@ -64,14 +74,14 @@ export async function cargarApiNativa(): Promise<ApiArchivos | null> {
     const dialogo = await import('@tauri-apps/plugin-dialog');
     const fs = await import('@tauri-apps/plugin-fs');
     return {
-      async guardar(nombreSugerido, contenido) {
-        const ruta = await dialogo.save({ defaultPath: nombreSugerido, filters: FILTRO });
+      async guardar(nombreSugerido, contenido, tipo = 'json') {
+        const ruta = await dialogo.save({ defaultPath: nombreSugerido, filters: FILTROS[tipo] });
         if (!ruta) return null;
         await fs.writeTextFile(ruta, contenido);
         return ruta;
       },
       async abrir(multiple) {
-        const elegido = (await dialogo.open({ multiple, directory: false, filters: FILTRO })) as
+        const elegido = (await dialogo.open({ multiple, directory: false, filters: FILTROS.json })) as
           string | string[] | null;
         if (!elegido) return [];
         const rutas = Array.isArray(elegido) ? elegido : [elegido];
@@ -87,8 +97,8 @@ export async function cargarApiNativa(): Promise<ApiArchivos | null> {
 }
 
 /** La descarga de siempre, que en el navegador funciona. */
-function descargarEnNavegador(nombre: string, contenido: string): void {
-  const blob = new Blob([contenido], { type: 'application/json;charset=utf-8' });
+function descargarEnNavegador(nombre: string, contenido: string, tipo: TipoArchivo): void {
+  const blob = new Blob([contenido], { type: MIME[tipo] });
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement('a');
   enlace.href = url;
@@ -108,12 +118,22 @@ export async function guardarCopia(
   nombre = nombreCopia(aliasDe(contenido)),
   api?: ApiArchivos | null,
 ): Promise<boolean> {
+  return guardarArchivo(contenido, nombre, 'json', api);
+}
+
+/** Lo mismo para cualquier fichero que la app ofrezca guardar. */
+export async function guardarArchivo(
+  contenido: string,
+  nombre: string,
+  tipo: TipoArchivo,
+  api?: ApiArchivos | null,
+): Promise<boolean> {
   const nativa = api === undefined ? await cargarApiNativa() : api;
   if (!nativa) {
-    descargarEnNavegador(nombre, contenido);
+    descargarEnNavegador(nombre, contenido, tipo);
     return true;
   }
-  return (await nativa.guardar(nombre, contenido)) !== null;
+  return (await nativa.guardar(nombre, contenido, tipo)) !== null;
 }
 
 /**

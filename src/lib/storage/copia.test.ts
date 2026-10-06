@@ -25,7 +25,7 @@ describe('guardarCopia (0.6)', () => {
     };
     const json = JSON.stringify({ perfil: { alias: 'Ana' } });
     expect(await guardarCopia(json, undefined, api)).toBe(true);
-    expect(api.guardar).toHaveBeenCalledWith(expect.stringMatching(/^libretype-ana-\d{4}-\d{2}-\d{2}\.json$/), json);
+    expect(api.guardar).toHaveBeenCalledWith(expect.stringMatching(/^libretype-ana-\d{4}-\d{2}-\d{2}\.json$/), json, 'json');
   });
 
   it('si se cancela el diálogo, no dice que se guardó', async () => {

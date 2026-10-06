@@ -120,9 +120,11 @@ describe('captura y paneles', () => {
     expect(dialogo.open).toBe(true);
     expect(dialogo.getAttribute('aria-labelledby')).toBe('resultado-titulo');
     expect(dialogo.getAttribute('aria-describedby')).toBe('resultado-desc');
-    expect(dialogo.getAttribute('aria-live')).toBe('polite');
     expect(dialogo.querySelector('#resultado-desc')).not.toBeNull();
+    // Una sola región viva: anidadas, el lector anunciaba lo mismo dos veces (roadmap 0.11).
     expect(dialogo.querySelector('.resultado')?.getAttribute('aria-live')).toBe('polite');
+    expect(dialogo.hasAttribute('aria-live')).toBe(false);
+    expect(dialogo.querySelectorAll('[aria-live], [role="status"], [role="alert"]')).toHaveLength(1);
     expect(campo().disabled).toBe(true);
     boton(accion).click();
     await tick();
@@ -357,5 +359,101 @@ describe('el objetivo de precisión nunca es un número aislado (#54)', () => {
     expect(nota?.textContent).toMatch(RE_SIN_PRESION);
     expect(nota?.textContent).toContain('desbloquear la siguiente lección');
     ningunaCifraSuelta();
+  });
+});
+
+/** El texto objetivo tal como lo pinta el ejercicio, para los modos que lo generan al azar. */
+function textoEnPantalla(): string {
+  return [...document.querySelectorAll('.ch')]
+    .map((c) => (c.textContent === ' ' ? ' ' : c.textContent)).join('');
+}
+
+async function irAModo(modo: 'continua' | 'propio'): Promise<void> {
+  const selector = document.querySelector('select')!;
+  selector.value = modo;
+  selector.dispatchEvent(new Event('change', { bubbles: true }));
+  await tick();
+  if (modo === 'propio') {
+    const entrada = document.querySelector<HTMLTextAreaElement>('textarea.input-texto-propio')!;
+    entrada.value = 'hola mundo';
+    entrada.dispatchEvent(new Event('input', { bubbles: true }));
+    boton('Empezar a teclear').click();
+    await tick();
+  }
+}
+
+describe('el titular del resultado cuenta lo que ha pasado (roadmap 0.1)', () => {
+  async function conTonoDeJuego(): Promise<void> {
+    await unmount(app);
+    guardar({ ...POR_DEFECTO, tono: 'juego' });
+    app = mount(App, { target: document.body });
+    await vi.waitFor(() => expect(document.querySelector('.cero')).not.toBeNull());
+    const selector = document.querySelector('select')!;
+    selector.value = '0';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+  }
+
+  it('con el tono lúdico no dice «superada» si el intento no llega al objetivo', async () => {
+    await conTonoDeJuego();
+    const objetivo = LESSONS[0].text;
+    let conFallos = '';
+    for (let i = 0; i < objetivo.length; i++) conFallos += i % 2 === 0 ? 'x' : objetivo[i];
+    campo().value = conFallos;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    const titulo = document.getElementById('resultado-titulo')?.textContent ?? '';
+    expect(titulo).toContain('¡Lección terminada!');
+    expect(titulo.toLowerCase()).not.toContain('superada');
+  });
+
+  it.each(['continua', 'propio'] as const)('en %s no habla de superar ninguna lección', async (modo) => {
+    await conTonoDeJuego();
+    await irAModo(modo);
+    campo().value = textoEnPantalla();
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    const titulo = document.getElementById('resultado-titulo')?.textContent ?? '';
+    expect(titulo.trim().length).toBeGreaterThan(0);
+    expect(titulo.toLowerCase()).not.toContain('lección');
+  });
+});
+
+describe('la pausa funciona en todos los modos (roadmap 0.2)', () => {
+  it.each(['continua', 'propio'] as const)('Pausar en %s detiene la captura y Reanudar la devuelve', async (modo) => {
+    await irAModo(modo);
+    expect(campo().disabled).toBe(false);
+    boton('Pausar').click();
+    await tick();
+    expect(campo().disabled).toBe(true);
+    expect(document.querySelector('.pausa-cartel')).not.toBeNull();
+
+    // El botón del cartel, que antes solo existía en las lecciones.
+    document.querySelector<HTMLButtonElement>('.btn-reanudar')!.click();
+    await tick();
+    expect(campo().disabled).toBe(false);
+    expect(document.querySelector('.pausa-cartel')).toBeNull();
+    expect(document.activeElement).toBe(campo());
+  });
+
+  it.each(['leccion', 'continua', 'propio'] as const)('perder el foco de la ventana pausa en %s', async (modo) => {
+    if (modo !== 'leccion') await irAModo(modo);
+    campo().value = textoEnPantalla().slice(0, 1);
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    window.dispatchEvent(new Event('blur'));
+    await tick();
+    expect(document.querySelector('.pausa-cartel')).not.toBeNull();
+    expect(campo().disabled).toBe(true);
+  });
+
+  it('cambiar de modo no arrastra una pausa anterior', async () => {
+    boton('Pausar').click();
+    await tick();
+    await irAModo('continua');
+    expect(document.querySelector('.pausa-cartel')).toBeNull();
+    expect(campo().disabled).toBe(false);
   });
 });

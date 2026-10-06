@@ -2,6 +2,7 @@ import appSvelte from "../App.svelte?raw";
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import drillSvelte from "./components/Drill.svelte?raw";
+import keyboardSvelte from "./components/Keyboard.svelte?raw";
 import leccionCeroSvelte from "./components/LeccionCero.svelte?raw";
 import { DOMINADA, opacidadEtiqueta } from "./keyboard/dominio";
 
@@ -143,6 +144,15 @@ describe("Accesibilidad visual (WCAG 2.2)", () => {
       expect(appSvelte).toContain('aria-live="polite"');
       expect(appSvelte).toContain('aria-describedby="resultado-desc"');
     });
+
+    it("App.svelte: el diálogo de resultado tiene una sola región viva (roadmap 0.11)", () => {
+      const dialogo = appSvelte.slice(
+        appSvelte.indexOf('id="dialogo-resultado"'),
+        appSvelte.indexOf('id="panel-dialogo"'),
+      );
+      const regiones = dialogo.match(/aria-live=|role="(status|alert|log)"/g) ?? [];
+      expect(regiones).toHaveLength(1);
+    });
   });
 
   describe("Issue #15: Animaciones reducidas y cursor", () => {
@@ -159,14 +169,102 @@ describe("Accesibilidad visual (WCAG 2.2)", () => {
   });
 
   describe("Issue #16: Texto accesible a lector de pantalla sin inundar pista", () => {
-    it("Drill.svelte: textarea y contenedor tienen aria-label descriptivo con el texto de la lección", () => {
-      expect(drillSvelte).toMatch(/aria-label=\{`Escribe el texto de la lección: \$\{target\}`\}/);
-      expect(drillSvelte).toMatch(/aria-label=\{`Texto de la lección: \$\{target\}`\}/);
+    it("Drill.svelte: el nombre del campo es corto y el texto va en aria-describedby (roadmap 0.11)", () => {
+      // El nombre con la lección entera se repetía cada vez que volvía el foco.
+      expect(drillSvelte).not.toMatch(/aria-label=\{`[^`]*\$\{target\}`\}/);
+      expect(drillSvelte).toMatch(/aria-describedby="\{uid\}-texto"/);
     });
 
     it("Drill.svelte: elementos decorativos tienen aria-hidden='true'", () => {
       expect(drillSvelte).toMatch(/<p\s+class="hint"\s+aria-hidden="true">/);
       expect(drillSvelte).toMatch(/<div\s+class="teclado"\s+aria-hidden="true">/);
     });
+  });
+});
+
+describe("Contraste de controles y teclas (roadmap 0.10, WCAG 1.4.11)", () => {
+  /** Valor de un token en el primer bloque que lo define a partir de `desde`. */
+  function token(nombre: string, desde: string): string {
+    const bloque = tokensCss.slice(tokensCss.indexOf(desde));
+    const m = bloque.match(new RegExp(`${nombre}:\\s*(#[0-9a-fA-F]{6});`));
+    if (!m) throw new Error(`no encuentro ${nombre} tras ${desde}`);
+    return m[1];
+  }
+
+  const temas = {
+    claro: ":root {",
+    "oscuro del sistema": "@media (prefers-color-scheme: dark)",
+    "oscuro elegido": ':root[data-theme="dark"] {',
+  };
+
+  for (const [tema, desde] of Object.entries(temas)) {
+    it(`${tema}: el contorno de controles y teclas llega a 3:1 con lo que tiene al lado`, () => {
+      const borde = token("--border-strong", desde);
+      // La tecla en reposo se rellena con --surface-sunken y está sobre --bg;
+      // los controles se pintan sobre --surface o --bg.
+      for (const fondo of ["--bg", "--surface", "--surface-sunken"]) {
+        expect(contrast(borde, token(fondo, desde)), `${tema}: --border-strong vs ${fondo}`)
+          .toBeGreaterThanOrEqual(3.0);
+      }
+    });
+  }
+
+  it("las teclas en reposo se perfilan con --border-strong y no con el borde decorativo", () => {
+    expect(keyboardSvelte).toMatch(/'var\(--border-strong\)'\}/);
+    expect(keyboardSvelte).not.toMatch(/'var\(--border\)'/);
+  });
+
+  it("la caja del texto de práctica y el selector de nivel usan el contorno de control", () => {
+    expect(drillSvelte).toMatch(/\.text\s*\{[^}]*border:\s*1px solid var\(--border-strong\)/);
+    expect(appSvelte).toMatch(/\.barra-practica select\s*\{[^}]*border:\s*1px solid var\(--border-strong\)/);
+  });
+
+  it("el cursor de práctica se ve en alto contraste del sistema (forced-colors)", () => {
+    expect(drillSvelte).toMatch(
+      /@media\s*\(\s*forced-colors:\s*active\s*\)\s*\{[^@]*\.ch\.current\s*\{[^}]*outline:[^;]*Highlight/,
+    );
+  });
+
+  it("tokens.css no pone border a un <g> de SVG, que no tiene caja", () => {
+    expect(tokensCss).not.toMatch(/\.key\s*\{[^}]*border:/);
+    const forzado = tokensCss.slice(tokensCss.indexOf("@media (forced-colors: active)"));
+    expect(forzado).toMatch(/--accent:\s*Highlight/);
+  });
+});
+
+describe("Tipografía para dislexia (roadmap 0.9)", () => {
+  // Antes solo se nombraba OpenDyslexic sin incluirla, y en Linux el ajuste no
+  // cambiaba nada. Estos tests fallan si la fuente vuelve a quedarse fuera.
+  const caras = [...tokensCss.matchAll(/@font-face\s*\{[^}]*\}/g)].map((m) => m[0]);
+  const urls = caras.flatMap((c) => [...c.matchAll(/url\("\.\.\/([^"]+)"\)/g)].map((m) => m[1]));
+
+  it("declara OpenDyslexic con @font-face en normal y negrita", () => {
+    const deOpenDyslexic = caras.filter((c) => c.includes('font-family: "OpenDyslexic"'));
+    expect(deOpenDyslexic.map((c) => c.match(/font-weight:\s*(\d+)/)?.[1]).sort()).toEqual(["400", "700"]);
+    expect(urls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("los ficheros existen, son woff2 de verdad y llevan la licencia OFL al lado", () => {
+    for (const url of urls) {
+      const binario = readFileSync(`src/${url}`, "latin1");
+      expect(binario.slice(0, 4), url).toBe("wOF2");
+    }
+    const licencia = readFileSync("src/assets/fonts/OFL.txt", "utf8");
+    expect(licencia).toContain("SIL OPEN FONT LICENSE Version 1.1");
+    expect(licencia).toContain("OpenDyslexic");
+  });
+
+  it("la pila para dislexia empieza por la fuente incluida y no por una que no existe en Linux", () => {
+    const bloque = tokensCss.slice(tokensCss.indexOf(':root[data-font="dyslexic"]'));
+    expect(bloque).toMatch(/--font-stack:\s*"OpenDyslexic"/);
+    expect(bloque).toMatch(/--font-drill:\s*"OpenDyslexic"/);
+    expect(tokensCss).not.toContain("Comic Sans");
+    expect(tokensCss).not.toContain("OpenDyslexic Mono");
+  });
+
+  it("el teclado conserva la monoespaciada con la que está medida su geometría", () => {
+    expect(keyboardSvelte).toMatch(/\.lbl\s*\{[^}]*font-family:\s*var\(--font-key\)/);
+    const bloque = tokensCss.slice(tokensCss.indexOf(':root[data-font="dyslexic"]'));
+    expect(bloque.slice(0, bloque.indexOf("}"))).not.toContain("--font-key");
   });
 });

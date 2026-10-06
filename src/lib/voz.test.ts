@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { VOCES, vozDe, type Voz } from './voz';
+import { PRECISION_ALTA, textosResultado, VOCES, vozDe, type Voz } from './voz';
+import { PCT_OBJETIVO } from './storage/objetivos';
 
 const CLAVES: (keyof Voz)[] = [
-  'terminada', 'record', 'animoAlto', 'animoBajo', 'repetir', 'siguiente', 'progreso', 'repaso',
+  'terminada', 'superada', 'practicaTerminada', 'record', 'recordPractica',
+  'animoAlto', 'animoMedio', 'animoBajo', 'repetir', 'siguiente', 'progreso', 'repaso',
 ];
 
 describe('voces', () => {
@@ -34,7 +36,7 @@ describe('voces', () => {
     // El error se corrige practicando, no avergonzando. Y para un niño esto
     // decide si vuelve mañana.
     for (const tono of ['juego', 'sobrio'] as const) {
-      const texto = VOCES[tono].animoBajo.toLowerCase();
+      const texto = `${VOCES[tono].animoBajo} ${VOCES[tono].animoMedio} ${VOCES[tono].terminada}`.toLowerCase();
       for (const palabra of ['mal', 'error', 'fallo', 'incorrecto', 'peor']) {
         expect(texto, `${tono} usa "${palabra}"`).not.toContain(palabra);
       }
@@ -47,5 +49,46 @@ describe('voces', () => {
         expect(VOCES[tono][clave].length, `${tono}.${clave}`).toBeLessThan(60);
       }
     }
+  });
+
+  describe('diálogo de resultado (roadmap 0.1)', () => {
+    for (const tono of ['juego', 'sobrio'] as const) {
+      const voz = VOCES[tono];
+
+      it(`${tono}: no dice «superada» si el intento no llega al objetivo`, () => {
+        const { titulo } = textosResultado(voz, { modo: 'leccion', precision: PCT_OBJETIVO - 1, record: false });
+        expect(titulo).toBe(voz.terminada);
+        expect(titulo.toLowerCase()).not.toContain('superada');
+      });
+
+      it(`${tono}: dice «superada» cuando el intento llega al objetivo`, () => {
+        expect(textosResultado(voz, { modo: 'leccion', precision: PCT_OBJETIVO, record: false }).titulo)
+          .toBe(voz.superada);
+      });
+
+      it(`${tono}: en práctica libre no habla de lecciones`, () => {
+        for (const precision of [50, PCT_OBJETIVO, 100]) {
+          for (const record of [false, true]) {
+            const { titulo } = textosResultado(voz, { modo: 'practica', precision, record });
+            expect(titulo.toLowerCase(), `${precision}% record=${record}`).not.toContain('lección');
+          }
+        }
+      });
+
+      it(`${tono}: el ánimo tiene tres escalones según la precisión`, () => {
+        const animo = (precision: number) =>
+          textosResultado(voz, { modo: 'leccion', precision, record: false }).animo;
+        expect(animo(PCT_OBJETIVO - 1)).toBe(voz.animoBajo);
+        expect(animo(PCT_OBJETIVO)).toBe(voz.animoMedio);
+        expect(animo(PRECISION_ALTA - 0.5)).toBe(voz.animoMedio);
+        expect(animo(PRECISION_ALTA)).toBe(voz.animoAlto);
+        expect(new Set([voz.animoBajo, voz.animoMedio, voz.animoAlto]).size).toBe(3);
+      });
+    }
+
+    it('la marca manda en el titular de la lección', () => {
+      expect(textosResultado(VOCES.juego, { modo: 'leccion', precision: 100, record: true }).titulo)
+        .toBe(VOCES.juego.record);
+    });
   });
 });

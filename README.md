@@ -13,7 +13,7 @@ Construido sobre **Tauri v2**, **Svelte 5** y **Rust**, LibreType combina la lig
 - **Retirada progresiva de ayudas visuales**: El teclado en pantalla actúa como apoyo inicial. A medida que el alumno demuestra dominio sobre una tecla (precisión ≥ 90 % y al menos 8 intentos), su letra se desvanece y se sustituye por un punto discreto para romper el hábito de buscar la tecla en la pantalla.
 - **Tono y preferencias respetuosas**: Evita la *design disqualification* (la sensación de exclusión al enfrentarse a interfaces infantiles o condescendientes). Permite alternar entre tono sobrio y tono lúdico por preferencia explícita (sin preguntar jamás la edad).
 - **Accesibilidad desde los cimientos**: Cumplimiento con las pautas WCAG 2.2 y el estándar europeo EN 301 549 (RD 1112/2018). Escalado de interfaz (100 % a 200 %), tipografía para dislexia, modos de alto contraste, reducción de movimiento y ningún estado transmitido únicamente por color.
-- **Privacidad y persistencia local**: Sin cuentas de usuario, sin telemetría ni servidores remotos. El progreso y las sesiones se guardan localmente en SQLite (`tauri-plugin-sql`), con respaldo automático en `localStorage` en entorno de desarrollo web.
+- **Privacidad y persistencia local**: Sin cuentas de usuario ni telemetría. La única conexión a un servidor es la comprobación de actualizaciones (un fichero JSON público en GitHub), que se puede apagar en Ajustes y que no existe si la instalación la gestiona apt o dnf. El progreso y las sesiones se guardan localmente en SQLite (`tauri-plugin-sql`), con respaldo automático en `localStorage` en entorno de desarrollo web.
 
 ---
 

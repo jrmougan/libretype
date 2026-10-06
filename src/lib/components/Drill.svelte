@@ -59,6 +59,9 @@
     movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar,
   }: Props = $props();
 
+  /** Para enlazar el campo con la descripción que lleva el texto entero. */
+  const uid = $props.id();
+
   const sinAnimaciones = $derived(movimiento === 'reducido' || animaciones === 'reducidas');
 
   let field = $state<HTMLTextAreaElement | null>(null);
@@ -284,9 +287,10 @@
     <p class="focus">{explicacion}</p>
   {/if}
 
-  <!-- La etiqueta devuelve el foco al pulsar el texto sin interceptar teclas.
-       El campo real conserva la composición del método de entrada del sistema. -->
-  <label class="text" aria-label={`Texto de la lección: ${target}`}>
+  <!-- El cartel de pausa va fuera del <label>: un botón dentro de la etiqueta
+       de un campo formaría parte de su nombre accesible y el clic sería
+       ambiguo (WCAG 4.1.2). -->
+  <div class="texto-caja">
     {#if pausado}
       <div class="pausa-cartel" role="status" aria-live="polite">
         <span>Ejercicio pausado</span>
@@ -297,31 +301,41 @@
         {/if}
       </div>
     {/if}
-    <textarea
-      bind:this={field}
-      class="capture"
-      autocomplete="off"
-      autocapitalize="off"
-      spellcheck="false"
-      disabled={!activo || pausado}
-      aria-label={`Escribe el texto de la lección: ${target}`}
-      onpaste={(e) => e.preventDefault()}
-      onbeforeinput={(e) => {
-        if ((e as InputEvent).inputType === 'insertFromPaste') {
-          e.preventDefault();
-        }
-      }}
-    ></textarea>
-    <span aria-hidden="true">
-      {#each [...target] as ch, i (i)}
-        <span class="ch {states[i]}">{ch === ' ' ? '\u00a0' : ch}</span>
-      {/each}
-    </span>
-  </label>
+    <!-- La etiqueta devuelve el foco al pulsar el texto sin interceptar teclas.
+         El campo real conserva la composición del método de entrada del sistema. -->
+    <label class="text">
+      <textarea
+        bind:this={field}
+        class="capture"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        disabled={!activo || pausado}
+        aria-label={titulo ? `Campo de práctica: ${titulo}` : 'Campo de práctica'}
+        aria-describedby="{uid}-texto"
+        onpaste={(e) => e.preventDefault()}
+        onbeforeinput={(e) => {
+          if ((e as InputEvent).inputType === 'insertFromPaste') {
+            e.preventDefault();
+          }
+        }}
+      ></textarea>
+      <span aria-hidden="true">
+        {#each [...target] as ch, i (i)}
+          <span class="ch {states[i]}">{ch === ' ' ? '\u00a0' : ch}</span>
+        {/each}
+      </span>
+    </label>
+  </div>
 
   <!-- Para lector de pantalla: el bucle de práctica es visual y motor, pero la
        pista sí tiene que ser audible, y el progreso legible. -->
   <p class="sr-only" aria-live="polite">{hint}</p>
+
+  <!-- El nombre del campo es corto: el texto entero va como descripción, que
+       el lector anuncia después y se puede saltar. Meterlo en el nombre lo
+       repetía completo cada vez que el foco volvía al campo. -->
+  <p class="sr-only" id="{uid}-texto">Texto: {target}</p>
 
   <p class="hint" aria-hidden="true">
     {#if nextStep}
@@ -413,14 +427,21 @@
 
   .focus { grid-area: explicacion; margin: 0; color: var(--fg-muted); max-width: 78ch; font-size: var(--text-sm); }
 
-  .text {
+  .texto-caja {
     grid-area: texto;
+    position: relative;
+    display: grid;
+    min-height: 0;
+  }
+
+  .text {
     cursor: text;
     font-family: var(--font-drill);
     font-size: var(--text-drill);
     line-height: 1.7;
     background: var(--surface);
-    border: 1px solid var(--border);
+    /* Es la caja que se pulsa para escribir: cuenta como contorno de control. */
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius);
     padding: var(--space-3) var(--space-4);
     margin: 0;
@@ -454,6 +475,16 @@
     color: var(--accent-fg);
     border-radius: 3px;
     animation: blink 1.1s var(--ease) infinite;
+  }
+
+  /* En alto contraste del sistema el fondo del cursor se pierde (lo fuerza a
+     Canvas): el contorno con Highlight es lo que lo deja ver. */
+  @media (forced-colors: active) {
+    .ch.current {
+      outline: 3px solid Highlight;
+      outline-offset: 1px;
+      animation: none;
+    }
   }
 
   @keyframes blink { 50% { opacity: 0.62; } }

@@ -295,3 +295,34 @@ describe('Esc pausa desde el campo (2.6)', () => {
     expect(onPausar).not.toHaveBeenCalled();
   });
 });
+
+describe('filtro de temblor en el campo (2.7)', () => {
+  function montarFiltro(ignorarRepeticion: boolean) {
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'aab', titulo: 'Prueba', ignorarRepeticion },
+    });
+    flushSync();
+    return document.querySelector('textarea')!;
+  }
+
+  function escribe(campo: HTMLTextAreaElement, data: string, t: number): boolean {
+    vi.spyOn(performance, 'now').mockReturnValue(t);
+    const ev = new InputEvent('beforeinput', { inputType: 'insertText', data, bubbles: true, cancelable: true });
+    campo.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  }
+
+  it('activado, cancela el rebote antes de que llegue al campo', () => {
+    const campo = montarFiltro(true);
+    expect(escribe(campo, 'a', 1000)).toBe(false);
+    expect(escribe(campo, 'a', 1040)).toBe(true);
+    expect(escribe(campo, 'a', 1200)).toBe(false);
+  });
+
+  it('apagado (por defecto) no toca nada', () => {
+    const campo = montarFiltro(false);
+    expect(escribe(campo, 'a', 1000)).toBe(false);
+    expect(escribe(campo, 'a', 1010)).toBe(false);
+  });
+});

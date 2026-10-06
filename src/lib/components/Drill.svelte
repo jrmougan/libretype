@@ -13,6 +13,7 @@
   import { TypingEngine, computeStats, diffAgainstTarget, UMBRAL_PAUSA_MS, type CharState, type Stats }
     from '../keyboard/engine';
   import { MS_RAPIDO, type MapaDominio } from '../keyboard/dominio';
+  import { crearFiltroTemblor } from '../keyboard/temblor';
   import { buildIndex, FINGER_NAMES, type KeyStep, type Layout }
     from '../keyboard/layouts';
 
@@ -57,13 +58,22 @@
      * spikes, y además así Esc solo pausa cuando se está escribiendo.
      */
     onPausar?: () => void;
+    /**
+     * Ignorar el rebote de una tecla por temblor. Actúa antes de que el
+     * carácter llegue al campo, así que el motor no se entera (ver
+     * `keyboard/temblor.ts`, que explica dónde y por qué ahí).
+     */
+    ignorarRepeticion?: boolean;
   }
 
   let {
     layout, target, activo = true, onDone, onTecla, dominios, onStats,
     titulo = '', explicacion = '', cobertura = '', espacioJusto = false,
     movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar, onPausar,
+    ignorarRepeticion = false,
   }: Props = $props();
+
+  const filtroTemblor = crearFiltroTemblor();
 
   const sinAnimaciones = $derived(movimiento === 'reducido' || animaciones === 'reducidas');
 
@@ -262,6 +272,7 @@
     avisado = false;
     tiempoDescontado = 0;
     pausadoEn = null;
+    filtroTemblor.olvidar();
   }
 </script>
 
@@ -320,7 +331,14 @@
         onPausar();
       }}
       onbeforeinput={(e) => {
-        if ((e as InputEvent).inputType === 'insertFromPaste') {
+        const ev = e as InputEvent;
+        if (ev.inputType === 'insertFromPaste') {
+          e.preventDefault();
+          return;
+        }
+        // Capa aparte del motor: si se cancela aquí, el carácter no llega al
+        // campo y el canal B (que lee el valor) no tiene nada que deshacer.
+        if (ignorarRepeticion && filtroTemblor.debeIgnorar(ev, performance.now())) {
           e.preventDefault();
         }
       }}

@@ -5,6 +5,7 @@
   import Progreso from './lib/components/Progreso.svelte';
   import SelectorTono from './lib/components/SelectorTono.svelte';
   import TamanoTexto from './lib/components/TamanoTexto.svelte';
+  import RecordatorioPausa from './lib/components/RecordatorioPausa.svelte';
   import Temario, { type Modo } from './lib/components/Temario.svelte';
   import { escucharAtajosTamano } from './lib/tamano';
   import { avisoQuitados, caracteresQuitados } from './lib/texto-propio';
@@ -27,7 +28,7 @@
     leccionesSuperadas, nivelDisponible, OBJETIVO_PENDIENTE, objetivoLeccion,
   } from './lib/storage/objetivos';
   import {
-    aplicar, cargar, guardar as guardarPrefs, POR_DEFECTO,
+    aplicar, cargar, guardar as guardarPrefs, MINUTOS_PAUSA, palabrasPorTexto, POR_DEFECTO,
     type Preferencias, type Tono,
   } from './lib/preferencias';
   import { PRECISION_ALTA, vozDe } from './lib/voz';
@@ -79,7 +80,7 @@
    * teclado iría tirando textos (WCAG 3.2.2).
    */
   let nivelElegido = $state(0);
-  let textoContinua = $state(generarTextoPractica(0));
+  let textoContinua = $state(generarTextoPractica(0, palabrasPorTexto(prefsIniciales.longitudTexto)));
   let continuaKey = $state(0);
 
   /** Variables para Texto propio (Issue #19) */
@@ -297,7 +298,7 @@
     }
     nivelPractica = maxDesbloqueado;
     nivelElegido = nivelPractica;
-    textoContinua = generarTextoPractica(nivelPractica);
+    textoContinua = generarTextoPractica(nivelPractica, palabrasPorTexto(prefs.longitudTexto));
     continuaKey++;
     result = null;
     pausado = false;
@@ -318,7 +319,7 @@
     }
     nivelPractica = Math.min(Math.max(nivel, 0), maxDesbloqueado);
     nivelElegido = nivelPractica;
-    textoContinua = generarTextoPractica(nivelPractica);
+    textoContinua = generarTextoPractica(nivelPractica, palabrasPorTexto(prefs.longitudTexto));
     continuaKey++;
     result = null;
     pausado = false;
@@ -595,6 +596,7 @@
           {pausado}
           onPausar={pausar}
           onReanudar={reanudar}
+          ignorarRepeticion={prefs.ignorarRepeticion}
           target={textoContinua}
           titulo="Práctica continua"
           explicacion={`Vocabulario acumulado hasta la lección ${nivelPractica + 1}: ${LESSONS[nivelPractica].title}.`}
@@ -644,6 +646,7 @@
             {pausado}
             onPausar={pausar}
             onReanudar={reanudar}
+            ignorarRepeticion={prefs.ignorarRepeticion}
             target={textoPropioActivo}
             titulo="Texto propio"
             explicacion="Práctica libre con texto personalizado."
@@ -667,6 +670,7 @@
           {pausado}
           onPausar={pausar}
           onReanudar={reanudar}
+          ignorarRepeticion={prefs.ignorarRepeticion}
           target={lesson.text}
           titulo={lesson.title}
           explicacion={leccionPersonalizada ? lesson.focus : objetivoLeccion(lesson.focus)}
@@ -750,6 +754,12 @@
       </div>
     </dialog>
   {/if}
+
+  <RecordatorioPausa
+    minutos={prefs.recordatorioPausa}
+    practicando={(vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio))
+      && !pausado && !panelAbierto && !result}
+  />
 
   {#if panelAbierto}
     <dialog
@@ -849,6 +859,51 @@
               Las teclas que ya dominas dejan de mostrar su letra, para que dejes de
               mirar el teclado. {#if aprendidas > 0}Llevas {aprendidas}
               {aprendidas === 1 ? 'tecla aprendida' : 'teclas aprendidas'}.{/if}
+            </p>
+          </div>
+
+          <div class="field">
+            <span id="longitud-l">Longitud de los textos de práctica</span>
+            <div class="group" role="group" aria-labelledby="longitud-l">
+              {#each [['corto', 'Cortos'], ['normal', 'Normales'], ['largo', 'Largos']] as [v, l] (v)}
+                <button aria-pressed={prefs.longitudTexto === v}
+                        onclick={() => (prefs = { ...prefs, longitudTexto: v as Preferencias['longitudTexto'] })}>
+                  {l}
+                </button>
+              {/each}
+            </div>
+            <p class="note">Cortos si cansa llegar al final; largos para coger ritmo.</p>
+          </div>
+
+          <div class="field">
+            <span id="pausa-l">Recordarme descansar</span>
+            <div class="group" role="group" aria-labelledby="pausa-l">
+              {#each MINUTOS_PAUSA as m (m)}
+                <button aria-pressed={prefs.recordatorioPausa === m}
+                        onclick={() => (prefs = { ...prefs, recordatorioPausa: m })}>
+                  {m === 0 ? 'No' : `Cada ${m} min`}
+                </button>
+              {/each}
+            </div>
+            <p class="note">Un aviso en una esquina, que no interrumpe ni se lleva el foco.</p>
+          </div>
+
+          <div class="field">
+            <span id="temblor-l">Si a veces una tecla se repite sin querer</span>
+            <div class="group" role="group" aria-labelledby="temblor-l">
+              <button aria-pressed={!prefs.ignorarRepeticion}
+                      onclick={() => (prefs = { ...prefs, ignorarRepeticion: false })}>Contar todo</button>
+              <button aria-pressed={prefs.ignorarRepeticion}
+                      onclick={() => (prefs = { ...prefs, ignorarRepeticion: true })}>Ignorar repeticiones muy rápidas</button>
+            </div>
+            <p class="note">
+              Con temblor, el dedo puede rebotar y escribir dos veces la misma
+              letra. Esto ignora la segunda si llega casi a la vez. Para algo más
+              completo, el sistema tiene «teclas de rebote» (o «teclas lentas»):
+              en Windows, en Configuración › Accesibilidad › Teclado; en macOS,
+              en Ajustes del Sistema › Accesibilidad › Teclado; en GNOME, en
+              Configuración › Accesibilidad › Escritura; en KDE, en Preferencias
+              del sistema › Accesibilidad › Filtros de teclado.
             </p>
           </div>
 

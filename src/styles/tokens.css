@@ -1,9 +1,21 @@
-/* OpenDyslexic, incluida con la app (OFL 1.1, licencia en assets/fonts/OFL.txt).
- * Sale de github.com/antijingoist/opendyslexic, carpeta compiled/, commit
- * 1824da5c. Va en el paquete y no se pide a ningún servidor: la app promete no
- * hablar con nadie salvo para buscar actualizaciones. Antes solo se nombraba
- * en la pila de fuentes, sin incluirla, y en Linux no cargaba nada (la de respaldo
- * tampoco existe allí): el ajuste «Para dislexia» no cambiaba la letra.
+/* --- Fuentes incluidas -------------------------------------------------------
+ * Todas van en el paquete y ninguna se pide a un servidor: la app promete no
+ * hablar con nadie salvo para buscar actualizaciones.
+ *
+ * Atkinson Hyperlegible Next (interfaz) y Atkinson Hyperlegible Mono (texto de
+ * práctica y letras del teclado), del Braille Institute: diseñadas para
+ * distinguir las letras que se confunden (I l 1, O 0, b d p q), que es justo lo
+ * que necesita quien empieza o ve con dificultad. OFL 1.1; licencias en
+ * assets/fonts/OFL-AtkinsonHyperlegibleNext.txt y OFL-AtkinsonHyperlegibleMono.txt.
+ * Salen del repositorio google/fonts (ofl/atkinsonhyperlegiblenext y
+ * ofl/atkinsonhyperlegiblemono), de la fuente variable, instanciada a 400, 500
+ * y 700 con fontTools y guardada en woff2. Cubren á é í ó ú ñ ü ¿ ¡ ´ ¨.
+ *
+ * OpenDyslexic, la opción «Para dislexia» (OFL 1.1, licencia en
+ * assets/fonts/OFL.txt). Sale de github.com/antijingoist/opendyslexic, carpeta
+ * compiled/, commit 1824da5c. Antes solo se nombraba en la pila de fuentes,
+ * sin incluirla, y en Linux no cargaba nada (la de respaldo tampoco existe
+ * allí): el ajuste «Para dislexia» no cambiaba la letra.
  * La negrita del fichero es de peso 800; se declara como 700 para que la use
  * cualquier `font-weight: bold`. */
 @font-face {
@@ -16,6 +28,48 @@
 @font-face {
   font-family: "OpenDyslexic";
   src: url("../assets/fonts/OpenDyslexic-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("../assets/fonts/AtkinsonHyperlegibleNext-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("../assets/fonts/AtkinsonHyperlegibleNext-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("../assets/fonts/AtkinsonHyperlegibleNext-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Mono";
+  src: url("../assets/fonts/AtkinsonHyperlegibleMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Mono";
+  src: url("../assets/fonts/AtkinsonHyperlegibleMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Mono";
+  src: url("../assets/fonts/AtkinsonHyperlegibleMono-Bold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -41,9 +95,17 @@
   --text-xs: calc(0.75rem * var(--ui-scale));
   --text-sm: calc(0.875rem * var(--ui-scale));
   --text-base: calc(1rem * var(--ui-scale));
+  /* 18px: cuerpo de los textos que se leen enteros (explicaciones, notas
+     largas) y el ánimo del resultado. */
+  --text-md: calc(1.125rem * var(--ui-scale));
   --text-lg: calc(1.25rem * var(--ui-scale));
+  /* 22px: las cifras de la barra y el logo. */
+  --text-cifra: calc(1.375rem * var(--ui-scale));
   --text-xl: calc(1.75rem * var(--ui-scale));
   --text-drill: calc(2rem * var(--ui-scale));
+  /* 34px y 40px: titulares de pantalla completa y cifras del resultado. */
+  --text-2xl: calc(2.125rem * var(--ui-scale));
+  --text-cifra-grande: calc(2.5rem * var(--ui-scale));
 
   /* El SVG del teclado escala con su caja: sus px son unidades del viewBox, no
    * píxeles reales. Con el texto al 200% la caja se comprime y las letras
@@ -66,13 +128,14 @@
   --text-key-small: calc(12px * var(--factor-tecla));
   --text-key-tiny: calc(11px * var(--factor-tecla));
 
-  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-drill: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* Las incluidas van primero; las del sistema solo si el fichero no cargase. */
+  --font-ui: "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-drill: "Atkinson Hyperlegible Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   /* Las letras del teclado van siempre en la monoespaciada: la geometría de la
    * tecla (ver --factor-tecla y geometria.test.ts) está medida con sus
    * métricas, y OpenDyslexic es más ancha y más alta. Por eso es un token
    * aparte que la fuente para dislexia no toca. */
-  --font-key: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-key: "Atkinson Hyperlegible Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   /* Fuente para dislexia: se activa poniendo data-font="dyslexic" en <html>.
    * La fuente viene incluida (@font-face de arriba); la sans del sistema solo
@@ -86,57 +149,101 @@
   --space-4: calc(1rem * var(--ui-scale));
   --space-6: calc(1.5rem * var(--ui-scale));
   --space-8: calc(2rem * var(--ui-scale));
-  --radius: 8px;
-  --radius-key: 6px;
+  /* Radios por tipo de pieza: cuanto más grande la pieza, más redondeada. */
+  --radius-sm: 6px;     /* marcas pequeñas: el cursor del texto, insignias */
+  --radius: 12px;       /* botones y campos */
+  --radius-card: 16px;  /* tarjetas: el texto de práctica, la pista */
+  --radius-panel: 22px; /* paneles y diálogos superpuestos */
+  --radius-chip: 999px; /* píldoras */
+  --radius-key: 10px;   /* teclas del teclado en pantalla */
 
   /* Objetivo mínimo de pulsación. 44px es el mínimo de WCAG 2.2 (2.5.8);
    * usamos 48 porque el público incluye niños y personas mayores. */
   --target-min: 48px;
+  /* El botón principal de cada pantalla es algo más alto que el resto. */
+  --target-primario: 52px;
 
-  /* --- Color: claro --- */
-  --bg: #faf9f7;
-  --surface: #ffffff;
-  --surface-sunken: #f0eee9;
+  /* --- Sombras ---
+   * La del botón principal es un canto sólido, no un difuminado: se lee como
+   * «esto se pulsa» también para quien no distingue bien los degradados. */
+  --shadow-boton: 0 3px 0 var(--accent-deep);
+  --shadow-panel: 0 24px 60px rgba(0, 0, 0, 0.28);
+
+  /* --- Color: claro ---------------------------------------------------------
+   * Papel cálido y acento terracota. Lo medido está en accesibilidad.test.ts:
+   * texto a 4,5:1 o más sobre los tres fondos, contorno de controles a 3:1. */
+  --bg: #f6f3ec;
+  --surface: #fffdf8;
+  --surface-sunken: #ece7dc;
   /* Dos bordes con usos distintos. --border es para separadores decorativos
    * (líneas entre zonas), que no identifican nada y pueden ser tenues.
    * --border-strong es para el contorno de cualquier control o de las teclas:
    * eso sí lo exige WCAG 1.4.11 a 3:1, y --border se queda en 1,4:1. Lo
    * comprueba accesibilidad.test.ts. */
-  --border: #d9d5cd;
-  --border-strong: #8c867b;
+  --border: #ddd5c6;
+  --border-strong: #8d8372;
 
-  --fg: #1b1b19;
-  --fg-muted: #5f5c55;
+  --fg: #1f1c17;
+  --fg-muted: #655e53;
 
-  --accent: #1d4ed8;
+  /* --accent es para rellenos y contornos (el botón principal, el cursor, la
+   * lección actual); como color de TEXTO sobre el papel no llega a 4,5:1, y
+   * para eso está --accent-ink. --accent-deep es solo el canto del botón. */
+  --accent: #c0532f;
   --accent-fg: #ffffff;
+  --accent-deep: #8a3518;
+  --accent-ink: #a2421f;
+  --accent-soft: #f7e2d6;
 
-  /* Estos tres nunca se usan solos: siempre acompañados de forma, icono o
+  /* Estos nunca se usan solos: siempre acompañados de forma, icono o
    * subrayado. Un daltónico no debe depender del color para saber si acertó. */
-  --ok: #15803d;
-  --ok-bg: #dcfce7;
-  --error: #b91c1c;
-  --error-bg: #fee2e2;
-  --pending: #92400e;
-  --pending-bg: #fef3c7;
+  --ok: #2e794d;
+  --ok-bg: #e1f1e6;
+  --error: #b3261e;
+  --error-bg: #fbe1da;
+  --pending: #8a5300;
+  --pending-bg: #fbefd2;
 
-  /* --- Dedos: ocho tonos distinguibles ---
-   * Se refuerzan siempre con el número de dedo en texto, nunca solo color. */
-  --finger-l-pinky: #7c3aed;
-  --finger-l-ring: #2563eb;
-  --finger-l-middle: #0891b2;
-  --finger-l-index: #059669;
-  --finger-r-index: #a16207;
-  --finger-r-middle: #ea580c;
-  --finger-r-ring: #dc2626;
-  --finger-r-pinky: #be185d;
-  --finger-thumb: #475569;
+  /* Celebración (récords, constancia). --celebracion rellena y perfila, con
+   * --on-celebracion encima; --celebracion-deep es solo canto o sombra, como
+   * --accent-deep. Ninguna de las dos es color de texto sobre el papel: sobre
+   * --celebracion-soft el texto va en --fg. */
+  --celebracion: #b97a00;
+  --celebracion-deep: #7d5200;
+  --celebracion-soft: #fbefd2;
+  --on-celebracion: #1f1c17;
+
+  /* Fondo de lo que queda detrás de un panel o diálogo. */
+  --scrim: rgba(31, 28, 23, 0.45);
+
+  /* --- Dedos: nueve tonos distinguibles ---
+   * Se refuerzan siempre con el nombre del dedo en texto, nunca solo color.
+   * --on-finger es el texto sobre CUALQUIERA de ellos (la tecla siguiente, la
+   * teja de la pista): en claro los dedos son oscuros y va en blanco; en
+   * oscuro son claros y va en oscuro. Medido en accesibilidad.test.ts. */
+  --on-finger: #ffffff;
+  --finger-l-pinky: #7b5cc4;
+  --finger-l-ring: #3f6fc4;
+  --finger-l-middle: #1a8196;
+  --finger-l-index: #2c8655;
+  --finger-r-index: #967110;
+  --finger-r-middle: #bb5b23;
+  --finger-r-ring: #c8423a;
+  --finger-r-pinky: #b84784;
+  --finger-thumb: #6b7280;
 
   /* Alias de cinco dedos */
   --finger-pinky: var(--finger-l-pinky);
   --finger-ring: var(--finger-l-ring);
   --finger-middle: var(--finger-l-middle);
   --finger-index: var(--finger-l-index);
+
+  /* Muestras del selector de tono. Existen aparte porque hay que poder enseñar
+     el aspecto del tono de juego mientras la aplicación va en sobrio, y al
+     revés, sin que ninguna de las dos quede fuera del tema en curso. */
+  --muestra-juego-bg: #fbefd2;
+  --muestra-juego-chip: #b97a00;
+  --muestra-juego-texto: #1f1c17;
 
   /* --- Movimiento --- */
   --motion-fast: 90ms;
@@ -146,38 +253,46 @@
 }
 
 /* Oscuro: solo se redefinen tokens, nunca se declara un color por primera vez
- * dentro de este bloque. */
+ * dentro de este bloque. Los dedos pasan a tonos claros y por eso --on-finger
+ * pasa a oscuro. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #15151a;
-    --surface: #1d1d24;
-    --surface-sunken: #111116;
-    --border: #33333d;
-    --border-strong: #707080;
-
-    --fg: #ecebe7;
-    --fg-muted: #a3a09a;
-
-    --accent: #7ba7f5;
-    --accent-fg: #10131a;
-
-    --ok: #4ade80;
-    --ok-bg: #14361f;
-    --error: #fb7185;
-    --error-bg: #3f1520;
-    --pending: #fbbf24;
-    --pending-bg: #3b2c08;
-
-    --finger-l-pinky: #c4b5fd;
-    --finger-l-ring: #93c5fd;
-    --finger-l-middle: #67e8f9;
-    --finger-l-index: #6ee7b7;
-    --finger-r-index: #fde047;
-    --finger-r-middle: #fdba74;
-    --finger-r-ring: #fca5a5;
-    --finger-r-pinky: #f9a8d4;
-    --finger-thumb: #94a3b8;
-
+    --bg: #1a1815;
+    --surface: #24211d;
+    --surface-sunken: #16140f;
+    --border: #3a352e;
+    --border-strong: #726a5d;
+    --fg: #efe9de;
+    --fg-muted: #aba294;
+    --accent: #ec8d66;
+    --accent-fg: #1a1815;
+    --accent-deep: #a8532f;
+    --accent-ink: #f2a585;
+    --accent-soft: #3b241a;
+    --ok: #86d3a0;
+    --ok-bg: #1d3326;
+    --error: #ff9183;
+    --error-bg: #42201a;
+    --pending: #f0c062;
+    --pending-bg: #3a2f17;
+    --celebracion: #f0c062;
+    --celebracion-deep: #a8801f;
+    --celebracion-soft: #3a2f17;
+    --on-celebracion: #1a1815;
+    --scrim: rgba(8, 7, 5, 0.62);
+    --on-finger: #1a1815;
+    --finger-l-pinky: #a993e8;
+    --finger-l-ring: #83a8ec;
+    --finger-l-middle: #62c1d1;
+    --finger-l-index: #76cf98;
+    --finger-r-index: #e0bb52;
+    --finger-r-middle: #f0a06a;
+    --finger-r-ring: #f08b80;
+    --finger-r-pinky: #e889b8;
+    --finger-thumb: #9aa3b2;
+    --muestra-juego-bg: #3a2f17;
+    --muestra-juego-chip: #f0c062;
+    --muestra-juego-texto: #1a1815;
     --finger-pinky: var(--finger-l-pinky);
     --finger-ring: var(--finger-l-ring);
     --finger-middle: var(--finger-l-middle);
@@ -186,30 +301,42 @@
 }
 
 :root[data-theme="dark"] {
-  --bg: #15151a;
-  --surface: #1d1d24;
-  --surface-sunken: #111116;
-  --border: #33333d;
-  --border-strong: #707080;
-  --fg: #ecebe7;
-  --fg-muted: #a3a09a;
-  --accent: #7ba7f5;
-  --accent-fg: #10131a;
-  --ok: #4ade80;
-  --ok-bg: #14361f;
-  --error: #fb7185;
-  --error-bg: #3f1520;
-  --pending: #fbbf24;
-  --pending-bg: #3b2c08;
-  --finger-l-pinky: #c4b5fd;
-  --finger-l-ring: #93c5fd;
-  --finger-l-middle: #67e8f9;
-  --finger-l-index: #6ee7b7;
-  --finger-r-index: #fde047;
-  --finger-r-middle: #fdba74;
-  --finger-r-ring: #fca5a5;
-  --finger-r-pinky: #f9a8d4;
-  --finger-thumb: #94a3b8;
+  --bg: #1a1815;
+  --surface: #24211d;
+  --surface-sunken: #16140f;
+  --border: #3a352e;
+  --border-strong: #726a5d;
+  --fg: #efe9de;
+  --fg-muted: #aba294;
+  --accent: #ec8d66;
+  --accent-fg: #1a1815;
+  --accent-deep: #a8532f;
+  --accent-ink: #f2a585;
+  --accent-soft: #3b241a;
+  --ok: #86d3a0;
+  --ok-bg: #1d3326;
+  --error: #ff9183;
+  --error-bg: #42201a;
+  --pending: #f0c062;
+  --pending-bg: #3a2f17;
+  --celebracion: #f0c062;
+  --celebracion-deep: #a8801f;
+  --celebracion-soft: #3a2f17;
+  --on-celebracion: #1a1815;
+  --scrim: rgba(8, 7, 5, 0.62);
+  --on-finger: #1a1815;
+  --finger-l-pinky: #a993e8;
+  --finger-l-ring: #83a8ec;
+  --finger-l-middle: #62c1d1;
+  --finger-l-index: #76cf98;
+  --finger-r-index: #e0bb52;
+  --finger-r-middle: #f0a06a;
+  --finger-r-ring: #f08b80;
+  --finger-r-pinky: #e889b8;
+  --finger-thumb: #9aa3b2;
+  --muestra-juego-bg: #3a2f17;
+  --muestra-juego-chip: #f0c062;
+  --muestra-juego-texto: #1a1815;
   --finger-pinky: var(--finger-l-pinky);
   --finger-ring: var(--finger-l-ring);
   --finger-middle: var(--finger-l-middle);
@@ -231,6 +358,16 @@
     --fg-muted: CanvasText;
     --accent: Highlight;
     --accent-fg: HighlightText;
+    --accent-deep: CanvasText;
+    --accent-ink: LinkText;
+    --accent-soft: Canvas;
+    --celebracion: Highlight;
+    --celebracion-deep: CanvasText;
+    --celebracion-soft: Canvas;
+    --on-celebracion: HighlightText;
+    --scrim: Canvas;
+    --shadow-boton: none;
+    --shadow-panel: none;
   }
 }
 
@@ -264,52 +401,11 @@
  * lo necesitan por igual el niño y la persona mayor, y vive en --ui-scale.
  *
  * Sin data-tono se usa el sobrio, que es el estado por defecto: es más fácil
- * perdonar que una app te hable seria de más que al revés.
+ * perdonar que una app te hable seria de más que al revés. Los dos tonos
+ * comparten paleta (la terracota es de la aplicación, no del tono); lo que
+ * cambia con el de celebración son las piezas que usan --celebracion y la
+ * franja de colores de dedo, que deciden los propios componentes.
  */
-:root {
-  /* Color de celebración. En sobrio no se usa; se declara aquí para que exista
-     en los tres estados de tema. */
-  --celebracion: #b45309;
-
-  /* Muestras del selector de tono. Existen aparte porque hay que poder enseñar
-     el aspecto del tono de juego mientras la aplicación va en sobrio, y al
-     revés, sin que ninguna de las dos quede fuera del tema en curso. */
-  --muestra-juego-bg: #f1e9fe;
-  --muestra-juego-chip: #7c3aed;
-  --muestra-juego-texto: #ffffff;
-}
-
-:root[data-tono="juego"] {
-  --accent: #7c3aed;
-  --accent-soft: #f1e9fe;
-  --celebracion: #d97706;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --celebracion: #fbbf24;
-    --muestra-juego-bg: #241a3d;
-    --muestra-juego-chip: #b39cf8;
-    --muestra-juego-texto: #16101f;
-  }
-  :root[data-tono="juego"]:not([data-theme="light"]) {
-    --accent: #b39cf8;
-    --accent-soft: #241a3d;
-    --celebracion: #fbbf24;
-  }
-}
-
-:root[data-theme="dark"] {
-  --celebracion: #fbbf24;
-  --muestra-juego-bg: #241a3d;
-  --muestra-juego-chip: #b39cf8;
-  --muestra-juego-texto: #16101f;
-}
-:root[data-theme="dark"][data-tono="juego"] {
-  --accent: #b39cf8;
-  --accent-soft: #241a3d;
-  --celebracion: #fbbf24;
-}
 
 :root[data-font="dyslexic"] {
   --font-stack: "OpenDyslexic", var(--font-ui);
@@ -351,19 +447,6 @@ body {
   border-radius: 3px;
 }
 
-button {
-  font: inherit;
-  min-height: var(--target-min);
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--fg);
-  cursor: pointer;
-  transition: background var(--motion-fast) var(--ease);
-}
-button:hover { background: var(--surface-sunken); }
-
 /* Solo para lectores de pantalla. */
 .sr-only {
   position: absolute; width: 1px; height: 1px;
@@ -388,7 +471,7 @@ button:hover { background: var(--surface-sunken); }
  * selector; el test comprueba que las seis copias digan lo mismo.
  *
  * Va al final del fichero a propósito: con la misma especificidad gana el
- * último, y tiene que ganarle también al color del tono de juego.
+ * último, y tiene que ganarle a la paleta normal y al tema elegido.
  */
 :root[data-contrast="alto"] {
   --bg: #ffffff;
@@ -400,6 +483,8 @@ button:hover { background: var(--surface-sunken); }
   --fg-muted: #2e2e2e;
   --accent: #0033a0;
   --accent-fg: #ffffff;
+  --accent-deep: #001a57;
+  --accent-ink: #0033a0;
   --accent-soft: #e5ebf7;
   --ok: #005c1f;
   --ok-bg: #e3f5e9;
@@ -408,6 +493,10 @@ button:hover { background: var(--surface-sunken); }
   --pending: #6a3200;
   --pending-bg: #fff2d4;
   --celebracion: #6a3200;
+  --celebracion-deep: #3b1c00;
+  --celebracion-soft: #fff2d4;
+  --on-celebracion: #ffffff;
+  --on-finger: #ffffff;
   --finger-l-pinky: #5b21b6;
   --finger-l-ring: #1d4ed8;
   --finger-l-middle: #0e7490;
@@ -433,6 +522,8 @@ button:hover { background: var(--surface-sunken); }
     --fg-muted: #d9d9d9;
     --accent: #ffd60a;
     --accent-fg: #000000;
+    --accent-deep: #8f7800;
+    --accent-ink: #ffd60a;
     --accent-soft: #2e2700;
     --ok: #6dff9b;
     --ok-bg: #00290f;
@@ -441,6 +532,10 @@ button:hover { background: var(--surface-sunken); }
     --pending: #ffd27a;
     --pending-bg: #2e2000;
     --celebracion: #ffd60a;
+    --celebracion-deep: #8f7800;
+    --celebracion-soft: #2e2700;
+    --on-celebracion: #000000;
+    --on-finger: #000000;
     --finger-l-pinky: #d8ccff;
     --finger-l-ring: #a9d1ff;
     --finger-l-middle: #8af0ff;
@@ -466,6 +561,8 @@ button:hover { background: var(--surface-sunken); }
   --fg-muted: #d9d9d9;
   --accent: #ffd60a;
   --accent-fg: #000000;
+  --accent-deep: #8f7800;
+  --accent-ink: #ffd60a;
   --accent-soft: #2e2700;
   --ok: #6dff9b;
   --ok-bg: #00290f;
@@ -474,6 +571,10 @@ button:hover { background: var(--surface-sunken); }
   --pending: #ffd27a;
   --pending-bg: #2e2000;
   --celebracion: #ffd60a;
+  --celebracion-deep: #8f7800;
+  --celebracion-soft: #2e2700;
+  --on-celebracion: #000000;
+  --on-finger: #000000;
   --finger-l-pinky: #d8ccff;
   --finger-l-ring: #a9d1ff;
   --finger-l-middle: #8af0ff;
@@ -500,6 +601,8 @@ button:hover { background: var(--surface-sunken); }
     --fg-muted: #2e2e2e;
     --accent: #0033a0;
     --accent-fg: #ffffff;
+    --accent-deep: #001a57;
+    --accent-ink: #0033a0;
     --accent-soft: #e5ebf7;
     --ok: #005c1f;
     --ok-bg: #e3f5e9;
@@ -508,6 +611,10 @@ button:hover { background: var(--surface-sunken); }
     --pending: #6a3200;
     --pending-bg: #fff2d4;
     --celebracion: #6a3200;
+    --celebracion-deep: #3b1c00;
+    --celebracion-soft: #fff2d4;
+    --on-celebracion: #ffffff;
+    --on-finger: #ffffff;
     --finger-l-pinky: #5b21b6;
     --finger-l-ring: #1d4ed8;
     --finger-l-middle: #0e7490;
@@ -534,6 +641,8 @@ button:hover { background: var(--surface-sunken); }
     --fg-muted: #d9d9d9;
     --accent: #ffd60a;
     --accent-fg: #000000;
+    --accent-deep: #8f7800;
+    --accent-ink: #ffd60a;
     --accent-soft: #2e2700;
     --ok: #6dff9b;
     --ok-bg: #00290f;
@@ -542,6 +651,10 @@ button:hover { background: var(--surface-sunken); }
     --pending: #ffd27a;
     --pending-bg: #2e2000;
     --celebracion: #ffd60a;
+    --celebracion-deep: #8f7800;
+    --celebracion-soft: #2e2700;
+    --on-celebracion: #000000;
+    --on-finger: #000000;
     --finger-l-pinky: #d8ccff;
     --finger-l-ring: #a9d1ff;
     --finger-l-middle: #8af0ff;
@@ -568,6 +681,8 @@ button:hover { background: var(--surface-sunken); }
     --fg-muted: #d9d9d9;
     --accent: #ffd60a;
     --accent-fg: #000000;
+    --accent-deep: #8f7800;
+    --accent-ink: #ffd60a;
     --accent-soft: #2e2700;
     --ok: #6dff9b;
     --ok-bg: #00290f;
@@ -576,6 +691,10 @@ button:hover { background: var(--surface-sunken); }
     --pending: #ffd27a;
     --pending-bg: #2e2000;
     --celebracion: #ffd60a;
+    --celebracion-deep: #8f7800;
+    --celebracion-soft: #2e2700;
+    --on-celebracion: #000000;
+    --on-finger: #000000;
     --finger-l-pinky: #d8ccff;
     --finger-l-ring: #a9d1ff;
     --finger-l-middle: #8af0ff;

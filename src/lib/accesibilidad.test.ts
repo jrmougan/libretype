@@ -42,70 +42,79 @@ function blend(fgHex: string, bgHex: string, alpha: number): string {
   return "#" + toHex(r) + toHex(g) + toHex(b);
 }
 
+/** Valor de un token en el primer bloque que lo define a partir de `desde`. */
+function token(nombre: string, desde: string): string {
+  const bloque = tokensCss.slice(tokensCss.indexOf(desde));
+  const m = bloque.match(new RegExp(`${nombre}:\\s*(#[0-9a-fA-F]{6});`));
+  if (!m) throw new Error(`no encuentro ${nombre} tras ${desde}`);
+  return m[1];
+}
+
+/** Dónde empieza cada paleta normal en tokens.css. */
+const TEMAS = {
+  claro: ":root {",
+  "oscuro del sistema": "@media (prefers-color-scheme: dark)",
+  "oscuro elegido": ':root[data-theme="dark"] {',
+} as const;
+
+const DEDOS = [
+  "--finger-l-pinky", "--finger-l-ring", "--finger-l-middle", "--finger-l-index",
+  "--finger-r-index", "--finger-r-middle", "--finger-r-ring", "--finger-r-pinky",
+  "--finger-thumb",
+] as const;
+
 describe("Accesibilidad visual (WCAG 2.2)", () => {
+  // Se leen los valores del propio tokens.css: antes estaban copiados aquí y,
+  // al cambiar la paleta, el test seguía midiendo los colores viejos.
   describe("Issue #12: Contraste de bordes de interfaz (>= 3:1, WCAG 1.4.11)", () => {
-    it("tema claro: --border-strong tiene ratio >= 3:1 frente a --surface y --bg", () => {
-      const bg = "#faf9f7";
-      const surface = "#ffffff";
-      const borderStrong = "#8c867b";
-
-      expect(tokensCss).toContain("--border-strong: #8c867b;");
-      expect(contrast(borderStrong, surface)).toBeGreaterThanOrEqual(3.0);
-      expect(contrast(borderStrong, bg)).toBeGreaterThanOrEqual(3.0);
-    });
-
-    it("tema oscuro: --border-strong tiene ratio >= 3:1 frente a --surface y --bg", () => {
-      const bg = "#15151a";
-      const surface = "#1d1d24";
-      const borderStrong = "#707080";
-
-      expect(tokensCss).toContain("--border-strong: #707080;");
-      expect(contrast(borderStrong, surface)).toBeGreaterThanOrEqual(3.0);
-      expect(contrast(borderStrong, bg)).toBeGreaterThanOrEqual(3.0);
-    });
+    for (const [tema, desde] of Object.entries(TEMAS)) {
+      it(`${tema}: --border-strong tiene ratio >= 3:1 frente a --surface y --bg`, () => {
+        const borde = token("--border-strong", desde);
+        expect(contrast(borde, token("--surface", desde))).toBeGreaterThanOrEqual(3.0);
+        expect(contrast(borde, token("--bg", desde))).toBeGreaterThanOrEqual(3.0);
+      });
+    }
   });
 
   describe("Issue #14: Etiquetas atenuadas del teclado (>= 4.5:1, WCAG 1.4.3)", () => {
-    it("la opacidad mínima de etiqueta atenuada no cae de 4.5:1 en tema claro", () => {
-      const bgTecla = "#f0eee9"; // --surface-sunken en claro
-      const fgTecla = "#1b1b19"; // --fg en claro
+    // La tecla puede pintarse sobre --surface o sobre --surface-sunken (las de
+    // control): se exige en las dos.
+    const FONDOS_TECLA = ["--surface", "--surface-sunken"];
 
-      for (let d = 0.5; d < DOMINADA; d += 0.01) {
-        const opac = opacidadEtiqueta(d);
-        const colorAtenuado = blend(fgTecla, bgTecla, opac);
-        const ratio = contrast(colorAtenuado, bgTecla);
-        expect(ratio, "dominio " + d.toFixed(2) + " con opac " + opac.toFixed(2)).toBeGreaterThanOrEqual(4.5);
-      }
-    });
+    for (const [tema, desde] of Object.entries(TEMAS)) {
+      it(`${tema}: la opacidad mínima de etiqueta atenuada no cae de 4.5:1`, () => {
+        const fgTecla = token("--fg", desde);
+        for (const fondo of FONDOS_TECLA) {
+          const bgTecla = token(fondo, desde);
+          for (let d = 0.5; d < DOMINADA; d += 0.01) {
+            const opac = opacidadEtiqueta(d);
+            const ratio = contrast(blend(fgTecla, bgTecla, opac), bgTecla);
+            expect(ratio, `${fondo}, dominio ${d.toFixed(2)} con opac ${opac.toFixed(2)}`)
+              .toBeGreaterThanOrEqual(4.5);
+          }
+        }
+      });
 
-    it("el punto de tecla aprendida cumple contraste >= 4.5:1 sobre la tecla", () => {
-      const bgTecla = "#f0eee9";
-      const fgMuted = "#5f5c55";
-      expect(contrast(fgMuted, bgTecla)).toBeGreaterThanOrEqual(4.5);
-    });
+      it(`${tema}: el punto de tecla aprendida cumple contraste >= 4.5:1 sobre la tecla`, () => {
+        for (const fondo of FONDOS_TECLA) {
+          expect(contrast(token("--fg-muted", desde), token(fondo, desde)), fondo)
+            .toBeGreaterThanOrEqual(4.5);
+        }
+      });
+    }
   });
 
   describe("Issue #17: Colores de dedo con contraste >= 3:1 (WCAG 1.4.11)", () => {
-    const dedosClaro: Record<string, string> = {
-      "--finger-l-pinky": "#7c3aed",
-      "--finger-l-ring": "#2563eb",
-      "--finger-l-middle": "#0891b2",
-      "--finger-l-index": "#059669",
-      "--finger-r-index": "#a16207",
-      "--finger-r-middle": "#ea580c",
-      "--finger-r-ring": "#dc2626",
-      "--finger-r-pinky": "#be185d",
-      "--finger-thumb": "#475569",
-    };
-
-    const bgClaro = "#faf9f7";
-    const surfaceClaro = "#ffffff";
-
-    for (const [nombre, hex] of Object.entries(dedosClaro)) {
-      it(nombre + " (" + hex + ") cumple contraste >= 3:1 frente a bg y surface", () => {
-        expect(contrast(hex, bgClaro), nombre + " vs bg").toBeGreaterThanOrEqual(3.0);
-        expect(contrast(hex, surfaceClaro), nombre + " vs surface").toBeGreaterThanOrEqual(3.0);
-      });
+    for (const [tema, desde] of Object.entries(TEMAS)) {
+      for (const nombre of DEDOS) {
+        it(`${tema}: ${nombre} cumple contraste >= 3:1 frente a bg, surface y la tecla`, () => {
+          const hex = token(nombre, desde);
+          for (const fondo of ["--bg", "--surface", "--surface-sunken"]) {
+            expect(contrast(hex, token(fondo, desde)), `${nombre} vs ${fondo}`)
+              .toBeGreaterThanOrEqual(3.0);
+          }
+        });
+      }
     }
 
     it("define los 5 alias de dedos y pulgar en tokens.css", () => {
@@ -183,21 +192,7 @@ describe("Accesibilidad visual (WCAG 2.2)", () => {
 });
 
 describe("Contraste de controles y teclas (roadmap 0.10, WCAG 1.4.11)", () => {
-  /** Valor de un token en el primer bloque que lo define a partir de `desde`. */
-  function token(nombre: string, desde: string): string {
-    const bloque = tokensCss.slice(tokensCss.indexOf(desde));
-    const m = bloque.match(new RegExp(`${nombre}:\\s*(#[0-9a-fA-F]{6});`));
-    if (!m) throw new Error(`no encuentro ${nombre} tras ${desde}`);
-    return m[1];
-  }
-
-  const temas = {
-    claro: ":root {",
-    "oscuro del sistema": "@media (prefers-color-scheme: dark)",
-    "oscuro elegido": ':root[data-theme="dark"] {',
-  };
-
-  for (const [tema, desde] of Object.entries(temas)) {
+  for (const [tema, desde] of Object.entries(TEMAS)) {
     it(`${tema}: el contorno de controles y teclas llega a 3:1 con lo que tiene al lado`, () => {
       const borde = token("--border-strong", desde);
       // La tecla en reposo se rellena con --surface-sunken y está sobre --bg;
@@ -267,6 +262,89 @@ describe("Tipografía para dislexia (roadmap 0.9)", () => {
     const bloque = tokensCss.slice(tokensCss.indexOf(':root[data-font="dyslexic"]'));
     expect(bloque.slice(0, bloque.indexOf("}"))).not.toContain("--font-key");
   });
+});
+
+describe("Tipografía Atkinson Hyperlegible, incluida con la app", () => {
+  const caras = [...tokensCss.matchAll(/@font-face\s*\{[^}]*\}/g)].map((m) => m[0]);
+
+  for (const familia of ["Atkinson Hyperlegible Next", "Atkinson Hyperlegible Mono"]) {
+    it(`${familia}: normal, media y negrita, en woff2 de verdad y sin pedir nada a la red`, () => {
+      const propias = caras.filter((c) => c.includes(`font-family: "${familia}"`));
+      expect(propias.map((c) => c.match(/font-weight:\s*(\d+)/)?.[1]).sort()).toEqual(["400", "500", "700"]);
+      for (const cara of propias) {
+        const url = cara.match(/url\("\.\.\/([^"]+)"\)/)?.[1];
+        expect(url, "cada cara apunta a un fichero del paquete").toMatch(/^assets\/fonts\/.+\.woff2$/);
+        expect(readFileSync(`src/${url}`, "latin1").slice(0, 4), url).toBe("wOF2");
+      }
+      const licencia = readFileSync(`src/assets/fonts/OFL-${familia.replace(/ /g, "")}.txt`, "utf8");
+      expect(licencia).toContain("SIL Open Font License, Version 1.1");
+      expect(licencia).toContain(familia);
+    });
+  }
+
+  it("ninguna fuente se carga de un servidor", () => {
+    expect(tokensCss).not.toMatch(/url\(["']?https?:/);
+    expect(tokensCss).not.toMatch(/@import/);
+  });
+
+  it("la interfaz va en Next y el texto de práctica y las teclas en Mono", () => {
+    expect(tokensCss).toMatch(/--font-ui:\s*"Atkinson Hyperlegible Next",/);
+    expect(tokensCss).toMatch(/--font-drill:\s*"Atkinson Hyperlegible Mono",/);
+    expect(tokensCss).toMatch(/--font-key:\s*"Atkinson Hyperlegible Mono",/);
+  });
+});
+
+/**
+ * Pares de color de la dirección visual 1a. Cada par es uno que un componente
+ * pinta de verdad (texto sobre fondo); si alguien retoca la paleta, se mide el
+ * valor nuevo.
+ */
+describe("Paleta: texto sobre sus fondos (WCAG 1.4.3, 4,5:1)", () => {
+  for (const [tema, desde] of Object.entries(TEMAS)) {
+    const t = (nombre: string) => token(nombre, desde);
+    const par = (texto: string, fondo: string) =>
+      expect(contrast(t(texto), t(fondo)), `${tema}: ${texto} sobre ${fondo}`).toBeGreaterThanOrEqual(4.5);
+
+    it(`${tema}: --on-finger se lee sobre CUALQUIER color de dedo`, () => {
+      // La tecla siguiente y la teja de la pista ponen la letra encima del
+      // color del dedo. La maqueta la ponía siempre en blanco, y en oscuro (o
+      // con el amarillo del índice derecho en claro) no llegaba.
+      for (const dedo of DEDOS) par("--on-finger", dedo);
+    });
+
+    it(`${tema}: el botón principal y el cursor del texto (--accent-fg sobre --accent)`, () => {
+      par("--accent-fg", "--accent");
+    });
+
+    it(`${tema}: los enlaces y chips en acento (--accent-ink)`, () => {
+      for (const fondo of ["--surface", "--bg", "--accent-soft"]) par("--accent-ink", fondo);
+    });
+
+    it(`${tema}: la insignia de récord (--on-celebracion sobre --celebracion)`, () => {
+      par("--on-celebracion", "--celebracion");
+      par("--fg", "--celebracion-soft");
+    });
+
+    it(`${tema}: el texto secundario sobre los tres fondos`, () => {
+      for (const fondo of ["--surface", "--bg", "--surface-sunken"]) {
+        par("--fg-muted", fondo);
+        par("--fg", fondo);
+      }
+    });
+
+    it(`${tema}: acierto, error y aviso sobre su fondo y sobre el papel`, () => {
+      for (const estado of ["--ok", "--error", "--pending"]) {
+        par(estado, `${estado}-bg`);
+        par(estado, "--surface");
+      }
+    });
+
+    it(`${tema}: el contorno de controles llega a 3:1 (WCAG 1.4.11)`, () => {
+      for (const fondo of ["--bg", "--surface", "--surface-sunken"]) {
+        expect(contrast(t("--border-strong"), t(fondo))).toBeGreaterThanOrEqual(3);
+      }
+    });
+  }
 });
 
 /**
@@ -346,6 +424,18 @@ describe("Alto contraste propio (2.2)", () => {
           expect(contrast(t[d], t["--bg"]), d).toBeGreaterThanOrEqual(3);
           expect(contrast(t[d], t["--surface-sunken"]), d).toBeGreaterThanOrEqual(3);
         }
+      });
+
+      it("los tokens nuevos de la paleta también se leen (on-finger, accent-ink, celebración)", () => {
+        const dedos = Object.keys(t).filter((k) => k.startsWith("--finger-"));
+        for (const d of dedos) {
+          expect(contrast(t["--on-finger"], t[d]), `--on-finger sobre ${d}`).toBeGreaterThanOrEqual(4.5);
+        }
+        for (const fondo of [...fondos, "--accent-soft"]) {
+          expect(contrast(t["--accent-ink"], t[fondo]), `--accent-ink sobre ${fondo}`).toBeGreaterThanOrEqual(7);
+        }
+        expect(contrast(t["--on-celebracion"], t["--celebracion"])).toBeGreaterThanOrEqual(7);
+        expect(contrast(t["--fg"], t["--celebracion-soft"])).toBeGreaterThanOrEqual(7);
       });
 
       it("la letra atenuada de una tecla casi dominada sigue a 4,5:1 o más", () => {

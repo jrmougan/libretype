@@ -260,6 +260,16 @@ lección, `lessons.test.ts` comprueba lo que importa: que no use teclas sin
 enseñar, que practique las que estrena, que ninguna meta más de cinco de golpe
 y que las tildes lleguen con las cinco vocales ya dadas.
 
+**Ese texto fijo solo se ve en el primer intento.** A partir del segundo,
+`generador.ts` construye uno nuevo con el vocabulario desbloqueado y las
+`frases` de cada lección, dando más peso a las teclas que estrena; si no, al
+tercer intento el 90% mide memoria y no destreza. Es determinista con semilla,
+y `generador.test.ts` exige a cientos de semillas lo mismo que `lessons.test.ts`
+a los textos fijos. Las frases van en minúscula y sin signos hasta que esas
+teclas se enseñan; el generador les pone la mayúscula y el punto en cuanto
+están dadas. El refuerzo de teclas flojas (`refuerzo.ts`) sale del mismo
+generador y tampoco se sale de lo enseñado.
+
 ## Compilación continua
 
 `.github/workflows/`. Lo barato corre siempre (tipos, tests, backend y el spike

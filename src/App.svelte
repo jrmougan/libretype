@@ -983,6 +983,10 @@
 
   <!-- Superpuesto: aparecer no puede mover el teclado de sitio. -->
   {#if result}
+    {@const repetirPrimero = result.stats.accuracy < 90}
+    {@const enTemario = vista === 'leccion' && !leccionPersonalizada}
+    {@const siguienteLeccion = enTemario && lessonIx < maxDesbloqueado ? LESSONS[lessonIx + 1] : null}
+    {@const conRepaso = enTemario && leccionesOxidadas(sesiones, undefined, lesson.id).length > 0}
     <dialog
       id="dialogo-resultado"
       class="capa"
@@ -1001,77 +1005,98 @@
         class:celebra={result.record && prefs.tono === 'juego'}
         aria-live="polite"
       >
-        <strong id="resultado-titulo">
-          {#if result.record}★ {/if}{textosRes?.titulo}
-        </strong>
-        <div id="resultado-desc">
-          <span>{result.stats.wpm} palabras por minuto, {result.stats.accuracy}% de precisión.</span>
-          <span class="animo">{textosRes?.animo}</span>
-        </div>
-        {#if vista === 'leccion' && !leccionPersonalizada}
-          <p class="note">
-            {#if superadas.has(lesson.id)}
-              Lección superada.{lessonIx === LESSONS.length - 1 ? ' Has completado el temario.' : ' Puedes pasar a la siguiente lección.'}
-            {:else}
-              {OBJETIVO_PENDIENTE}
-            {/if}
-          </p>
-        {/if}
-        {#if vista === 'leccion' && !leccionPersonalizada && !superadas.has(lesson.id)}
-          <p class="note">{voz.horizonte}</p>
-        {/if}
-        {#if result.costaron.length > 0}
-          <p class="note costaron">
-            {voz.costaron} {enumerar(result.costaron.map((t) => t.nombre))}. {voz.costaronAnimo}
-          </p>
-        {/if}
-        {#if vista === 'fluidez' && valoracionFluidez}
-          <p class="note">{valoracionFluidez}</p>
-        {/if}
-        {#if result.sinMirar && result.sinMirar.length > 0}
-          <p class="note logro">
-            {result.sinMirar.length === 1 ? 'Ya escribes sin mirar la tecla' : 'Ya escribes sin mirar las teclas'}
-            {result.sinMirar.map((c) => `«${c}»`).join(', ')}{prefs.ayudaTeclado === 'auto'
-              ? (result.sinMirar.length === 1 ? ': su letra deja el teclado de la pantalla.' : ': sus letras dejan el teclado de la pantalla.')
-              : '.'}
-          </p>
-        {/if}
-        {#if errorGuardado}
-          <p class="note">No se pudo guardar el resultado. El avance de este intento solo estará disponible durante esta sesión.</p>
-        {/if}
-        <div class="botones">
-          {#if result.stats.accuracy < 90}
-            <button class="primario" onclick={again}>{voz.repetir}</button>
-            {#if vista === 'continua'}
-              <button onclick={() => nuevaContinua()}>Nuevo texto</button>
-            {:else if vista === 'fluidez'}
-              <button onclick={() => nuevaFluidez()}>Otra tanda</button>
-            {:else if vista === 'propio'}
-              <button onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
-            {:else if !leccionPersonalizada && lessonIx < maxDesbloqueado}
-              <button onclick={() => pick(lessonIx + 1)}>{voz.siguiente}</button>
-            {/if}
-          {:else}
-            <button onclick={again}>{voz.repetir}</button>
-            {#if vista === 'continua'}
-              <button class="primario" onclick={() => nuevaContinua()}>Nuevo texto</button>
-            {:else if vista === 'fluidez'}
-              <button class="primario" onclick={() => nuevaFluidez()}>Otra tanda</button>
-            {:else if vista === 'propio'}
-              <button class="primario" onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
-            {:else if !leccionPersonalizada && lessonIx < maxDesbloqueado}
-              <button class="primario" onclick={() => pick(lessonIx + 1)}>{voz.siguiente}</button>
-            {/if}
+        <!-- La franja con los colores de los dedos es del tono con
+             celebración: en el tranquilo, el resultado no se adorna. -->
+        {#if prefs.tono === 'juego'}<div class="franja" aria-hidden="true"></div>{/if}
+        <div class="res-cuerpo">
+          <div class="res-cab">
+            <!-- El récord se dice con la estrella y la palabra, no solo con el color. -->
+            {#if result.record}<span class="chip-record">★ Récord</span>{/if}
+            <h2 id="resultado-titulo">{textosRes?.titulo}</h2>
+          </div>
+
+          <div id="resultado-desc">
+            <div class="cifras">
+              <p class="cifra">
+                <span class="cifra-valor">{result.stats.wpm}</span>
+                <span class="cifra-eti">palabras por minuto,</span>
+              </p>
+              <!-- El fondo de acierto solo cuando lo es: por debajo del objetivo
+                   la tarjeta queda neutra, sin rojo ni reproche. -->
+              <p class="cifra" class:cifra-ok={!repetirPrimero}>
+                <span class="cifra-valor">{result.stats.accuracy}%</span>
+                <span class="cifra-eti">de precisión.</span>
+              </p>
+            </div>
+            <p class="animo">{textosRes?.animo}</p>
+          </div>
+
+          {#if enTemario}
+            <p class="note">
+              {#if superadas.has(lesson.id)}
+                Lección superada.{lessonIx === LESSONS.length - 1 ? ' Has completado el temario.' : ' Puedes pasar a la siguiente lección.'}
+              {:else}
+                {OBJETIVO_PENDIENTE}
+              {/if}
+            </p>
           {/if}
+          {#if enTemario && !superadas.has(lesson.id)}
+            <p class="note">{voz.horizonte}</p>
+          {/if}
+          {#if result.costaron.length > 0}
+            <p class="note costaron">
+              {voz.costaron} {enumerar(result.costaron.map((t) => t.nombre))}. {voz.costaronAnimo}
+            </p>
+          {/if}
+          {#if vista === 'fluidez' && valoracionFluidez}
+            <p class="note">{valoracionFluidez}</p>
+          {/if}
+          {#if result.sinMirar && result.sinMirar.length > 0}
+            <p class="note logro">
+              {result.sinMirar.length === 1 ? 'Ya escribes sin mirar la tecla' : 'Ya escribes sin mirar las teclas'}
+              {result.sinMirar.map((c) => `«${c}»`).join(', ')}{prefs.ayudaTeclado === 'auto'
+                ? (result.sinMirar.length === 1 ? ': su letra deja el teclado de la pantalla.' : ': sus letras dejan el teclado de la pantalla.')
+                : '.'}
+            </p>
+          {/if}
+          {#if errorGuardado}
+            <p class="note">No se pudo guardar el resultado. El avance de este intento solo estará disponible durante esta sesión.</p>
+          {/if}
+
+          <!-- Lo que se propone primero depende del intento: por debajo del
+               objetivo, repetir; si no, seguir. El primario se lleva el ancho. -->
+          <div class="botones" class:repetir-primero={repetirPrimero}>
+            <button class:primario={repetirPrimero} onclick={again}>{voz.repetir}</button>
+            {#if vista === 'continua'}
+              <button class:primario={!repetirPrimero} onclick={() => nuevaContinua()}>Nuevo texto</button>
+            {:else if vista === 'fluidez'}
+              <button class:primario={!repetirPrimero} onclick={() => nuevaFluidez()}>Otra tanda</button>
+            {:else if vista === 'propio'}
+              <button class:primario={!repetirPrimero} onclick={() => { dialogoResultado?.close(); enEdicionPropio = true; result = null; }}>Cambiar texto</button>
+            {:else if siguienteLeccion}
+              <button class="siguiente" class:primario={!repetirPrimero} onclick={() => pick(lessonIx + 1)}>
+                {voz.siguiente}<span class="sig-nombre"> · {siguienteLeccion.title}</span>
+              </button>
+            {/if}
+          </div>
         </div>
-        {#if vista === 'leccion' && !leccionPersonalizada && leccionesOxidadas(sesiones, undefined, lesson.id).length > 0}
-          <p class="note">{voz.repaso} Puedes practicar a tu ritmo con vocabulario conocido.</p>
-          <button onclick={() => { vista = 'continua'; nuevaContinua(maxDesbloqueado); }}>Repasar con práctica continua</button>
-        {/if}
-        {#if result.refuerzo}
+
+        {#if conRepaso || result.refuerzo}
           {@const refuerzo = result.refuerzo}
-          <p class="note">{voz.refuerzo}</p>
-          <button onclick={() => practicarRefuerzo(refuerzo)}>Practicar las teclas que más cuestan</button>
+          <div class="res-pie">
+            {#if conRepaso}
+              <div class="pie-fila">
+                <p class="note">{voz.repaso} Puedes practicar a tu ritmo con vocabulario conocido.</p>
+                <button class="suave" onclick={() => { vista = 'continua'; nuevaContinua(maxDesbloqueado); }}>Repasar con práctica continua</button>
+              </div>
+            {/if}
+            {#if refuerzo}
+              <div class="pie-fila">
+                <p class="note">{voz.refuerzo}</p>
+                <button class="suave" onclick={() => practicarRefuerzo(refuerzo)}>Practicar las teclas que más cuestan</button>
+              </div>
+            {/if}
+          </div>
         {/if}
       </div>
     </dialog>
@@ -1083,293 +1108,306 @@
   />
 
   {#if panelAbierto}
+    <!-- El <dialog> ocupa la ventana y pinta el velo; la caja va centrada
+         encima. Así el velo no depende de que ::backdrop herede los tokens. -->
     <dialog
       id="panel-dialogo"
       class="panel"
-      class:ancho={verTemario}
       bind:this={dialogoPanel}
       use:abrirDialogo
       aria-label={settingsOpen ? 'Ajustes' : verTemario ? 'Temario' : 'Progreso'}
       oncancel={(e) => { e.preventDefault(); cerrarPanel(); }}
     >
-      <div class="panel-cab">
-        <h2>{settingsOpen ? 'Ajustes' : verTemario ? 'Temario' : voz.progreso}{#if verProgreso && !settingsOpen && perfiles.length > 1} · {aliasActivo}{/if}</h2>
-        <button onclick={cerrarPanel}>Cerrar</button>
-      </div>
+      <div class="panel-caja" class:caja-ajustes={settingsOpen} class:caja-temario={verTemario && !settingsOpen}>
+        <div class="panel-cab">
+          <h2>{settingsOpen ? 'Ajustes' : verTemario ? 'Temario' : voz.progreso}{#if verProgreso && !settingsOpen && perfiles.length > 1} · {aliasActivo}{/if}</h2>
+          <button class="cerrar" onclick={cerrarPanel}>Cerrar</button>
+        </div>
 
-      <div class="panel-cuerpo">
-        {#if settingsOpen}
-          <div class="field">
-            <TamanoTexto escala={prefs.escala} conDeslizador
-                         onCambiar={(escala) => (prefs = { ...prefs, escala })} />
-          </div>
+        <!-- El panel sí se desplaza por dentro (al 200% no cabe): es lo que
+             evita que lo haga la página, y nada queda recortado sin llegar. -->
+        <div class="panel-cuerpo">
+          {#if settingsOpen}
+            <div class="ajustes">
+              <div class="ajustes-col">
+                <div class="field">
+                  <TamanoTexto escala={prefs.escala} conDeslizador
+                               onCambiar={(escala) => (prefs = { ...prefs, escala })} />
+                </div>
 
-          <div class="field">
-            <span id="theme-l">Tema</span>
-            <div class="group" role="group" aria-labelledby="theme-l">
-              {#each [['auto', 'Sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']] as [v, l] (v)}
-                <button aria-pressed={prefs.tema === v}
-                        onclick={() => (prefs = { ...prefs, tema: v as Preferencias['tema'] })}>
-                  {l}
-                </button>
-              {/each}
-            </div>
-          </div>
+                <div class="field">
+                  <span id="theme-l">Tema</span>
+                  <div class="group" role="group" aria-labelledby="theme-l">
+                    {#each [['auto', 'Sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']] as [v, l] (v)}
+                      <button aria-pressed={prefs.tema === v}
+                              onclick={() => (prefs = { ...prefs, tema: v as Preferencias['tema'] })}>
+                        {l}
+                      </button>
+                    {/each}
+                  </div>
+                </div>
 
-          <div class="field">
-            <span id="contraste-l">Contraste</span>
-            <div class="group" role="group" aria-labelledby="contraste-l">
-              {#each [['auto', 'Sistema'], ['normal', 'Normal'], ['alto', 'Alto']] as [v, l] (v)}
-                <button aria-pressed={prefs.contraste === v}
-                        onclick={() => (prefs = { ...prefs, contraste: v as Preferencias['contraste'] })}>
-                  {l}
-                </button>
-              {/each}
-            </div>
-            <p class="note">
-              «Alto» pone negro sobre blanco (o al revés con el tema oscuro) y
-              bordes marcados. En «Sistema» se activa solo si tu equipo pide más
-              contraste.
-            </p>
-          </div>
+                <div class="field">
+                  <span id="contraste-l">Contraste</span>
+                  <div class="group" role="group" aria-labelledby="contraste-l">
+                    {#each [['auto', 'Sistema'], ['normal', 'Normal'], ['alto', 'Alto']] as [v, l] (v)}
+                      <button aria-pressed={prefs.contraste === v}
+                              onclick={() => (prefs = { ...prefs, contraste: v as Preferencias['contraste'] })}>
+                        {l}
+                      </button>
+                    {/each}
+                  </div>
+                  <p class="note">
+                    «Alto» pone negro sobre blanco (o al revés con el tema oscuro) y
+                    bordes marcados. En «Sistema» se activa solo si tu equipo pide más
+                    contraste.
+                  </p>
+                </div>
 
-          <div class="field">
-            <span id="tono-l">Cómo te habla</span>
-            <div class="group" role="group" aria-labelledby="tono-l">
-              <button aria-pressed={prefs.tono === 'juego'}
-                      onclick={() => (prefs = { ...prefs, tono: 'juego' })}>
-                Con celebración
-              </button>
-              <button aria-pressed={prefs.tono !== 'juego'}
-                      onclick={() => (prefs = { ...prefs, tono: 'sobrio' })}>
-                Tranquila
-              </button>
-            </div>
-            <p class="note">Cambia los colores y los mensajes. No cambia el tamaño ni las lecciones.</p>
-          </div>
+                <div class="field">
+                  <span id="tono-l">Cómo te habla</span>
+                  <div class="group" role="group" aria-labelledby="tono-l">
+                    <button aria-pressed={prefs.tono === 'juego'}
+                            onclick={() => (prefs = { ...prefs, tono: 'juego' })}>
+                      Con celebración
+                    </button>
+                    <button aria-pressed={prefs.tono !== 'juego'}
+                            onclick={() => (prefs = { ...prefs, tono: 'sobrio' })}>
+                      Tranquila
+                    </button>
+                  </div>
+                  <p class="note">Cambia los colores y los mensajes. No cambia el tamaño ni las lecciones.</p>
+                </div>
 
-          <div class="field">
-            <span id="motion-l">Animaciones</span>
-            <div class="group" role="group" aria-labelledby="motion-l">
-              <button aria-pressed={prefs.movimiento === 'auto'}
-                      onclick={() => (prefs = { ...prefs, movimiento: 'auto' })}>Normales</button>
-              <button aria-pressed={prefs.movimiento === 'reducido'}
-                      onclick={() => (prefs = { ...prefs, movimiento: 'reducido' })}>Reducidas</button>
-            </div>
-          </div>
+                <div class="field">
+                  <span id="motion-l">Animaciones</span>
+                  <div class="group" role="group" aria-labelledby="motion-l">
+                    <button aria-pressed={prefs.movimiento === 'auto'}
+                            onclick={() => (prefs = { ...prefs, movimiento: 'auto' })}>Normales</button>
+                    <button aria-pressed={prefs.movimiento === 'reducido'}
+                            onclick={() => (prefs = { ...prefs, movimiento: 'reducido' })}>Reducidas</button>
+                  </div>
+                </div>
 
-          <div class="field">
-            <span id="font-l">Tipografía</span>
-            <div class="group" role="group" aria-labelledby="font-l">
-              <button aria-pressed={prefs.fuente === 'normal'}
-                      onclick={() => (prefs = { ...prefs, fuente: 'normal' })}>Normal</button>
-              <button aria-pressed={prefs.fuente === 'dislexia'}
-                      onclick={() => (prefs = { ...prefs, fuente: 'dislexia' })}>Para dislexia</button>
-            </div>
-          </div>
+                <div class="field">
+                  <span id="metricas-l">Mientras practicas</span>
+                  <div class="group" role="group" aria-labelledby="metricas-l">
+                    <button aria-pressed={!prefs.ocultarMetricas}
+                            onclick={() => (prefs = { ...prefs, ocultarMetricas: false })}>Ver velocidad y precisión</button>
+                    <button aria-pressed={prefs.ocultarMetricas}
+                            onclick={() => (prefs = { ...prefs, ocultarMetricas: true })}>Ocultarlas</button>
+                  </div>
+                  <p class="note">
+                    Si ver los números a cada tecla te distrae o te agobia, puedes
+                    ocultarlos: al terminar se siguen enseñando. {QUE_ES_PPM}
+                  </p>
+                </div>
 
-          <div class="field">
-            <span id="ayuda-l">Letras del teclado en pantalla</span>
-            <div class="group" role="group" aria-labelledby="ayuda-l">
-              <button aria-pressed={prefs.ayudaTeclado === 'auto'}
-                      onclick={() => (prefs = { ...prefs, ayudaTeclado: 'auto' })}>Se van quitando</button>
-              <button aria-pressed={prefs.ayudaTeclado === 'siempre'}
-                      onclick={() => (prefs = { ...prefs, ayudaTeclado: 'siempre' })}>Siempre visibles</button>
-            </div>
-            <p class="note">
-              Las teclas que ya dominas dejan de mostrar su letra, para que dejes de
-              mirar el teclado. {#if aprendidas > 0}Llevas {aprendidas}
-              {aprendidas === 1 ? 'tecla aprendida' : 'teclas aprendidas'}.{/if}
-            </p>
-          </div>
-
-          <div class="field">
-            <span id="metricas-l">Mientras practicas</span>
-            <div class="group" role="group" aria-labelledby="metricas-l">
-              <button aria-pressed={!prefs.ocultarMetricas}
-                      onclick={() => (prefs = { ...prefs, ocultarMetricas: false })}>Ver velocidad y precisión</button>
-              <button aria-pressed={prefs.ocultarMetricas}
-                      onclick={() => (prefs = { ...prefs, ocultarMetricas: true })}>Ocultarlas</button>
-            </div>
-            <p class="note">
-              Si ver los números a cada tecla te distrae o te agobia, puedes
-              ocultarlos: al terminar se siguen enseñando. {QUE_ES_PPM}
-            </p>
-          </div>
-
-          <div class="field">
-            <span id="sonido-l">Sonido</span>
-            <div class="group" role="group" aria-labelledby="sonido-l">
-              <button aria-pressed={!prefs.sonido}
-                      onclick={() => (prefs = { ...prefs, sonido: false })}>Sin sonido</button>
-              <button aria-pressed={prefs.sonido}
-                      onclick={() => { prefs = { ...prefs, sonido: true }; sonido.fin(prefs.volumen); }}>Con sonido</button>
-            </div>
-            {#if prefs.sonido}
-              <label for="volumen">Volumen: {Math.round(prefs.volumen * 100)}%</label>
-              <input id="volumen" type="range" min="0.1" max="1" step="0.1"
-                     value={prefs.volumen}
-                     oninput={(e) => (prefs = { ...prefs, volumen: +e.currentTarget.value })}
-                     onchange={() => sonido.acierto(prefs.volumen)} />
-            {/if}
-            <p class="note">
-              Un toque suave al acertar, una nota grave al fallar y un acorde al
-              terminar. Se genera en el equipo: no descarga nada.
-            </p>
-          </div>
-
-          <div class="field">
-            <span id="longitud-l">Longitud de los textos de práctica</span>
-            <div class="group" role="group" aria-labelledby="longitud-l">
-              {#each [['corto', 'Cortos'], ['normal', 'Normales'], ['largo', 'Largos']] as [v, l] (v)}
-                <button aria-pressed={prefs.longitudTexto === v}
-                        onclick={() => (prefs = { ...prefs, longitudTexto: v as Preferencias['longitudTexto'] })}>
-                  {l}
-                </button>
-              {/each}
-            </div>
-            <p class="note">Cortos si cansa llegar al final; largos para coger ritmo.</p>
-          </div>
-
-          <div class="field">
-            <span id="pausa-l">Recordarme descansar</span>
-            <div class="group" role="group" aria-labelledby="pausa-l">
-              {#each MINUTOS_PAUSA as m (m)}
-                <button aria-pressed={prefs.recordatorioPausa === m}
-                        onclick={() => (prefs = { ...prefs, recordatorioPausa: m })}>
-                  {m === 0 ? 'No' : `Cada ${m} min`}
-                </button>
-              {/each}
-            </div>
-            <p class="note">Un aviso en una esquina, que no interrumpe ni se lleva el foco.</p>
-          </div>
-
-          <div class="field">
-            <span id="temblor-l">Si a veces una tecla se repite sin querer</span>
-            <div class="group" role="group" aria-labelledby="temblor-l">
-              <button aria-pressed={!prefs.ignorarRepeticion}
-                      onclick={() => (prefs = { ...prefs, ignorarRepeticion: false })}>Contar todo</button>
-              <button aria-pressed={prefs.ignorarRepeticion}
-                      onclick={() => (prefs = { ...prefs, ignorarRepeticion: true })}>Ignorar repeticiones muy rápidas</button>
-            </div>
-            <p class="note">
-              Con temblor, el dedo puede rebotar y escribir dos veces la misma
-              letra. Esto ignora la segunda si llega casi a la vez. Para algo más
-              completo, el sistema tiene «teclas de rebote» (o «teclas lentas»):
-              en Windows, en Configuración › Accesibilidad › Teclado; en macOS,
-              en Ajustes del Sistema › Accesibilidad › Teclado; en GNOME, en
-              Configuración › Accesibilidad › Escritura; en KDE, en Preferencias
-              del sistema › Accesibilidad › Filtros de teclado.
-            </p>
-          </div>
-
-          <div class="field">
-            <label for="layout">Distribución del teclado</label>
-            <select
-              id="layout"
-              value={layout.id}
-              onchange={(e) => {
-                const id = e.currentTarget.value;
-                layout = obtenerLayout(id);
-                prefs = { ...prefs, layout: id };
-              }}
-            >
-              {#each LAYOUTS as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
-            </select>
-            <p class="note">
-              No la detectamos automáticamente: la API que lo permite solo existe en
-              Chromium, así que en macOS y Linux no sería fiable.
-            </p>
-          </div>
-
-          {#if gestorDelSistema}
-            <div class="field">
-              <span id="act-l">Actualizaciones</span>
-              <p class="note">
-                {#if gestorDelSistema === 'politica'}
-                  Quien administra este equipo ha desactivado las
-                  actualizaciones automáticas: se encarga de instalar las
-                  versiones nuevas. La aplicación no consulta nada por internet.
-                {:else}
-                  LibreType se instaló con
-                  {gestorDelSistema === 'deb' ? 'apt' : 'dnf'}, así que las
-                  actualizaciones llegan con las del resto del sistema. La
-                  aplicación no las descarga por su cuenta ni consulta nada por
-                  internet.
-                {/if}
-              </p>
-            </div>
-          {:else if actualizador}
-            <div class="field">
-              <span id="act-l">Actualizaciones</span>
-              <div class="group" role="group" aria-labelledby="act-l">
-                <button aria-pressed={prefs.buscarActualizaciones}
-                        onclick={() => (prefs = { ...prefs, buscarActualizaciones: true })}>
-                  Avisarme
-                </button>
-                <button aria-pressed={!prefs.buscarActualizaciones}
-                        onclick={() => (prefs = { ...prefs, buscarActualizaciones: false })}>
-                  No buscar
-                </button>
-              </div>
-              <p class="note">
-                Es lo único que LibreType consulta por internet: un fichero público
-                en GitHub con el número de la última versión. No se envía nada de
-                tu progreso ni de quién eres. Nunca se instala sola.
-              </p>
-              <div class="act-manual">
-                <button
-                  onclick={() => void actualizador?.comprobar(true)}
-                  disabled={estadoAct.fase === 'buscando' || estadoAct.fase === 'descargando'}
-                >
-                  Buscar ahora
-                </button>
-                <!-- Aquí sí se cuentan todas las fases: alguien acaba de preguntar. -->
-                <p class="note" role="status">
-                  {#if estadoAct.fase === 'buscando'}Buscando…
-                  {:else if estadoAct.fase === 'al-dia'}Estás en la última versión, la {estadoAct.version}.
-                  {:else if estadoAct.fase === 'disponible'}Hay una versión nueva, la {estadoAct.version}.
-                  {:else if estadoAct.fase === 'descargando'}Descargando{estadoAct.pct >= 0 ? ` ${estadoAct.pct}%` : '…'}
-                  {:else if estadoAct.fase === 'lista'}Lista la {estadoAct.version}. Se aplica al reiniciar.
-                  {:else if estadoAct.fase === 'error'}No se ha podido comprobar. {estadoAct.mensaje}
+                <div class="field">
+                  <span id="sonido-l">Sonido</span>
+                  <div class="group" role="group" aria-labelledby="sonido-l">
+                    <button aria-pressed={!prefs.sonido}
+                            onclick={() => (prefs = { ...prefs, sonido: false })}>Sin sonido</button>
+                    <button aria-pressed={prefs.sonido}
+                            onclick={() => { prefs = { ...prefs, sonido: true }; sonido.fin(prefs.volumen); }}>Con sonido</button>
+                  </div>
+                  {#if prefs.sonido}
+                    <label for="volumen" class="eti-valor">Volumen: <span class="valor">{Math.round(prefs.volumen * 100)}%</span></label>
+                    <input id="volumen" type="range" min="0.1" max="1" step="0.1"
+                           value={prefs.volumen}
+                           oninput={(e) => (prefs = { ...prefs, volumen: +e.currentTarget.value })}
+                           onchange={() => sonido.acierto(prefs.volumen)} />
                   {/if}
-                </p>
+                  <p class="note">
+                    Un toque suave al acertar, una nota grave al fallar y un acorde al
+                    terminar. Se genera en el equipo: no descarga nada.
+                  </p>
+                </div>
+              </div>
+
+              <div class="ajustes-col">
+                <div class="field">
+                  <span id="font-l">Tipografía</span>
+                  <div class="group" role="group" aria-labelledby="font-l">
+                    <button aria-pressed={prefs.fuente === 'normal'}
+                            onclick={() => (prefs = { ...prefs, fuente: 'normal' })}>Normal</button>
+                    <button aria-pressed={prefs.fuente === 'dislexia'}
+                            onclick={() => (prefs = { ...prefs, fuente: 'dislexia' })}>Para dislexia</button>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <span id="ayuda-l">Letras del teclado en pantalla</span>
+                  <div class="group" role="group" aria-labelledby="ayuda-l">
+                    <button aria-pressed={prefs.ayudaTeclado === 'auto'}
+                            onclick={() => (prefs = { ...prefs, ayudaTeclado: 'auto' })}>Se van quitando</button>
+                    <button aria-pressed={prefs.ayudaTeclado === 'siempre'}
+                            onclick={() => (prefs = { ...prefs, ayudaTeclado: 'siempre' })}>Siempre visibles</button>
+                  </div>
+                  <p class="note">
+                    Las teclas que ya dominas dejan de mostrar su letra, para que dejes de
+                    mirar el teclado. {#if aprendidas > 0}Llevas {aprendidas}
+                    {aprendidas === 1 ? 'tecla aprendida' : 'teclas aprendidas'}.{/if}
+                  </p>
+                </div>
+
+                <div class="field">
+                  <label for="layout">Distribución del teclado</label>
+                  <select
+                    id="layout"
+                    value={layout.id}
+                    onchange={(e) => {
+                      const id = e.currentTarget.value;
+                      layout = obtenerLayout(id);
+                      prefs = { ...prefs, layout: id };
+                    }}
+                  >
+                    {#each LAYOUTS as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
+                  </select>
+                  <p class="note">
+                    No la detectamos automáticamente: la API que lo permite solo existe en
+                    Chromium, así que en macOS y Linux no sería fiable.
+                  </p>
+                </div>
+
+                <div class="field">
+                  <span id="longitud-l">Longitud de los textos de práctica</span>
+                  <div class="group" role="group" aria-labelledby="longitud-l">
+                    {#each [['corto', 'Cortos'], ['normal', 'Normales'], ['largo', 'Largos']] as [v, l] (v)}
+                      <button aria-pressed={prefs.longitudTexto === v}
+                              onclick={() => (prefs = { ...prefs, longitudTexto: v as Preferencias['longitudTexto'] })}>
+                        {l}
+                      </button>
+                    {/each}
+                  </div>
+                  <p class="note">Cortos si cansa llegar al final; largos para coger ritmo.</p>
+                </div>
+
+                <div class="field">
+                  <span id="pausa-l">Recordarme descansar</span>
+                  <div class="group" role="group" aria-labelledby="pausa-l">
+                    {#each MINUTOS_PAUSA as m (m)}
+                      <button aria-pressed={prefs.recordatorioPausa === m}
+                              onclick={() => (prefs = { ...prefs, recordatorioPausa: m })}>
+                        {m === 0 ? 'No' : `Cada ${m} min`}
+                      </button>
+                    {/each}
+                  </div>
+                  <p class="note">Un aviso en una esquina, que no interrumpe ni se lleva el foco.</p>
+                </div>
+
+                <div class="field">
+                  <span id="temblor-l">Si a veces una tecla se repite sin querer</span>
+                  <div class="group" role="group" aria-labelledby="temblor-l">
+                    <button aria-pressed={!prefs.ignorarRepeticion}
+                            onclick={() => (prefs = { ...prefs, ignorarRepeticion: false })}>Contar todo</button>
+                    <button aria-pressed={prefs.ignorarRepeticion}
+                            onclick={() => (prefs = { ...prefs, ignorarRepeticion: true })}>Ignorar repeticiones muy rápidas</button>
+                  </div>
+                  <p class="note">
+                    Con temblor, el dedo puede rebotar y escribir dos veces la misma
+                    letra. Esto ignora la segunda si llega casi a la vez. Para algo más
+                    completo, el sistema tiene «teclas de rebote» (o «teclas lentas»):
+                    en Windows, en Configuración › Accesibilidad › Teclado; en macOS,
+                    en Ajustes del Sistema › Accesibilidad › Teclado; en GNOME, en
+                    Configuración › Accesibilidad › Escritura; en KDE, en Preferencias
+                    del sistema › Accesibilidad › Filtros de teclado.
+                  </p>
+                </div>
+
+                {#if gestorDelSistema}
+                  <div class="field">
+                    <span id="act-l">Actualizaciones</span>
+                    <p class="note">
+                      {#if gestorDelSistema === 'politica'}
+                        Quien administra este equipo ha desactivado las
+                        actualizaciones automáticas: se encarga de instalar las
+                        versiones nuevas. La aplicación no consulta nada por internet.
+                      {:else}
+                        LibreType se instaló con
+                        {gestorDelSistema === 'deb' ? 'apt' : 'dnf'}, así que las
+                        actualizaciones llegan con las del resto del sistema. La
+                        aplicación no las descarga por su cuenta ni consulta nada por
+                        internet.
+                      {/if}
+                    </p>
+                  </div>
+                {:else if actualizador}
+                  <div class="field">
+                    <span id="act-l">Actualizaciones</span>
+                    <div class="group" role="group" aria-labelledby="act-l">
+                      <button aria-pressed={prefs.buscarActualizaciones}
+                              onclick={() => (prefs = { ...prefs, buscarActualizaciones: true })}>
+                        Avisarme
+                      </button>
+                      <button aria-pressed={!prefs.buscarActualizaciones}
+                              onclick={() => (prefs = { ...prefs, buscarActualizaciones: false })}>
+                        No buscar
+                      </button>
+                    </div>
+                    <p class="note">
+                      Es lo único que LibreType consulta por internet: un fichero público
+                      en GitHub con el número de la última versión. No se envía nada de
+                      tu progreso ni de quién eres. Nunca se instala sola.
+                    </p>
+                    <div class="act-manual">
+                      <button class="enlace"
+                        onclick={() => void actualizador?.comprobar(true)}
+                        disabled={estadoAct.fase === 'buscando' || estadoAct.fase === 'descargando'}
+                      >
+                        Buscar ahora
+                      </button>
+                      <!-- Aquí sí se cuentan todas las fases: alguien acaba de preguntar. -->
+                      <p class="note" role="status">
+                        {#if estadoAct.fase === 'buscando'}Buscando…
+                        {:else if estadoAct.fase === 'al-dia'}Estás en la última versión, la {estadoAct.version}.
+                        {:else if estadoAct.fase === 'disponible'}Hay una versión nueva, la {estadoAct.version}.
+                        {:else if estadoAct.fase === 'descargando'}Descargando{estadoAct.pct >= 0 ? ` ${estadoAct.pct}%` : '…'}
+                        {:else if estadoAct.fase === 'lista'}Lista la {estadoAct.version}. Se aplica al reiniciar.
+                        {:else if estadoAct.fase === 'error'}No se ha podido comprobar. {estadoAct.mensaje}
+                        {/if}
+                      </p>
+                    </div>
+                  </div>
+                {/if}
               </div>
             </div>
+          {:else if verTemario}
+            <Temario
+              lecciones={LESSONS}
+              {sesiones}
+              modo={leccionPersonalizada ? null : modoActual}
+              leccionActual={lessonIx}
+              onLeccion={(i) => void pick(i)}
+              onModo={(m) => void elegirModo(m)}
+            />
+          {:else}
+            <Progreso
+              {sesiones}
+              lecciones={LESSONS}
+              {tipoAlmacen}
+              {errorAlmacen}
+              {almacen}
+              {teclas}
+              {layout}
+              onBorrar={borrarProgreso}
+              onExportar={exportarProgreso}
+              onImportar={importarProgreso}
+              onPracticarRefuerzo={practicarRefuerzo}
+              leccionActual={vista === 'leccion' && !leccionPersonalizada ? lessonIx : null}
+              celebra={prefs.tono === 'juego'}
+            />
+            <Perfiles
+              {perfiles}
+              activo={perfilActivo}
+              onCambiar={cambiarPerfil}
+              onCrear={async (alias) => { await crearPerfil(alias); }}
+              onRenombrar={renombrarPerfil}
+              onBorrar={borrarPerfil}
+            />
+            <Informe alias={aliasActivo} {sesiones} {teclas} />
           {/if}
-        {:else if verTemario}
-          <Temario
-            lecciones={LESSONS}
-            {sesiones}
-            modo={leccionPersonalizada ? null : modoActual}
-            leccionActual={lessonIx}
-            onLeccion={(i) => void pick(i)}
-            onModo={(m) => void elegirModo(m)}
-          />
-        {:else}
-          <Progreso
-            {sesiones}
-            lecciones={LESSONS}
-            {tipoAlmacen}
-            {errorAlmacen}
-            {almacen}
-            {teclas}
-            {layout}
-            onBorrar={borrarProgreso}
-            onExportar={exportarProgreso}
-            onImportar={importarProgreso}
-            onPracticarRefuerzo={practicarRefuerzo}
-          />
-          <Perfiles
-            {perfiles}
-            activo={perfilActivo}
-            onCambiar={cambiarPerfil}
-            onCrear={async (alias) => { await crearPerfil(alias); }}
-            onRenombrar={renombrarPerfil}
-            onBorrar={borrarPerfil}
-          />
-          <Informe alias={aliasActivo} {sesiones} {teclas} />
-        {/if}
+        </div>
       </div>
     </dialog>
   {/if}
@@ -1487,7 +1525,12 @@
   .centrado { align-self: center; justify-self: center; max-width: 72ch; }
   .primera { display: grid; gap: var(--space-6); }
 
-  /* --- Superpuestos ------------------------------------------------------ */
+  /* --- Superpuestos ------------------------------------------------------
+   * Resultado y panel comparten forma: el <dialog> ocupa la ventana y pinta
+   * el velo (--scrim), y la caja va centrada encima. El velo va en el propio
+   * diálogo y no en ::backdrop porque este no hereda los tokens en todos los
+   * WebKit que soportamos. Los radios usan tokens de Fundamentos con el valor
+   * de la maqueta como respaldo. */
   dialog {
     color: var(--fg);
     max-width: none;
@@ -1496,40 +1539,128 @@
     padding: 0;
     border: 0;
   }
-  dialog::backdrop {
-    background: color-mix(in srgb, var(--bg) 78%, transparent);
-  }
-  .capa {
+  dialog::backdrop { background: transparent; }
+  .capa, .panel {
     position: fixed; inset: 0;
     width: 100%; height: 100%;
     display: grid; place-items: center;
-    background: transparent;
+    background: var(--scrim);
     padding: var(--space-4);
   }
+
+  /* Diálogo de resultado. */
   .resultado {
-    display: grid; gap: var(--space-2);
+    width: min(calc(36.25rem * var(--ui-scale)), 100%);
     min-height: 0;
     max-height: 100%;
     overflow-y: auto;
-    max-width: 46ch;
-    padding: var(--space-6);
+    display: grid;
     background: var(--surface);
-    border: 2px solid var(--ok);
-    border-radius: var(--radius);
-    box-shadow: 0 12px 40px rgb(0 0 0 / 0.28);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel, 22px);
+    box-shadow: var(--shadow-panel);
   }
-  #resultado-desc { display: grid; gap: var(--space-1); }
+  /* Los nueve colores de los dedos, en el orden del teclado. Decorativa:
+     no dice nada que no diga el texto. */
+  .franja {
+    height: calc(var(--space-2) + var(--space-1) / 2);
+    background: linear-gradient(90deg,
+      var(--finger-l-pinky) 0 11.11%, var(--finger-l-ring) 0 22.22%,
+      var(--finger-l-middle) 0 33.33%, var(--finger-l-index) 0 44.44%,
+      var(--finger-thumb) 0 55.55%, var(--finger-r-index) 0 66.66%,
+      var(--finger-r-middle) 0 77.77%, var(--finger-r-ring) 0 88.88%,
+      var(--finger-r-pinky) 0 100%);
+  }
+  .res-cuerpo {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-6);
+  }
+  .res-cab { display: grid; gap: var(--space-2); justify-items: start; }
+  .chip-record {
+    font-size: var(--text-sm);
+    font-weight: 700;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-pill, 999px);
+    background: var(--celebracion);
+    color: var(--on-celebracion);
+  }
+  #resultado-titulo {
+    margin: 0;
+    font-size: var(--text-xl);
+    line-height: 1.2;
+  }
+  #resultado-desc { display: grid; gap: var(--space-3); }
+  .cifras {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(12rem * var(--ui-scale))), 1fr));
+    gap: var(--space-3);
+  }
+  .cifra {
+    margin: 0;
+    display: grid;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-card, 16px);
+    background: var(--surface-sunken);
+  }
+  .cifra-valor {
+    font-size: calc(2.5rem * var(--ui-scale));
+    font-weight: 700;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .cifra-eti { font-size: var(--text-sm); color: var(--fg-muted); }
+  /* El acierto se dice con la cifra y el texto; el fondo verde acompaña. */
+  .cifra-ok { background: var(--ok-bg); }
+  .cifra-ok .cifra-valor { color: var(--ok); }
+  .cifra-ok .cifra-eti { color: var(--fg); }
+  .animo { margin: 0; font-size: var(--text-lg); font-weight: 700; }
   /* El logro se distingue por el texto y el borde, no solo por el color. */
   .logro { color: var(--fg); border-left: 4px solid var(--ok); padding-left: var(--space-2); }
-  .resultado strong { font-size: var(--text-lg); }
-  .resultado .animo { color: var(--fg-muted); }
-  .botones { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
-  .primario { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 
-  /* El récord se distingue por la estrella y el texto, no solo por el borde. */
-  .resultado.record { border-width: 3px; border-style: double; }
+  .botones { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+  .botones button { min-height: calc(var(--target-min) + var(--space-1)); border-radius: var(--radius-control, 12px); }
+  .botones .primario { flex: 1 1 auto; }
+  .sig-nombre { font-weight: 400; }
+
+  .res-pie {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-6);
+    border-top: 1px solid var(--border);
+  }
+  .pie-fila {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .pie-fila .note { flex: 1 1 calc(14rem * var(--ui-scale)); }
+
+  /* Botón primario de la maqueta: relleno de acento, negrita y una sombra
+     corta que lo despega del resto. */
+  .primario {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
+    font-weight: 700;
+    box-shadow: 0 3px 0 var(--accent-deep);
+  }
+  .primario:hover { background: var(--accent); filter: brightness(1.05); }
+  /* Acción secundaria que no compite con los botones: texto de acento sobre
+     su fondo suave. El borde mantiene el contorno a 3:1. */
+  .suave {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    border-color: var(--accent-ink);
+    font-weight: 700;
+    border-radius: var(--radius-control, 12px);
+  }
+  .suave:hover { background: var(--accent-soft); filter: brightness(0.97); }
+
+  /* El récord se distingue por el chip y su texto, no solo por un color. */
   .resultado.celebra {
-    border-color: var(--celebracion);
     animation: celebrar var(--motion-slow) var(--ease) 2 alternate;
   }
   @keyframes celebrar { from { transform: scale(1); } to { transform: scale(1.015); } }
@@ -1539,39 +1670,101 @@
     animation: none;
   }
 
-  .panel {
-    position: fixed; top: 0; right: 0; bottom: 0; left: auto;
-    height: 100%;
-    width: min(30rem, 100%);
+  /* Panel compartido: Progreso, Temario y Ajustes. */
+  .panel-caja {
+    width: min(70rem, 100%);
+    max-height: 100%;
+    min-height: 0;
     display: grid;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
     background: var(--surface);
-    border-left: 1px solid var(--border);
-    box-shadow: -12px 0 40px rgb(0 0 0 / 0.22);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel, 22px);
+    box-shadow: var(--shadow-panel);
   }
-  /* El temario necesita más ancho para que las tarjetas vayan de dos en dos. */
-  .panel.ancho { width: min(46rem, 100%); }
+  .panel-caja.caja-ajustes { width: min(65rem, 100%); }
+  .panel-caja.caja-temario { width: min(60rem, 100%); }
   .panel-cab {
     display: flex; align-items: center; justify-content: space-between;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-4) var(--space-6);
     border-bottom: 1px solid var(--border);
   }
-  .panel-cab h2 { margin: 0; font-size: var(--text-lg); }
+  .panel-cab h2 { margin: 0; font-size: calc(1.5rem * var(--ui-scale)); line-height: 1.2; }
+  .panel-cab .cerrar { border-radius: var(--radius-control, 12px); }
   /* El panel sí se desplaza por dentro: es lo que evita que lo haga la página. */
   .panel-cuerpo {
+    min-height: 0;
     overflow-y: auto;
-    padding: var(--space-4);
+    padding: var(--space-4) var(--space-6) var(--space-6);
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-6);
     align-content: start;
   }
 
-  .field { display: grid; gap: var(--space-2); align-content: start; }
-  .group { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-  .group button[aria-pressed='true'] {
-    background: var(--accent); color: var(--accent-fg); border-color: var(--accent);
+  /* Ajustes: dos columnas al 100%; al crecer la letra, una. La base de cada
+     columna escala con --ui-scale, así que es el propio tamaño el que decide
+     cuándo dejan de caber dos. */
+  .ajustes { display: flex; flex-wrap: wrap; gap: 0 var(--space-8); }
+  .ajustes-col {
+    flex: 1 1 calc(26rem * var(--ui-scale));
+    min-width: 0;
+    display: grid;
+    align-content: start;
   }
+  .field {
+    display: grid; gap: var(--space-2); align-content: start;
+    padding-block: var(--space-4);
+    border-bottom: 1px solid var(--border);
+  }
+  .ajustes-col .field:last-child { border-bottom: 0; }
+  .field > span:first-child, .field > label:first-child { font-weight: 700; }
+  .eti-valor .valor { color: var(--accent-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .field input[type='range'] { accent-color: var(--accent); width: 100%; min-height: var(--target-min); }
+
+  /* Grupo segmentado: la opción elegida lleva fondo, borde, negrita y «✓»
+     delante, no solo color. La marca va en CSS para no cambiar el nombre del
+     botón, y con texto alternativo vacío para que el lector no la lea dos
+     veces (ya anuncia «pulsado»). */
+  .group {
+    justify-self: start;
+    max-width: 100%;
+    display: flex; gap: var(--space-1); flex-wrap: wrap;
+    padding: var(--space-1);
+    border-radius: var(--radius-control, 12px);
+    background: var(--surface-sunken);
+  }
+  .group button {
+    background: transparent;
+    border-color: transparent;
+    color: var(--fg-muted);
+    border-radius: calc(var(--radius-control, 12px) - 2px);
+  }
+  .group button:hover { color: var(--fg); background: transparent; }
+  .group button[aria-pressed='true'] {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    color: var(--fg);
+    font-weight: 700;
+  }
+  .group button[aria-pressed='true']::before {
+    content: '✓ ';
+    content: '✓ ' / '';
+  }
+
+  /* Enlace-botón: acción menor dentro de un campo. */
+  .enlace {
+    background: transparent;
+    border-color: transparent;
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    padding-inline: var(--space-1);
+  }
+  .enlace:hover { background: transparent; text-decoration-thickness: 2px; }
+  .enlace:disabled { color: var(--fg-muted); cursor: default; }
+
   .note { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
 
   /* Pantallas bajas: la barra se aprieta para dejarle sitio al teclado. */

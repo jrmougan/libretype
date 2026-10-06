@@ -4,6 +4,7 @@ import App from './App.svelte';
 import { LESSONS } from './lib/lessons';
 import { guardar, POR_DEFECTO } from './lib/preferencias';
 import { PCT_OBJETIVO, SIN_PRESION } from './lib/storage/objetivos';
+import { VOCES } from './lib/voz';
 
 let app: ReturnType<typeof App>;
 
@@ -56,6 +57,16 @@ function boton(texto: string): HTMLButtonElement {
   return [...document.querySelectorAll('button')].find(b => b.textContent?.trim() === texto)!;
 }
 
+/**
+ * «Siguiente» lleva detrás el nombre de la lección a la que lleva
+ * («Siguiente lección · Vocales»), así que no se busca por el texto exacto.
+ */
+function botonSiguiente(): HTMLButtonElement | null {
+  const b = document.querySelector<HTMLButtonElement>('#dialogo-resultado button.siguiente');
+  if (b) expect(b.textContent?.trim().startsWith(VOCES.sobrio.siguiente)).toBe(true);
+  return b;
+}
+
 function campo(): HTMLTextAreaElement {
   return document.querySelector('textarea.capture')!;
 }
@@ -95,7 +106,7 @@ describe('captura y paneles', () => {
     await tick();
     const repasar = boton('Repasar con práctica continua');
     expect(Boolean(repasar)).toBe(antigua);
-    expect(boton('Siguiente lección')).toBeDefined();
+    expect(botonSiguiente()?.textContent).toContain(LESSONS[2].title);
     if (antigua) {
       repasar.click();
       await tick();
@@ -152,7 +163,11 @@ describe('captura y paneles', () => {
     expect(dialogo.hasAttribute('aria-live')).toBe(false);
     expect(dialogo.querySelectorAll('[aria-live], [role="status"], [role="alert"]')).toHaveLength(1);
     expect(campo().disabled).toBe(true);
-    boton(accion).click();
+    if (accion === 'Repetir') boton(accion).click();
+    else {
+      expect(botonSiguiente()?.textContent).toContain(`· ${LESSONS[1].title}`);
+      botonSiguiente()!.click();
+    }
     await tick();
     expect(document.querySelector('dialog')).toBeNull();
     expect(document.activeElement).toBe(campo());
@@ -181,7 +196,7 @@ describe('captura y paneles', () => {
       this.open = false;
     });
 
-    boton('Siguiente lección').click();
+    botonSiguiente()!.click();
     await tick();
 
     // En WKWebView, retirar primero el campo hace que la restauración nativa
@@ -295,7 +310,7 @@ describe('experiencia de producto (#21, #23, #24)', () => {
     expect(dialogo).not.toBeNull();
     const btnPrimario = dialogo?.querySelector('button.primario');
     expect(btnPrimario?.textContent).toContain('Repetir');
-    expect(boton('Siguiente lección')).toBeUndefined();
+    expect(botonSiguiente()).toBeNull();
     boton('Repetir').click();
     await tick();
     await abrirTemario();

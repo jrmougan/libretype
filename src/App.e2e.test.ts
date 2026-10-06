@@ -117,9 +117,14 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
 
     const resultadoTitulo = document.getElementById('resultado-titulo');
     expect(resultadoTitulo?.textContent).toBeTruthy();
-    // En tono 'juego' debe incluir felicitación y la estrella de récord
-    expect(resultadoTitulo?.textContent).toContain('★');
+    // En tono 'juego' debe incluir felicitación y la estrella de récord. La
+    // estrella va en su chip, con la palabra: el récord no se dice solo con color.
     expect(resultadoTitulo?.textContent).toContain('¡Nunca habías ido tan rápido en esta lección!');
+    const chipRecord = document.querySelector('#dialogo-resultado .chip-record');
+    expect(chipRecord?.textContent).toContain('★');
+    expect(chipRecord?.textContent).toContain('Récord');
+    // La franja con los colores de los dedos es del tono con celebración.
+    expect(document.querySelector('#dialogo-resultado .franja')?.getAttribute('aria-hidden')).toBe('true');
 
     const resultadoDesc = document.getElementById('resultado-desc');
     expect(resultadoDesc?.textContent).toContain('palabras por minuto');

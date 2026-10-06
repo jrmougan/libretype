@@ -55,24 +55,36 @@
 {/if}
 
 <style>
-  /* Fijo y en una esquina: aparecer no puede mover el teclado de sitio. */
+  /* Fijo y en una esquina: aparecer no puede mover el teclado de sitio. Con
+     la forma de los paneles (radio, sombra), pero sin velo: no bloquea nada. */
   .recordatorio {
     position: fixed;
     right: var(--space-4);
     bottom: var(--space-4);
     z-index: 10;
-    max-width: min(28rem, calc(100vw - 2 * var(--space-4)));
+    max-width: min(calc(28rem * var(--ui-scale)), calc(100vw - 2 * var(--space-4)));
+    max-height: calc(100dvh - 2 * var(--space-4));
+    overflow-y: auto;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-4);
     background: var(--surface);
     color: var(--fg);
     border: 2px solid var(--accent);
-    border-radius: var(--radius);
-    box-shadow: 0 8px 28px rgb(0 0 0 / 0.22);
+    border-radius: var(--radius-card, 16px);
+    box-shadow: var(--shadow-panel);
     font-size: var(--text-sm);
   }
-  p { margin: 0; }
-  button { flex: none; }
+  p { margin: 0; flex: 1 1 calc(14rem * var(--ui-scale)); }
+  button {
+    flex: none;
+    font-weight: 700;
+    border-radius: var(--radius-control, 12px);
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    border-color: var(--accent-ink);
+  }
+  button:hover { background: var(--accent-soft); filter: brightness(0.97); }
 </style>

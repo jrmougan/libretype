@@ -172,7 +172,13 @@
 </section>
 
 <style>
-  .perfiles { display: grid; gap: var(--space-3); }
+  /* Bloque del panel de progreso, separado de lo anterior por una línea. */
+  .perfiles {
+    display: grid;
+    gap: var(--space-3);
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--border);
+  }
   h3 { margin: 0; font-size: var(--text-lg); }
   .nota { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
 
@@ -183,42 +189,57 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-4);
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius);
+    border-radius: var(--radius-card, 16px);
+    background: var(--surface);
   }
   /* El perfil activo no se distingue solo por color: lleva el texto
      «practicando ahora» y un borde más grueso. */
-  .lista li.activo { border-width: 3px; border-color: var(--accent); }
-  .alias { font-weight: 600; overflow-wrap: anywhere; }
+  .lista li.activo {
+    border-width: 2px;
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .alias { font-weight: 700; overflow-wrap: anywhere; }
   .alias small { font-weight: 400; color: var(--fg-muted); }
+  .activo .alias small { color: var(--fg); }
   .botones, .fila { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+  label { font-weight: 700; }
+  button { border-radius: var(--radius-control, 12px); }
 
   input {
     font: inherit;
     min-height: var(--target-min);
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius);
+    border-radius: var(--radius-control, 12px);
     background: var(--surface);
     color: var(--fg);
     flex: 1 1 12rem;
+  }
+  /* Halo de foco como el del editor de texto propio: borde de acento y un
+     anillo suave. El contorno de :focus-visible sigue encima. */
+  input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
   }
 
   .confirmar-borrado {
     display: grid;
     gap: var(--space-2);
-    padding: var(--space-3);
+    padding: var(--space-3) var(--space-4);
     border: 2px solid var(--error);
-    border-radius: var(--radius);
+    border-radius: var(--radius-card, 16px);
     background: var(--error-bg);
   }
   .confirmar-borrado p { margin: 0; }
-  .peligro { border: 2px solid var(--error); font-weight: 600; }
+  .peligro { border: 2px solid var(--error); color: var(--error); font-weight: 700; }
   .error {
     margin: 0;
     padding: var(--space-2) var(--space-3);
     border-left: 4px solid var(--error);
     background: var(--error-bg);
+    border-radius: 0 var(--radius) var(--radius) 0;
   }
 </style>

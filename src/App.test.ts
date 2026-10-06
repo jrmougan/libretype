@@ -434,6 +434,39 @@ describe('el titular del resultado cuenta lo que ha pasado (roadmap 0.1)', () =>
     expect(titulo.toLowerCase()).not.toContain('superada');
   });
 
+  it('el tono tranquilo no lleva franja de colores y el récord va en su chip', async () => {
+    completar();
+    expect(document.querySelector('#dialogo-resultado .franja')).toBeNull();
+    expect(document.querySelector('#dialogo-resultado .chip-record')?.textContent).toContain('Récord');
+  });
+
+  it('con el tono de celebración el resultado lleva la franja de los dedos', async () => {
+    await conTonoDeJuego();
+    campo().value = textoEnPantalla();
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    expect(document.querySelector('#dialogo-resultado .franja')?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('la tarjeta de precisión solo se pinta de acierto cuando lo es', async () => {
+    completar();
+    expect(document.querySelectorAll('#resultado-desc .cifra')).toHaveLength(2);
+    expect(document.querySelector('#resultado-desc .cifra-ok')?.textContent).toContain('100%');
+    boton('Repetir').click();
+    await tick();
+    // Al repetir llega un texto nuevo: se lee de la pantalla.
+    const objetivo = textoEnPantalla();
+    let conFallos = '';
+    for (let i = 0; i < objetivo.length; i++) conFallos += i % 2 === 0 ? 'x' : objetivo[i];
+    campo().value = conFallos;
+    campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    expect(document.querySelector('#resultado-desc .cifra-ok')).toBeNull();
+    expect(document.querySelector('#resultado-desc')?.textContent).toContain('de precisión');
+  });
+
   it.each(['continua', 'propio'] as const)('en %s no habla de superar ninguna lección', async (modo) => {
     await conTonoDeJuego();
     await irAModo(modo);

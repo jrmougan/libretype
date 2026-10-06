@@ -123,19 +123,24 @@
 </article>
 
 <style>
+  /* Solo pantalla: en papel y en la página guardada manda HOJA_CSS, que no
+     puede usar los tokens. */
   .informe { display: grid; gap: var(--space-2); }
-  h2 { margin: 0; font-size: var(--text-xl); }
+  h2 { margin: 0; font-size: var(--text-xl); line-height: 1.2; }
   h3 { margin: var(--space-3) 0 0; font-size: var(--text-lg); }
   p, ul, ol { margin: 0; }
   .nota { font-size: var(--text-sm); color: var(--fg-muted); }
   .chips { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1); }
   .chips li {
-    font-family: var(--font-drill);
+    font-family: var(--font-key);
+    font-weight: 700;
     padding: 0 var(--space-2);
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius);
+    border-radius: var(--radius-control, 12px);
+    background: var(--surface-sunken);
   }
-  table { border-collapse: collapse; width: 100%; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
   caption { text-align: left; }
   th, td { text-align: left; padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--border); }
+  thead th { background: var(--surface-sunken); }
 </style>

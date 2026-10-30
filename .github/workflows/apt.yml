@@ -100,9 +100,9 @@ jobs:
           paquete=$(dpkg-deb -f "$(find debs -name '*.deb' | sort | tail -1)" Package)
           sed "s/PAQUETE/$paquete/g" empaquetado/apt/index.html > _site/index.html
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
       - id: desplegar
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

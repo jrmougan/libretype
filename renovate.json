@@ -2,5 +2,25 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "minimumReleaseAge": "3 days",
+  "packageRules": [
+    {
+      "description": "svelte-check 4.x peer is typescript ^5 || ^6; TS7 is the native port without a JS API",
+      "matchPackageNames": [
+        "typescript"
+      ],
+      "allowedVersions": "<7"
+    },
+    {
+      "description": "ubuntu-22.04 runners set the glibc baseline of the Linux binaries on purpose (see AGENTS.md)",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepNames": [
+        "ubuntu"
+      ],
+      "allowedVersions": "<23"
+    }
   ]
 }

@@ -1,7 +1,7 @@
 [tools]
-node = "24.21.0" # CI y releases usan Node 24; el lockfile exige ^22.13 || >=24.
-pnpm = "11.11.0" # Igual que packageManager en package.json.
-rust = { version = "1.98.1", components = "rustfmt,clippy", profile = "minimal" }
+node = "26.13.0" # CI y releases usan Node 26; el lockfile exige ^22.13 || >=24.
+pnpm = "12.16.1" # Igual que packageManager en package.json.
+rust = { version = "1.99.1", components = "rustfmt,clippy", profile = "minimal" }
 
 [tasks.setup]
 description = "Instalar las dependencias bloqueadas del frontend"

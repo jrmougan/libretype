@@ -47,13 +47,13 @@ La aplicación incluye la **Lección Cero** (`src/lib/components/LeccionCero.sve
 ## Requisitos previos
 
 - [mise](https://mise.jdx.dev/getting-started.html), que instala las versiones exactas
-  fijadas en `mise.toml`: Node 24.21.0, pnpm 11.11.0 (la de `packageManager`) y
-  Rust 1.98.1 con `rustfmt` y `clippy`.
+  fijadas en `mise.toml`: Node 26.13.0, pnpm 12.16.1 (la de `packageManager`) y
+  Rust 1.99.1 con `rustfmt` y `clippy`.
 - Dependencias del sistema para Tauri (ver [guía de requisitos de Tauri](https://v2.tauri.app/start/prerequisites/)).
   En Linux hacen falta también para `clippy`, `cargo test` y `cargo build`, no solo
   para empaquetar.
 
-Sin mise sigue funcionando con Node 24, pnpm 11 y Rust 1.77.2 o superior, pero
+Sin mise sigue funcionando con Node 26, pnpm 12 y Rust 1.77.2 o superior, pero
 son las versiones de `mise.toml` las que usa CI.
 
 ---

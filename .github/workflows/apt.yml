@@ -19,7 +19,7 @@ concurrency:
 jobs:
   publicar:
     name: Construir y publicar
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       pages: write

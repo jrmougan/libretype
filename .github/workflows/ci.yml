@@ -14,7 +14,7 @@ concurrency:
 jobs:
   verificar:
     name: Tipos, tests y compilación
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
@@ -63,7 +63,7 @@ jobs:
 
   repo-apt:
     name: Repositorio apt
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
@@ -86,7 +86,7 @@ jobs:
 
   spike-deadkeys:
     name: Dead keys en WebKitGTK
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 

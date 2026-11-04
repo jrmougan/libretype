@@ -255,3 +255,18 @@ describe('Keyboard.svelte (Issue #36)', () => {
     });
   });
 });
+
+describe('contraste de la tecla pulsada', () => {
+  it('las etiquetas pequeñas cambian de color con el fondo de acento', () => {
+    const svg = montar({ held: new Set(['KeyE']) });
+    const pulsada = svg.querySelector('g.key.pressed')!;
+    const alt = pulsada.querySelector('text.alt');
+    expect(alt?.textContent).toBe('€');
+    expect(alt?.getAttribute('fill')).toBe('var(--accent-fg)');
+  });
+
+  it('sobre el fondo de error, no: ese fondo es claro', () => {
+    const svg = montar({ held: new Set(['KeyE']), lastWrong: true });
+    expect(svg.querySelector('g.key.pressed text.alt')?.getAttribute('fill')).toBe('var(--fg-muted)');
+  });
+});

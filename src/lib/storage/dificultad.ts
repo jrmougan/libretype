@@ -30,7 +30,7 @@
  * La agregación vive en TypeScript y no en SQL por lo mismo que el resto: se
  * puede probar sin base de datos.
  */
-import { LESSONS } from '../lessons';
+import { catalogo as catalogoApp, type Catalogo } from '../lecciones/catalogo';
 import { idCanonico } from './equivalencias';
 import { PCT_OBJETIVO } from './objetivos';
 import type { Sesion } from './progreso';
@@ -107,9 +107,9 @@ function medianaDe(valores: readonly number[]): number {
  * Intentos que costó superar cada lección del temario, por identificador
  * canónico.
  *
- * Solo entran las lecciones de `LESSONS`. Se quedan fuera la práctica libre
- * (`practica-continua`, `texto-propio`, `refuerzo`), que no tiene objetivo que
- * superar y cuyo texto cambia en cada sesión, y las lecciones retiradas, que se
+ * Solo entran las lecciones del catálogo. Se quedan fuera la práctica libre
+ * (`practica-continua`, `texto-propio`, `refuerzo`, `refuerzo-suelto`) y las personalizadas, que no
+ * tienen objetivo que superar y cuyo texto cambia, y las lecciones retiradas, que se
  * jugaban con otra regla: en la v0.1.0 terminar ya desbloqueaba la siguiente,
  * así que contarles intentos hasta el 90% mezclaría dos temarios y daría una
  * cifra que no significa nada.
@@ -119,9 +119,10 @@ function medianaDe(valores: readonly number[]): number {
  * cada logro, los intentos anteriores a ese pueden haber caído. En un histórico
  * recortado la cifra es un suelo, no el recuento completo.
  */
-export function resumirDificultad(sesiones: readonly Sesion[]): Map<string, DificultadLeccion> {
-  const delTemario = new Set(LESSONS.map((l) => l.id));
-
+export function resumirDificultad(
+  sesiones: readonly Sesion[],
+  catalogo: Catalogo = catalogoApp,
+): Map<string, DificultadLeccion> {
   // "El primero que alcanzó el objetivo" solo significa algo con la historia en
   // orden, y el orden de llegada no es fiable: una copia importada puede traer
   // sesiones antiguas detrás de recientes. El orden estable respeta la llegada
@@ -134,7 +135,7 @@ export function resumirDificultad(sesiones: readonly Sesion[]): Map<string, Difi
 
   for (const s of enOrden) {
     const leccion = idCanonico(s.leccion);
-    if (!delTemario.has(leccion)) continue;
+    if (!catalogo.tiene(leccion)) continue;
 
     const previo = porLeccion.get(leccion);
     // Lo practicado después de superarla ya no es "hasta superar": es repaso

@@ -70,10 +70,10 @@ def orden_voraz(palabras, base=RE):
 # teclas por lección en vez de diez y ordena por rentabilidad en español.
 PROPUESTA = [
     ('Reposo', RE), ('Las dos vocales que mandan', 'eo'),
-    ('Las nasales y la erre', 'nr'), ('Se cierran las vocales', 'itu'),
-    ('Tildes', 'áéíóú'), ('Las oclusivas', 'cmp'),
-    ('Resto de consonantes', 'bgv'), ('Las difíciles', 'hqy'),
-    ('Las raras', 'zxwkü'),
+    ('La N y la R', 'nr'), ('Las cinco vocales', 'itu'),
+    ('Tildes', 'áéíóú'), ('La C, la M y la P', 'cmp'),
+    ('La B, la G y la V', 'bgv'), ('La H, la Q y la Y', 'hqy'),
+    ('Las raras', 'zxwü'),
 ]
 
 TRADICIONAL = [

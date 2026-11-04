@@ -8,12 +8,13 @@ Construido sobre **Tauri v2**, **Svelte 5** y **Rust**, LibreType combina la lig
 
 ## Características principales
 
-- **Español primero**: El temario de aprendizaje no sigue el orden tradicional en inglés (reposo, superior, inferior), sino uno derivado de frecuencias reales sobre un corpus de 50.000 palabras en español (`investigacion/frecuencias.py`). El **12,97 %** de las palabras en español contienen tildes, diéresis o eñe, y la tecla `´` se pulsa con más frecuencia que la `p`. Por ello, las tildes se enseñan temprano (lección 5 de 9) utilizando palabras reales.
+- **Español primero**: El temario de aprendizaje no sigue el orden tradicional en inglés (reposo, superior, inferior), sino uno derivado de frecuencias reales sobre un corpus de 50.000 palabras en español (`investigacion/frecuencias.py`). El **13 %** de las palabras en español contienen tildes, diéresis o eñe, y la tecla `´` se pulsa con más frecuencia que la `p`. Por ello, las tildes se enseñan temprano (lección 5 de 14) utilizando palabras reales.
 - **Todo cabe en la ventana, sin scroll**: Para aprender mecanografía sin mirarse las manos, el alumno debe ver en un solo golpe de vista el texto objetivo, la pista del dedo y el teclado en pantalla. La ventana tiene un tamaño mínimo garantizado de 800×600 y una jerarquía de adaptación que evita que el teclado se vuelva ilegible.
 - **Retirada progresiva de ayudas visuales**: El teclado en pantalla actúa como apoyo inicial. A medida que el alumno demuestra dominio sobre una tecla (precisión ≥ 90 % y al menos 8 intentos), su letra se desvanece y se sustituye por un punto discreto para romper el hábito de buscar la tecla en la pantalla.
 - **Tono y preferencias respetuosas**: Evita la *design disqualification* (la sensación de exclusión al enfrentarse a interfaces infantiles o condescendientes). Permite alternar entre tono sobrio y tono lúdico por preferencia explícita (sin preguntar jamás la edad).
-- **Accesibilidad desde los cimientos**: Cumplimiento con las pautas WCAG 2.2 y el estándar europeo EN 301 549 (RD 1112/2018). Escalado de interfaz (100 % a 200 %), tipografía para dislexia, modos de alto contraste, reducción de movimiento y ningún estado transmitido únicamente por color.
-- **Privacidad y persistencia local**: Sin cuentas de usuario, sin telemetría ni servidores remotos. El progreso y las sesiones se guardan localmente en SQLite (`tauri-plugin-sql`), con respaldo automático en `localStorage` en entorno de desarrollo web.
+- **Accesibilidad desde los cimientos**: Diseñada siguiendo las pautas WCAG 2.2 y el estándar europeo EN 301 549 (RD 1112/2018), aunque sin auditoría externa. Escalado de interfaz (100 % a 200 %), tipografía para dislexia, modos de alto contraste, reducción de movimiento y ningún estado transmitido únicamente por color.
+- **Tus propias lecciones**: Crea, edita, duplica, practica y borra lecciones con el texto que quieras desde *Tus lecciones*, en el selector de lección. Se pueden exportar e importar como fichero JSON para pasárselas a otra persona, sin red. Cada carácter se comprueba contra la distribución elegida y, si alguno no se puede teclear, se indica cuál y dónde. No desbloquean el temario ni hacen que el teclado retire letras (ver `AGENTS.md`).
+- **Privacidad y persistencia local**: Sin cuentas de usuario, sin telemetría ni servidores remotos; lo único que se consulta por internet es si hay versión nueva, y se puede desactivar. El progreso y las sesiones se guardan localmente en SQLite (`tauri-plugin-sql`), con respaldo automático en `localStorage` en entorno de desarrollo web.
 
 ---
 
@@ -33,6 +34,25 @@ Para garantizar un funcionamiento consistente y robusto en cualquier sistema ope
 
 ---
 
+## Arquitectura: lecciones y cursos
+
+El temario son datos (`src/lib/lecciones/cursos/`) y se consulta siempre a través de `src/lib/lecciones/catalogo.ts`. Para añadir un curso basta con crear su fichero de datos y añadirlo a `cursos/index.ts`: el selector, el progreso y las comprobaciones de coherencia (`garantias.ts`) lo recogen sin tocar nada más.
+
+Las lecciones personalizadas se guardan en SQLite (migración 3) o, en el navegador, en `localStorage`. Al exportar en la aplicación de escritorio, el fichero se guarda en tu carpeta de Descargas y se muestra la ruta completa. El formato es JSON versionado:
+
+```json
+{
+  "formato": "libretype-lecciones",
+  "version": 1,
+  "creadoEn": "2026-11-04T10:00:00.000Z",
+  "lecciones": [
+    { "id": "propia:…", "titulo": "Refranes", "descripcion": "", "texto": "a quien madruga Dios le ayuda" }
+  ]
+}
+```
+
+---
+
 ## Público objetivo
 
 LibreType está concebido tanto para:
@@ -40,7 +60,7 @@ LibreType está concebido tanto para:
 - **Niños y jóvenes**: Que se inician en el uso del ordenador o el teclado físico escolar.
 - **Adultos y personas mayores**: Que desean mejorar su soltura, reaprender hábitos posturales o afianzar la memoria muscular.
 
-La aplicación incluye la **Lección Cero** (`src/lib/components/LeccionCero.svelte`), una guía anatómica y postural centrada en la colocación de las manos sobre los relieves guía de las teclas `F` y `J`, sin presiones de tiempo ni puntuaciones.
+La aplicación incluye la **lección cero** («Antes de empezar», `src/lib/components/LeccionCero.svelte`), una guía postural centrada en la colocación de las manos sobre los relieves guía de las teclas `F` y `J`, sin presiones de tiempo ni puntuaciones.
 
 ---
 
@@ -178,7 +198,7 @@ El paquete se llama **`libre-type`**, con guion: lo deriva Tauri del `productNam
 
 Requiere `libwebkit2gtk-4.1-0`, así que funciona en Ubuntu 22.04+ y Debian 12+, y solo se publica para **amd64**. `sudo apt upgrade` trae las versiones nuevas; que se instalen solas requiere configurar `unattended-upgrades` para orígenes de terceros, cosa que por defecto no hace.
 
-### El resto: la aplicación se actualiza sola
+### El resto: la aplicación te avisa
 
 En AppImage, macOS y Windows, LibreType mira al arrancar si hay una versión nueva y lo avisa en la barra de arriba. Nunca instala ni reinicia por su cuenta: las dos cosas son un clic, porque reiniciar a mitad de una lección tiraría el intento por la borda.
 

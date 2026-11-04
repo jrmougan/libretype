@@ -115,6 +115,24 @@ describe('los textos son español de verdad', () => {
     });
   });
 
+  it('cada lección practica todas las teclas que estrena, no solo alguna', () => {
+    // «Fila de reposo» estrenaba la j, la k y la ñ y su texto no usaba ninguna: el
+    // alumno terminaba la lección sin haberlas pulsado.
+    LESSONS.forEach((l) => {
+      const sinPracticar = [...l.nuevas].filter((ch) => !l.text.includes(ch));
+      expect(sinPracticar, `"${l.title}" no practica: ${sinPracticar.join(' ')}`).toEqual([]);
+    });
+  });
+
+  it('hay palabras de sobra y sin repetirlas una y otra vez', () => {
+    const iRaras = LESSONS.findIndex((l) => l.id === 'raras');
+    LESSONS.slice(0, iRaras + 1).forEach((l) => {
+      const palabras = l.text.split(' ');
+      expect(palabras.length, `"${l.title}" es corta`).toBeGreaterThanOrEqual(25);
+      expect(new Set(palabras).size, `"${l.title}" repite palabras`).toBe(palabras.length);
+    });
+  });
+
   it('la lección de tildes practica las cinco', () => {
     const l = LESSONS.find((x) => x.id === 'tildes')!;
     for (const v of 'áéíóú') {

@@ -35,14 +35,14 @@ export const PASOS: Paso[] = [
       'La espalda apoyada en el respaldo y los pies planos en el suelo. Si no llegan, ponles debajo una caja o un libro grueso.',
       'La pantalla más o menos a la altura de los ojos, para no bajar la cabeza.',
       'Los codos cerca del cuerpo, formando un ángulo recto, y las muñecas rectas: no las apoyes en la mesa mientras escribes.',
-      'Esto no es una formalidad. Teclear con la postura torcida cansa en diez minutos y a la larga hace daño.',
+      'Esto no es una formalidad: teclear con la postura torcida cansa pronto y, a la larga, puede hacer daño.',
     ],
     guia: [],
   },
   {
     titulo: 'Los ocho dedos tienen su sitio',
     cuerpo: [
-      'Esta hilera se llama la fila de reposo, y es la casa de tus dedos. Cada uno tiene la suya y siempre vuelve a ella.',
+      'Esta hilera se llama fila de reposo, y es la casa de tus dedos: cada uno tiene su tecla y siempre vuelve a ella.',
       'Mano izquierda: el meñique en la A, el anular en la S, el corazón en la D y el índice en la F.',
       'Mano derecha: el índice en la J, el corazón en la K, el anular en la L y el meñique en la Ñ.',
       'Los pulgares se quedan flotando sobre la barra espaciadora. No hacen nada más.',
@@ -66,7 +66,7 @@ export const PASOS: Paso[] = [
     titulo: 'El espacio es cosa de los pulgares',
     cuerpo: [
       'La barra espaciadora se pulsa con un pulgar, el que te resulte cómodo. Nunca con otro dedo, porque eso obliga a sacar la mano de su sitio.',
-      'Prueba a darle una vez sin mover el resto de los dedos de la fila de reposo.',
+      'Prueba a pulsarla una vez sin mover de la fila de reposo el resto de los dedos.',
     ],
     guia: ['Space'],
     pide: [{ code: 'Space', comoSeLlama: 'la barra espaciadora', dedo: 'thumb' }],
@@ -74,10 +74,10 @@ export const PASOS: Paso[] = [
   {
     titulo: 'Y ahora, lo difícil: no mirar',
     cuerpo: [
-      'Al principio vas a ir lento y vas a querer mirar el teclado. Es normal y le pasa a todo el mundo.',
-      'Mirar es justo lo que impide aprender: mientras los ojos buscan la tecla, los dedos no memorizan dónde estaba. Se avanza más yendo despacio sin mirar que rápido mirando.',
+      'Al principio irás despacio y querrás mirar el teclado. Es normal: le pasa a todo el mundo.',
+      'Mirar es justo lo que frena el aprendizaje: mientras los ojos buscan la tecla, los dedos no memorizan dónde está. Se avanza más yendo despacio sin mirar que rápido mirando.',
       'Si te pierdes, busca los relieves de la F y la J con los índices y vuelve a empezar. Para eso están.',
-      'Ya puedes ir a la primera lección. Esta pantalla se queda aquí por si quieres repasarla.',
+      'Ya puedes ponerte a practicar. Esta pantalla sigue en el selector de lección, en «Antes de empezar», por si quieres repasarla.',
     ],
     guia: REPOSO,
   },

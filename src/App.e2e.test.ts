@@ -66,7 +66,7 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
     // 4. Desde la lección cero, el usuario pasa al ejercicio usando el selector superior
     const selectorLeccion = document.querySelector('header select') as HTMLSelectElement;
     expect(selectorLeccion).not.toBeNull();
-    selectorLeccion.value = '0';
+    selectorLeccion.value = LESSONS[0].id;
     selectorLeccion.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
@@ -137,7 +137,7 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
 
     // 10. Verifica que el resultado se ha cerrado y la lección 2 está activa
     expect(document.querySelector('#dialogo-resultado')).toBeNull();
-    expect(selectorLeccion.value).toBe('1');
+    expect(selectorLeccion.value).toBe(LESSONS[1].id);
     expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
 
     const campoNuevo = campoCaptura();
@@ -161,7 +161,7 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
 
     await vi.waitFor(() => expect(document.querySelector('select')?.disabled).toBe(false));
     const selector = document.querySelector('select')!;
-    selector.value = '0';
+    selector.value = LESSONS[0].id;
     selector.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
@@ -196,7 +196,7 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
 
     await vi.waitFor(() => expect(document.querySelector('select')?.disabled).toBe(false));
     const selector = document.querySelector('select')!;
-    selector.value = '0';
+    selector.value = LESSONS[0].id;
     selector.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();

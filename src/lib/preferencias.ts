@@ -26,7 +26,8 @@
  */
 export type Tono = 'juego' | 'sobrio';
 
-import { LESSONS } from './lessons';
+import { catalogo } from './lecciones/catalogo';
+import { esIdPropio } from './lecciones/ids';
 
 export interface Preferencias {
   /** Escala del texto, de 1 a 2. */
@@ -51,7 +52,11 @@ export interface Preferencias {
    * consulta. Sin ella la actualización sigue siendo posible a mano.
    */
   buscarActualizaciones: boolean;
-  /** Última lección seleccionada por el alumno para recordar por dónde iba. */
+  /**
+   * Última lección seleccionada, del temario o personalizada. Una personalizada
+   * solo se valida por su forma: aquí no se sabe si existe, porque se cargan del
+   * almacén después. Si se borró, `resolverLeccion()` cae a una segura.
+   */
   ultimaLeccion?: string;
   /** Identificador de la distribución seleccionada (p. ej. 'es-iso'). */
   layout: string;
@@ -65,7 +70,7 @@ export const POR_DEFECTO: Preferencias = {
   tono: null,
   ayudaTeclado: 'auto',
   buscarActualizaciones: true,
-  ultimaLeccion: LESSONS[0]?.id ?? 'reposo',
+  ultimaLeccion: catalogo.primera.id,
   layout: 'es-iso',
 };
 
@@ -86,7 +91,7 @@ export function normalizar(crudo: unknown): Preferencias {
   const movimientoCrudo = o.movimiento ?? (o.animaciones === 'reducidas' ? 'reducido' : undefined);
   const leccionValida =
     typeof o.ultimaLeccion === 'string' &&
-    LESSONS.some((l) => l.id === o.ultimaLeccion);
+    (catalogo.tiene(o.ultimaLeccion) || esIdPropio(o.ultimaLeccion));
 
   return {
     escala: enRango(o.escala, 1, 2, POR_DEFECTO.escala),
@@ -102,7 +107,7 @@ export function normalizar(crudo: unknown): Preferencias {
       typeof o.buscarActualizaciones === 'boolean'
         ? o.buscarActualizaciones
         : POR_DEFECTO.buscarActualizaciones,
-    ultimaLeccion: leccionValida ? (o.ultimaLeccion as string) : (POR_DEFECTO.ultimaLeccion ?? LESSONS[0].id),
+    ultimaLeccion: leccionValida ? (o.ultimaLeccion as string) : catalogo.primera.id,
     layout: typeof o.layout === 'string' && o.layout.trim() ? o.layout.trim() : POR_DEFECTO.layout,
   };
 }

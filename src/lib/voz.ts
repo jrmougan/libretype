@@ -13,8 +13,10 @@ import type { Tono } from './preferencias';
 export interface Voz {
   terminada: string;
   record: string;
-  /** Cuando ha ido bien de precisión. */
+  /** Cuando ha ido muy bien de precisión (`PRECISION_ALTA` o más). */
   animoAlto: string;
+  /** Ha llegado al objetivo, pero con algún fallo: «casi sin fallos» sería falso. */
+  animoMedio: string;
   /** Cuando ha fallado bastante: nunca reprende, propone repetir. */
   animoBajo: string;
   repetir: string;
@@ -30,25 +32,28 @@ export interface Voz {
 }
 
 const JUEGO: Voz = {
-  terminada: '¡Lección superada!',
+  // No dice «superada»: se llega aquí también por debajo del objetivo.
+  terminada: '¡Has llegado al final!',
   record: '¡Nunca habías ido tan rápido en esta lección!',
   animoAlto: '¡Casi sin fallos! Vas muy bien.',
-  animoBajo: 'Tranquilo, esto se coge con la práctica. ¿Otra vez?',
+  animoMedio: '¡Bien hecho! Un poco más y te sale redondo.',
+  animoBajo: '¡No pasa nada! Esto se aprende practicando. ¿Otra vez?',
   repetir: 'Otra vez',
   siguiente: '¡Siguiente!',
   progreso: 'Lo que llevas conseguido',
-  repaso: '¡A repasar! Hay teclas ganadas que piden otra vuelta.',
+  repaso: '¡Hora de repasar! Algunas teclas piden otra vuelta.',
 };
 
 const SOBRIO: Voz = {
   terminada: 'Lección terminada.',
   record: 'Tu mejor marca en esta lección.',
   animoAlto: 'Precisión alta.',
-  animoBajo: 'Con un par de repeticiones más la precisión sube.',
+  animoMedio: 'Buena precisión.',
+  animoBajo: 'Con un poco más de práctica, la precisión sube.',
   repetir: 'Repetir',
   siguiente: 'Siguiente lección',
   progreso: 'Tu progreso',
-  repaso: 'Hay teclas ya superadas que llevan un tiempo sin salir.',
+  repaso: 'Algunas teclas que ya conoces llevan tiempo sin salir.',
 };
 
 export const VOCES: Record<Tono, Voz> = { juego: JUEGO, sobrio: SOBRIO };

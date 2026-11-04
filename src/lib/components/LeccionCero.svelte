@@ -19,9 +19,11 @@
   interface Props {
     layout?: Layout;
     onTerminar?: () => void;
+    /** Quien vuelve a repasar esto no va a la primera lección, sino a la suya. */
+    textoTerminar?: string;
   }
 
-  let { layout = ES_ISO, onTerminar }: Props = $props();
+  let { layout = ES_ISO, onTerminar, textoTerminar = 'Ir a la primera lección' }: Props = $props();
 
   let i = $state(0);
   let campo = $state<HTMLTextAreaElement | null>(null);
@@ -87,7 +89,9 @@
 
 <section class="cero" aria-labelledby="cero-tit">
   <div class="texto">
-  <header>
+  <!-- El paso cambia sin que se mueva el foco: al pulsar «Siguiente» sigue en ese
+       botón, y sin esto un lector de pantalla no diría nada. -->
+  <header aria-live="polite">
     <p class="etapa">Antes de empezar · paso {i + 1} de {PASOS.length}</p>
     <h2 id="cero-tit">{paso.titulo}</h2>
   </header>
@@ -139,12 +143,12 @@
       held={pulsadas}
       guia={new Set(paso.guia)}
       etiqueta={paso.guia.length
-        ? `Teclado en pantalla con la posición de reposo señalada: ${paso.guia.length} teclas.`
+        ? `Teclado en pantalla con ${paso.guia.length === 1 ? 'una tecla señalada' : `${paso.guia.length} teclas señaladas`}.`
         : 'Teclado en pantalla.'}
     />
   </div>
 
-  <nav class="pasos" aria-label="Pasos de la lección cero">
+  <nav class="pasos" aria-label="Pasos de «Antes de empezar»">
     <button onclick={() => ir(i - 1)} disabled={i === 0}>Anterior</button>
 
     <ol class="puntos" aria-hidden="true">
@@ -155,7 +159,7 @@
 
     {#if ultimo}
       <button class="primario" onclick={() => onTerminar?.()}>
-        Ir a la primera lección
+        {textoTerminar}
       </button>
     {:else}
       <button class="primario" onclick={() => ir(i + 1)}>Siguiente</button>
@@ -180,7 +184,11 @@
     display: grid;
     gap: var(--space-3) var(--space-6);
     grid-template-areas: 'texto teclado' 'pasos pasos' 'saltar saltar';
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    /* El límite aquí es el ancho, no el alto: la columna tiene que ser lo bastante
+       ancha para que el teclado alcance su suelo a lo alto. El `min(100%, …)` es para
+       una ventana estrecha, donde además esto ya va apilado. */
+    grid-template-columns: minmax(0, 1fr)
+      minmax(min(100%, calc(min(34vh, 230px) * var(--teclado-proporcion))), 1.1fr);
     grid-template-rows: minmax(0, 1fr) auto auto;
     min-height: 0;
   }
@@ -189,8 +197,16 @@
     display: grid;
     gap: var(--space-3);
     align-content: start;
+    /* Sin esto, las filas se encogen hasta el mínimo de cada hijo en vez de dejar
+       que se desplace la caja: la zona de prueba tiene un `min-height` y su texto se
+       salía por debajo del recuadro. */
+    grid-auto-rows: max-content;
     min-height: 0;
     overflow-y: auto;
+    /* El contorno de foco de la zona de prueba sale de su caja; sin este margen lo
+       recortaba el desplazamiento y solo se veía arriba y abajo. */
+    padding: var(--space-1) var(--margen-foco);
+    margin-inline: calc(-1 * var(--margen-foco));
   }
   /* La fila 1fr le da altura definida a la columna, que es lo que permite al
      SVG escalarse para llenarla en vez de quedarse a tamaño intrínseco. */
@@ -204,13 +220,29 @@
   .pasos { grid-area: pasos; }
   .saltar { grid-area: saltar; }
 
-  @media (max-width: 900px) {
+  /* Por debajo de esto, con el teclado en su suelo, al texto le quedaría una columna
+     de unas cuarenta letras: mejor uno encima del otro. */
+  @media (max-width: 1120px) {
     .cero {
       grid-template-areas: 'texto' 'teclado' 'pasos' 'saltar';
-      grid-template-columns: 1fr;
-      grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+      grid-template-columns: minmax(0, 1fr);
+      /* Aquí el texto se lleva lo que sobra, que se lee; el teclado, su suelo y algo más. */
+      grid-template-rows: minmax(0, 2fr) minmax(min(34vh, 230px), 1fr) auto auto;
     }
   }
+  /* Letra grande: en dos columnas el texto no cabe ni en una palabra por línea y el
+     teclado queda diminuto. El teclado no baja de la mitad de su caja a lo ancho, y
+     «Saltar» sube a la fila de los botones para no gastar otra. */
+  :global(.app.compacta) .cero {
+    grid-template-areas: 'texto' 'teclado' 'pasos' 'saltar';
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, auto) auto auto;
+    gap: var(--space-1);
+  }
+  :global(.app.compacta) .cero .teclado { height: min(33vw, 34vh); }
+  :global(.app.compacta) .etapa { margin: 0; }
+  :global(.app.compacta) .pasos button { padding-block: 0; }
+  :global(.app.compacta) .saltar, :global(.app.compacta) .enlace { min-height: var(--target-min); }
 
   .etapa {
     margin: 0 0 var(--space-1);
@@ -230,7 +262,7 @@
   .captura { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
   .prueba {
-    display: block;
+    position: relative;
     cursor: text;
     border: 2px dashed var(--border-strong);
     border-radius: var(--radius);
@@ -254,19 +286,18 @@
     background: var(--accent);
     color: var(--accent-fg);
     padding: 0 var(--space-2);
-    border-radius: 4px;
+    border-radius: var(--radius-key);
   }
   .dedo { color: var(--fg-muted); font-size: var(--text-base); }
   .ok { margin: 0; font-size: var(--text-lg); color: var(--ok); font-weight: 600; }
   .sugerencia, .eco { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
 
-  .pasos { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-  .primario { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
-  button:disabled { opacity: 0.45; cursor: default; }
+  /* Volver a un lado y seguir al otro, como en cualquier asistente. */
+  .pasos { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 
   .puntos { display: flex; gap: var(--space-2); list-style: none; margin: 0; padding: 0; }
   .puntos li {
-    width: 10px; height: 10px; border-radius: 50%;
+    width: var(--space-2); height: var(--space-2); border-radius: 50%;
     border: 1px solid var(--border-strong); background: transparent;
   }
   .puntos li.hecho { background: var(--border-strong); }

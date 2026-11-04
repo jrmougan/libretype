@@ -22,6 +22,56 @@ function montar() {
   return document.querySelector('textarea')!;
 }
 
+describe('la cifra de cobertura', () => {
+  it('habla del idioma del curso, no siempre del español', () => {
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'ás', titulo: 'T', cobertura: '45', idioma: 'inglés' },
+    });
+    flushSync();
+    const chapa = document.querySelector('.cobertura')!;
+    expect(chapa.textContent).toContain('45% del inglés');
+    expect(chapa.getAttribute('aria-label')).toContain('se escriben en inglés');
+    expect(document.body.textContent).not.toContain('español');
+  });
+});
+
+describe('texto largo dentro de su caja', () => {
+  const rect = (top: number, bottom: number) => ({ top, bottom }) as DOMRect;
+
+  it('lleva el cursor a la vista al salirse de la caja', async () => {
+    // Sin esto, en cuanto el texto pasaba de lo que cabe en la caja, el cursor
+    // seguía avanzando por debajo sin que se viera.
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'uno dos', titulo: 'Largo' },
+    });
+    flushSync();
+    const campo = document.querySelector('textarea')!;
+    const caja = document.querySelector<HTMLElement>('.text')!;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return this === caja ? rect(100, 150) : rect(180, 200);
+    });
+
+    campo.value = 'u';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    await tick();
+
+    expect(caja.scrollTop).toBe(80);
+  });
+
+  it('no parte las palabras: cada una va entera en su envoltorio', () => {
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'uno dos', titulo: 'Largo' },
+    });
+    flushSync();
+    const palabras = [...document.querySelectorAll('.palabra')].map((p) => p.textContent);
+    expect(palabras).toEqual(['uno\u00a0', 'dos']);
+    expect(document.querySelectorAll('.ch')).toHaveLength(7);
+  });
+});
+
 describe('foco de la lección', () => {
   it('no recupera el foco al salir hacia otro control ni hacia el fondo', () => {
     const campo = montar();
@@ -44,9 +94,8 @@ describe('foco de la lección', () => {
     const campo = montar();
     campo.value = 'á';
     campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
-    const boton = document.querySelector('button')!;
-    boton.focus();
-    boton.click();
+    campo.blur();
+    (componente as unknown as { enfocar: () => void }).enfocar();
     await tick();
     expect(document.activeElement).toBe(campo);
     expect(campo.value).toBe('á');
@@ -190,7 +239,9 @@ describe('reporte de tiempos por tecla (issue #9)', () => {
 });
 
 describe('reiniciar y pausar lección (issue #24)', () => {
-  it('el botón Empezar de nuevo reinicia el texto y las métricas', async () => {
+  // El botón vive en la barra de `App`, que tiene su propio test: aquí se comprueba
+  // lo que ese botón llama. Antes había dos botones con la misma etiqueta accesible.
+  it('restart() reinicia el texto y las métricas', async () => {
     let statsReportadas: any = null;
     componente = mount(Drill, {
       target: document.body,
@@ -210,12 +261,7 @@ describe('reiniciar y pausar lección (issue #24)', () => {
     expect(campo.value).toBe('a');
     expect(statsReportadas.typed).toBe(1);
 
-    const botonReiniciar = [...document.querySelectorAll('button')].find(
-      (b) => b.textContent?.includes('Empezar de nuevo'),
-    );
-    expect(botonReiniciar).not.toBeNull();
-
-    botonReiniciar?.click();
+    (componente as unknown as { restart: () => void }).restart();
     flushSync();
     await tick();
 
@@ -242,5 +288,40 @@ describe('reiniciar y pausar lección (issue #24)', () => {
     const cartel = document.querySelector('.pausa-cartel');
     expect(cartel).not.toBeNull();
     expect(cartel?.textContent).toContain('Ejercicio pausado');
+  });
+});
+
+describe('pulido de la lección', () => {
+  it('la tecla con la que se sale del campo no se queda encendida', async () => {
+    const campo = montar();
+    campo.dispatchEvent(new KeyboardEvent('keydown', { code: 'Tab', bubbles: true }));
+    flushSync();
+    expect(document.querySelector('g.key.pressed')).not.toBeNull();
+    campo.dispatchEvent(new FocusEvent('blur'));
+    flushSync();
+    expect(document.querySelector('g.key.pressed')).toBeNull();
+  });
+
+  it('al empezar a teclear lleva el texto a la vista una sola vez por intento', async () => {
+    const original = Element.prototype.scrollIntoView;
+    const desplazar = vi.fn();
+    Element.prototype.scrollIntoView = desplazar;
+    try {
+      const campo = montar();
+      expect(desplazar).not.toHaveBeenCalled();
+      for (const v of ['á', 'ás']) {
+        campo.value = v;
+        campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        flushSync();
+      }
+      expect(desplazar).toHaveBeenCalledTimes(1);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  it('el aviso de foco perdido no le estorba al lector de pantalla', () => {
+    montar();
+    expect(document.querySelector('.aviso-foco')?.getAttribute('aria-hidden')).toBe('true');
   });
 });

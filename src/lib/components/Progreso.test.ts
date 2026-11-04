@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { flushSync, mount, tick, unmount } from "svelte";
 import Progreso from "./Progreso.svelte";
+import { LIMITES } from "../lecciones/personalizadas";
 import { LESSONS } from "../lessons";
 import { AlmacenMemoria } from "../storage/almacen";
 import { FILA_DISPONIBLE, PCT_OBJETIVO, SIN_PRESION } from "../storage/objetivos";
@@ -41,8 +42,8 @@ describe("Progreso.svelte - Aviso de degradación (Issue #29)", () => {
 
     const alerta = document.querySelector("[role='alert']");
     expect(alerta).not.toBeNull();
-    expect(alerta?.textContent).toContain("No se pudo abrir la base de datos local");
-    expect(alerta?.textContent?.replace(/\s+/g, " ")).toContain("almacenamiento del navegador temporalmente");
+    expect(alerta?.textContent).toContain("No se ha podido abrir la base de datos de este equipo");
+    expect(alerta?.textContent?.replace(/\s+/g, " ")).toContain("almacén provisional de la aplicación");
   });
 
   it("muestra el aviso normal de navegador si es local sin errorAlmacen", () => {
@@ -60,7 +61,7 @@ describe("Progreso.svelte - Aviso de degradación (Issue #29)", () => {
 
     const aviso = document.querySelector(".aviso");
     expect(aviso).not.toBeNull();
-    expect(aviso?.textContent).toContain("Guardando en el navegador");
+    expect(aviso?.textContent).toContain("Tu progreso se guarda en este navegador");
     expect(document.querySelector("[role='alert']")).toBeNull();
   });
 
@@ -131,12 +132,12 @@ describe("Progreso.svelte - Exportación e importación (Issue #28)", () => {
     expect(botonExportar.disabled).toBe(false);
 
     botonExportar.click();
-    await tick();
-    await new Promise((r) => setTimeout(r, 10));
+    // Guardar carga la API de Tauri en diferido: no cabe una espera fija.
+    await vi.waitFor(() =>
+      expect(document.querySelector("[role='status']")?.textContent)
+        .toContain("Copia de seguridad exportada correctamente"));
 
     expect(onExportar).toHaveBeenCalled();
-    const mensaje = document.querySelector("[role='status']");
-    expect(mensaje?.textContent).toContain("Copia de seguridad exportada correctamente");
   });
 
   it("importa correctamente un archivo JSON válido", async () => {
@@ -251,6 +252,77 @@ describe("Progreso.svelte - Exportación e importación (Issue #28)", () => {
   });
 });
 
+describe("Progreso.svelte - restaurar sin pisarse", () => {
+  async function hastaConfirmar(onImportar: (j: string) => Promise<void>): Promise<void> {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones: [sesionPrueba], lecciones: LESSONS, tipoAlmacen: "sqlite", onBorrar: () => {}, onImportar },
+    });
+    flushSync();
+    const input = document.querySelector("input[type='file']") as HTMLInputElement;
+    Object.defineProperty(input, "files", { value: [new File(["{}"], "c.json")] });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    await vi.waitFor(() => expect(document.querySelector(".confirmacion")).not.toBeNull());
+  }
+  const confirmar = () => [...document.querySelectorAll<HTMLButtonElement>(".confirmacion button")]
+    .find((b) => b.textContent?.includes("Sí, importar"))!;
+
+  it("un doble clic solo importa una vez, y mientras dura lo dice y no se puede pulsar nada", async () => {
+    let acabar = (): void => {};
+    const onImportar = vi.fn(() => new Promise<void>((r) => { acabar = r; }));
+    await hastaConfirmar(onImportar);
+
+    const boton = confirmar();
+    boton.click();
+    boton.click();
+    flushSync();
+
+    expect(onImportar).toHaveBeenCalledTimes(1);
+    expect(document.querySelector("[role='status']")?.textContent).toContain("Importando");
+    for (const b of document.querySelectorAll<HTMLButtonElement>(".confirmacion button")) expect(b.disabled).toBe(true);
+    expect(document.querySelector<HTMLButtonElement>(".importar")!.disabled).toBe(true);
+
+    acabar();
+    await vi.waitFor(() => expect(document.querySelector("[role='status']")?.textContent).toContain("con éxito"));
+    expect(document.querySelector<HTMLButtonElement>(".importar")!.disabled).toBe(false);
+  });
+
+  it("mientras se restaura tampoco responden gestionar ni borrar", async () => {
+    let acabar = (): void => {};
+    const onImportar = vi.fn(() => new Promise<void>((r) => { acabar = r; }));
+    componente = mount(Progreso, {
+      target: document.body,
+      props: {
+        sesiones: [sesionPrueba, { ...sesionPrueba, leccion: "propia:a" }], lecciones: LESSONS, tipoAlmacen: "sqlite", onBorrar: () => {}, onImportar,
+        onGestionarLecciones: () => {},
+        leccionesPropias: [{ id: "propia:a", titulo: "Mía", descripcion: "", texto: "la sal", creadaEn: "2026-01-01T00:00:00.000Z", actualizadaEn: "2026-01-01T00:00:00.000Z", borradaEn: null }],
+      },
+    });
+    flushSync();
+    const boton = (t: string) => [...document.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent?.trim() === t)!;
+    boton("Borrar progreso").click();
+    flushSync();
+    const input = document.querySelector("input[type='file']") as HTMLInputElement;
+    Object.defineProperty(input, "files", { value: [new File(["{}"], "c.json")] });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    await vi.waitFor(() => expect(document.querySelector(".confirmacion")).not.toBeNull());
+    confirmar().click();
+    flushSync();
+
+    for (const t of ["Gestionar", "Sí, borrar"]) expect(boton(t).disabled, t).toBe(true);
+
+    acabar();
+    await vi.waitFor(() => expect(boton("Gestionar").disabled).toBe(false));
+  });
+
+  it("si falla, se puede volver a intentar", async () => {
+    await hastaConfirmar(() => Promise.reject(new Error("Tu historial sigue como estaba.")));
+    confirmar().click();
+    await vi.waitFor(() => expect(document.querySelector("[role='alert']")?.textContent).toContain("sigue como estaba"));
+    expect(document.querySelector<HTMLButtonElement>(".importar")!.disabled).toBe(false);
+  });
+});
+
 describe("Progreso.svelte - Evolución temporal (Issue #26) y Teclas flojas (Issue #22)", () => {
   it("muestra la evolución temporal y los días practicados", () => {
     componente = mount(Progreso, {
@@ -272,7 +344,25 @@ describe("Progreso.svelte - Evolución temporal (Issue #26) y Teclas flojas (Iss
 
     const tituloEvolucion = document.querySelector("#titulo-evolucion");
     expect(tituloEvolucion).not.toBeNull();
-    expect(tituloEvolucion?.textContent).toContain("Evolución temporal");
+    expect(tituloEvolucion?.textContent).toContain("Evolución por días");
+  });
+
+  it("un día de refuerzo con texto repetido no se atribuye al alumno", () => {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: {
+        sesiones: [{ ...sesionPrueba, leccion: "refuerzo-suelto" }],
+        lecciones: LESSONS,
+        tipoAlmacen: "sqlite",
+        onBorrar: () => {},
+      },
+    });
+    flushSync();
+
+    // Ese texto lo generó la aplicación: «textos tuyos» sería falso.
+    const fila = document.querySelector("#titulo-evolucion")?.closest("section")?.querySelector("tbody tr");
+    expect(fila?.textContent).toContain("solo textos a medida");
+    expect(document.body.textContent).not.toContain("textos tuyos");
   });
 
   it("muestra la lista de teclas y permite iniciar ejercicio de refuerzo", async () => {
@@ -436,5 +526,149 @@ describe("Progreso.svelte - Intentos hasta superar (Issue #53)", () => {
     const col = columnaHastaSuperar();
     expect(celdaDe("Práctica continua", col)).toBe("—");
     expect(celdaDe("Las vocales que mandan", col)).toBe("—");
+  });
+});
+
+describe("Progreso: lecciones personalizadas", () => {
+  const AHORA = "2026-09-02T12:00:00.000Z";
+  const sesionDe = (leccion: string, extra: Partial<Sesion> = {}): Sesion => ({
+    leccion, ppm: 40, pctAcierto: 95, aciertos: 95, escritos: 100, ms: 60000, terminadaEn: AHORA, ...extra,
+  });
+  const propia = (id: string, titulo: string, borradaEn: string | null = null) => ({
+    id, titulo, descripcion: "", texto: borradaEn ? "" : "una frase", creadaEn: AHORA, actualizadaEn: AHORA, borradaEn,
+  });
+  const montar = (sesiones: Sesion[], extra: Record<string, unknown> = {}) => {
+    const c = mount(Progreso, {
+      target: document.body,
+      props: { sesiones, lecciones: LESSONS, tipoAlmacen: "local", onBorrar: () => {}, ...extra },
+    });
+    flushSync();
+    return c;
+  };
+  const seccion = () => document.querySelector("section[aria-labelledby='titulo-propias']");
+
+  afterEach(() => document.body.replaceChildren());
+
+  it("las enseña aparte, con su nombre, y no como lección retirada", async () => {
+    const c = montar([sesionDe("propia:a")], { leccionesPropias: [propia("propia:a", "Refranes")] });
+    expect(seccion()?.textContent).toContain("Refranes");
+    expect(seccion()?.textContent).not.toContain("lección borrada");
+    expect(document.body.textContent).not.toContain("lección retirada");
+    await unmount(c);
+  });
+
+  it("borrada sigue saliendo con su nombre", async () => {
+    const c = montar([sesionDe("propia:a")], { leccionesPropias: [propia("propia:a", "Refranes", AHORA)] });
+    expect(seccion()?.textContent).toContain("Refranes");
+    expect(seccion()?.textContent).toContain("lección borrada");
+    await unmount(c);
+  });
+
+  it("si no se conoce el nombre, lo dice sin enseñar el identificador", async () => {
+    const c = montar([sesionDe("propia:perdida")]);
+    expect(seccion()?.textContent).toContain("Lección sin nombre");
+    expect(document.body.textContent).not.toContain("propia:perdida");
+    await unmount(c);
+  });
+
+  it("no cuentan como lección practicada del temario ni fijan la mejor marca", async () => {
+    const c = montar([sesionDe("propia:a", { ppm: 900 })], { leccionesPropias: [propia("propia:a", "Refranes")] });
+    const global = document.querySelector("dl.global")!.textContent!;
+    expect(global).toContain(`0 de ${LESSONS.length}`);
+    expect(global).toContain("Mejor marca0 ppm");
+    expect(seccion()?.textContent).toContain("900");
+    await unmount(c);
+  });
+
+  it("sin marca todavía lo dice en su fila", async () => {
+    const c = montar([sesionDe("propia:a", { pctAcierto: 50 })], { leccionesPropias: [propia("propia:a", "Refranes")] });
+    expect(seccion()?.textContent).toContain("sin marca todavía");
+    await unmount(c);
+  });
+
+  it("sin histórico de lecciones propias no hay sección", async () => {
+    const c = montar([sesionDe("reposo")]);
+    expect(seccion()).toBeNull();
+    await unmount(c);
+  });
+
+  it("un id de una copia dañada no pinta lo que hereda Object.prototype", async () => {
+    const c = montar(["constructor", "toString", "__proto__"].map((id) => sesionDe(id)));
+    const filas = [...document.querySelectorAll("tr.retirada")].map((f) => f.textContent ?? "");
+    expect(filas).toHaveLength(3);
+    for (const f of filas) {
+      expect(f).toContain("lección retirada");
+      expect(f).not.toContain("native code");
+      expect(f).not.toContain("[object");
+    }
+    await unmount(c);
+  });
+
+  it("si no hay ejercicio posible lo dice, en vez de no hacer nada", async () => {
+    const onPracticarRefuerzo = vi.fn();
+    const c = mount(Progreso, {
+      target: document.body,
+      props: {
+        sesiones: [sesionDe("reposo")],
+        lecciones: LESSONS,
+        tipoAlmacen: "local",
+        teclas: new Map([["Enter", { intentos: 20, aciertos: 8, msTotal: 20000 }]]),
+        onBorrar: () => {},
+        onPracticarRefuerzo,
+      },
+    });
+    flushSync();
+    const estado = document.querySelector(".estado-refuerzo")!;
+    expect(estado.getAttribute("role")).toBe("status");
+    expect(estado.textContent?.trim()).toBe("");
+    (document.querySelector(".btn-refuerzo") as HTMLButtonElement).click();
+    flushSync();
+    expect(onPracticarRefuerzo).not.toHaveBeenCalled();
+    expect(estado.textContent).toContain("Todavía no hay palabras");
+    await unmount(c);
+  });
+
+  it("enlaza con la gestión", async () => {
+    const onGestionarLecciones = vi.fn();
+    const c = montar([sesionDe("propia:a")], { onGestionarLecciones });
+    [...seccion()!.querySelectorAll("button")].find((b) => b.textContent === "Gestionar")!.click();
+    expect(onGestionarLecciones).toHaveBeenCalledOnce();
+    await unmount(c);
+  });
+});
+
+
+describe("Progreso: los modos de práctica no son lecciones retiradas", () => {
+  it("el refuerzo sale con su nombre y sin la nota de versión anterior", () => {
+    const base = { ppm: 30, pctAcierto: 95, aciertos: 95, escritos: 100, ms: 1000, terminadaEn: "2026-09-01T10:00:00.000Z" };
+    componente = mount(Progreso, {
+      target: document.body,
+      props: {
+        sesiones: [{ ...base, leccion: "reposo" }, { ...base, leccion: "refuerzo" }],
+        lecciones: LESSONS,
+        tipoAlmacen: "sqlite",
+        onBorrar: () => {},
+      },
+    });
+    const fila = document.querySelector("tr.retirada")!;
+    expect(fila.textContent).toContain("Refuerzo de teclas");
+    expect(fila.textContent).toContain("práctica libre");
+    expect(fila.textContent).not.toContain("retirada");
+    expect(document.body.textContent).not.toContain("versión anterior");
+  });
+
+  it("un fichero demasiado grande no se llega a leer", async () => {
+    const onImportar = vi.fn();
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones: [], lecciones: LESSONS, tipoAlmacen: "sqlite", onBorrar: () => {}, onImportar },
+    });
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const archivo = new File(["{}"], "copia.json");
+    Object.defineProperty(archivo, "size", { value: LIMITES.copiaBytes + 1 });
+    Object.defineProperty(input, "files", { configurable: true, value: [archivo] });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    await vi.waitFor(() => expect(document.querySelector("[role='alert']")?.textContent).toContain("demasiado grande"));
+    expect(onImportar).not.toHaveBeenCalled();
   });
 });

@@ -23,7 +23,7 @@ beforeEach(async () => {
   app = mount(App, { target: document.body });
   await vi.waitFor(() => expect(document.querySelector('.cero')).not.toBeNull());
   const selector = document.querySelector('select')!;
-  selector.value = '0';
+  selector.value = LESSONS[0].id;
   selector.dispatchEvent(new Event('change', { bubbles: true }));
   await tick();
 });
@@ -76,7 +76,7 @@ describe('captura y paneles', () => {
       expect(document.querySelector('h2')?.textContent).toBe('Práctica continua');
       expect(document.querySelector('#dialogo-resultado')).toBeNull();
       expect(campo().disabled).toBe(false);
-      expect(document.querySelector<HTMLSelectElement>('main select')?.value).toBe('2');
+      expect(document.querySelector<HTMLSelectElement>('main select')?.value).toBe(LESSONS[2].id);
     }
   });
 
@@ -170,7 +170,7 @@ describe('captura y paneles', () => {
 
     // Vuelve a empezar la lección disponible sin haber completado el intento.
     const selector = document.querySelector('select')!;
-    selector.value = '0';
+    selector.value = LESSONS[0].id;
     selector.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
 
@@ -227,8 +227,8 @@ describe('captura y paneles', () => {
 describe('experiencia de producto (#21, #23, #24)', () => {
   it('impide saltarse una lección bloqueada incluso mediante un cambio programático', async () => {
     const selector = document.querySelector('select')!;
-    expect(selector.querySelector<HTMLOptionElement>('option[value="1"]')?.disabled).toBe(true);
-    selector.value = '1';
+    expect(selector.querySelector<HTMLOptionElement>(`option[value="${LESSONS[1].id}"]`)?.disabled).toBe(true);
+    selector.value = LESSONS[1].id;
     selector.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     expect(document.querySelector('h2')?.textContent).toBe(LESSONS[0].title);
@@ -241,15 +241,15 @@ describe('experiencia de producto (#21, #23, #24)', () => {
     guardar({ ...POR_DEFECTO, tono: 'sobrio', ultimaLeccion: LESSONS[5].id });
     app = mount(App, { target: document.body });
     await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title));
-    expect(document.querySelector<HTMLOptionElement>('header option[value="1"]')?.disabled).toBe(false);
-    expect(document.querySelector<HTMLOptionElement>('header option[value="2"]')?.disabled).toBe(true);
+    expect(document.querySelector<HTMLOptionElement>(`header option[value="${LESSONS[1].id}"]`)?.disabled).toBe(false);
+    expect(document.querySelector<HTMLOptionElement>(`header option[value="${LESSONS[2].id}"]`)?.disabled).toBe(true);
   });
 
   it('actualiza la ultimaLeccion en preferencias al cambiar de lección (#21)', async () => {
     completar();
     await tick();
     const selector = document.querySelector('select')!;
-    selector.value = '1';
+    selector.value = LESSONS[1].id;
     selector.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
 
@@ -274,7 +274,7 @@ describe('experiencia de producto (#21, #23, #24)', () => {
     const btnPrimario = dialogo?.querySelector('button.primario');
     expect(btnPrimario?.textContent).toContain('Repetir');
     expect(boton('Siguiente lección')).toBeUndefined();
-    expect(document.querySelector<HTMLOptionElement>('header option[value="1"]')?.disabled).toBe(true);
+    expect(document.querySelector<HTMLOptionElement>(`header option[value="${LESSONS[1].id}"]`)?.disabled).toBe(true);
   });
 
   it('criterio de superación dinámico: accuracy >= 90% hace que Siguiente sea primario (#23)', async () => {

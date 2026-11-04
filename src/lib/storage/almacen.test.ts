@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { afterEach, describe, it, expect, beforeEach, vi } from "vitest";
 import {
   AlmacenSqlite,
   AlmacenLocal,
   AlmacenMemoria,
   abrirAlmacen,
   parsearCopiaSeguridad,
-  errorAlmacen,
-  setErrorAlmacen,
+  cargarDatos,
   type DbSql,
 } from "./almacen";
+import { LIMITES } from "../lecciones/personalizadas";
 import type { Sesion } from "./progreso";
 import type { EstadoTecla } from "../keyboard/dominio";
 
@@ -87,69 +87,6 @@ describe("AlmacenSqlite", () => {
     expect(sqles).toContain("VACUUM");
   });
 
-  it("exporta e importa progreso en formato JSON correctamente", async () => {
-    const { db } = crearMockDb();
-    const almacen = new AlmacenSqlite(db);
-
-    await almacen.guardar(sesionDemo({ ppm: 45, leccion: "tildes" }));
-    const teclas = new Map<string, EstadoTecla>([
-      ["KeyA", { intentos: 12, aciertos: 11, msTotal: 2500 }],
-    ]);
-    await almacen.guardarTeclas(teclas);
-
-    const json = await almacen.exportar();
-    expect(json).toBeTypeOf("string");
-
-    const parsed = JSON.parse(json);
-    expect(parsed.version).toBe(1);
-    expect(parsed.sesiones).toHaveLength(1);
-    expect(parsed.sesiones[0].leccion).toBe("tildes");
-    expect(parsed.teclas.KeyA.intentos).toBe(12);
-
-    // Borrar y reimportar
-    await almacen.borrarTodo();
-    expect(await almacen.leerTodas()).toHaveLength(0);
-
-    await almacen.importar(json);
-    const sesionesImportadas = await almacen.leerTodas();
-    expect(sesionesImportadas).toHaveLength(1);
-    expect(sesionesImportadas[0].leccion).toBe("tildes");
-
-    const teclasImportadas = await almacen.leerTeclas();
-    expect(teclasImportadas.get("KeyA")?.intentos).toBe(12);
-  });
-
-  it("soporta importar en modo combinar (reemplazar: false)", async () => {
-    const { db } = crearMockDb();
-    const almacen = new AlmacenSqlite(db);
-
-    await almacen.guardar(sesionDemo({ terminadaEn: "2026-09-01T10:00:00.000Z", ppm: 20 }));
-    await almacen.guardarTeclas(new Map([["KeyA", { intentos: 5, aciertos: 5, msTotal: 1000 }]]));
-
-    const copiaParaImportar = JSON.stringify({
-      version: 1,
-      creadaEn: "2026-09-02T10:00:00.000Z",
-      sesiones: [
-        sesionDemo({ terminadaEn: "2026-09-01T10:00:00.000Z", ppm: 20 }), // duplicada
-        sesionDemo({ terminadaEn: "2026-09-02T10:00:00.000Z", ppm: 30 }), // nueva
-      ],
-      teclas: {
-        KeyA: { intentos: 10, aciertos: 9, msTotal: 2000 },
-        KeyB: { intentos: 4, aciertos: 4, msTotal: 800 },
-      },
-    });
-
-    await almacen.importar(copiaParaImportar, { reemplazar: false });
-
-    const todas = await almacen.leerTodas();
-    expect(todas).toHaveLength(2);
-
-    const teclas = await almacen.leerTeclas();
-    // KeyA debe acumular intentos: 5 + 10 = 15
-    expect(teclas.get("KeyA")?.intentos).toBe(15);
-    expect(teclas.get("KeyB")?.intentos).toBe(4);
-  });
-
   it("guarda, actualiza y recupera el mapa de teclas íntegro (Issue #38)", async () => {
     const { db } = crearMockDb();
     const almacen = new AlmacenSqlite(db);
@@ -200,10 +137,10 @@ describe("AlmacenLocal", () => {
     await almacen.guardar(sesionDemo({ ppm: 55 }));
     await almacen.guardarTeclas(new Map([["KeyF", { intentos: 20, aciertos: 19, msTotal: 3000 }]]));
 
-    const json = await almacen.exportarProgreso();
+    const json = await almacen.exportar();
     localStorage.clear();
 
-    await almacen.importarProgreso(json);
+    await almacen.importar(json);
     const sesiones = await almacen.leerTodas();
     expect(sesiones).toHaveLength(1);
     expect(sesiones[0].ppm).toBe(55);
@@ -309,16 +246,16 @@ describe("AlmacenMemoria", () => {
 
 describe("parsearCopiaSeguridad", () => {
   it("valida JSON sintácticamente incorrecto", () => {
-    expect(() => parsearCopiaSeguridad("no es json")).toThrow("El archivo no contiene un JSON válido.");
+    expect(() => parsearCopiaSeguridad("no es json")).toThrow("Este fichero no se puede leer: no es una copia de seguridad de LibreType.");
   });
 
   it("valida objeto raíz", () => {
-    expect(() => parsearCopiaSeguridad(JSON.stringify("cadena"))).toThrow("El formato de la copia de seguridad no es un objeto válido.");
+    expect(() => parsearCopiaSeguridad(JSON.stringify("cadena"))).toThrow("Este fichero no se puede leer: no es una copia de seguridad de LibreType.");
   });
 
   it("valida que sesiones sea un array", () => {
     expect(() => parsearCopiaSeguridad(JSON.stringify({ sesiones: "no-array" }))).toThrow(
-      "La copia de seguridad no contiene una lista de sesiones válida.",
+      "Esta copia de seguridad no trae la lista de sesiones",
     );
   });
 
@@ -327,8 +264,22 @@ describe("parsearCopiaSeguridad", () => {
       sesiones: [{ leccion: "reposo" }], // faltan ppm, escritos, etc.
     });
     expect(() => parsearCopiaSeguridad(invalido)).toThrow(
-      "Una o más sesiones de la copia de seguridad contienen campos inválidos.",
+      "Alguna sesión de esta copia de seguridad está dañada",
     );
+  });
+
+  it("rechaza una copia con más identificadores de los que salen practicando", () => {
+    const sesion = (leccion: string) => ({ leccion, ppm: 20, pctAcierto: 95, aciertos: 19, escritos: 20, ms: 60000, terminadaEn: "2026-01-01T00:00:00.000Z" });
+    const distintas = (n: number) => JSON.stringify({ sesiones: Array.from({ length: n }, (_, i) => sesion(`x${i}`)) });
+    expect(parsearCopiaSeguridad(distintas(LIMITES.copiaIdentificadores)).sesiones).toHaveLength(LIMITES.copiaIdentificadores);
+    expect(() => parsearCopiaSeguridad(distintas(LIMITES.copiaIdentificadores + 1))).toThrow("no se ha importado");
+
+    // Muchas sesiones de pocas lecciones son un historial normal, no un abuso.
+    const largo = JSON.stringify({ sesiones: Array.from({ length: LIMITES.copiaIdentificadores * 3 }, () => sesion("reposo")) });
+    expect(parsearCopiaSeguridad(largo).sesiones).toHaveLength(LIMITES.copiaIdentificadores * 3);
+
+    const teclas = Object.fromEntries(Array.from({ length: LIMITES.copiaIdentificadores + 1 }, (_, i) => [`K${i}`, { intentos: 1, aciertos: 1, msTotal: 1 }]));
+    expect(() => parsearCopiaSeguridad(JSON.stringify({ sesiones: [], teclas }))).toThrow("no se ha importado");
   });
 
   it("valida tipos en el estado de teclas", () => {
@@ -339,7 +290,7 @@ describe("parsearCopiaSeguridad", () => {
       },
     });
     expect(() => parsearCopiaSeguridad(invalido)).toThrow(
-      'El estado de la tecla "KeyA" en la copia de seguridad es inválido.',
+      'Los datos de la tecla «KeyA» en esta copia de seguridad están dañados',
     );
   });
 });
@@ -347,7 +298,6 @@ describe("parsearCopiaSeguridad", () => {
 describe("abrirAlmacen y degradación transparente (Issue #29)", () => {
   beforeEach(() => {
     vi.resetModules();
-    setErrorAlmacen(false);
   });
 
   it("en entorno web (!isTauri) devuelve AlmacenLocal sin errorAlmacen", async () => {
@@ -371,9 +321,109 @@ describe("abrirAlmacen y degradación transparente (Issue #29)", () => {
       },
     }));
 
-    const { abrirAlmacen: abrir, errorAlmacen: errFlag } = await import("./almacen");
+    const { abrirAlmacen: abrir } = await import("./almacen");
     const almacen = await abrir();
     expect(almacen.tipo).toBe("local");
     expect(almacen.errorAlmacen).toBe(true);
+  });
+});
+
+describe("datos dañados en el respaldo local", () => {
+  beforeEach(() => localStorage.clear());
+  const buena = { leccion: "reposo", ppm: 20, pctAcierto: 95, aciertos: 95, escritos: 100, ms: 1000, terminadaEn: "2026-09-01T10:00:00.000Z" };
+
+  it.each([
+    ["[null]"], ["{}"], ["[{}]"], ["3"], ["no es json"],
+    [JSON.stringify([{ ...buena, ppm: "20" }])],
+    [JSON.stringify([{ ...buena, terminadaEn: "ayer" }])],
+  ])("sesiones %s: se leen como si no hubiera, sin lanzar", async (crudo) => {
+    localStorage.setItem("libretype.sesiones", crudo);
+    expect(await new AlmacenLocal().leerTodas()).toEqual([]);
+  });
+
+  it("una fila dañada no se lleva a las buenas", async () => {
+    localStorage.setItem("libretype.sesiones", JSON.stringify([null, buena, {}]));
+    expect(await new AlmacenLocal().leerTodas()).toEqual([buena]);
+  });
+
+  it.each([
+    ['[["KeyA",null]]'], ["{}"], ["[1]"], ['[["KeyA",{"intentos":"3"}]]'], ["no es json"],
+  ])("teclas %s: se leen como si no hubiera, sin lanzar", async (crudo) => {
+    localStorage.setItem("libretype.teclas", crudo);
+    expect((await new AlmacenLocal().leerTeclas()).size).toBe(0);
+  });
+
+  it("una tecla dañada no se lleva a las buenas", async () => {
+    const e = { intentos: 3, aciertos: 2, msTotal: 100 };
+    localStorage.setItem("libretype.teclas", JSON.stringify([["KeyA", null], ["KeyS", e]]));
+    expect([...(await new AlmacenLocal().leerTeclas())]).toEqual([["KeyS", e]]);
+  });
+});
+
+describe("cargarDatos", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("si SQLite no se puede leer, sigue en el respaldo y lo dice", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const db: DbSql = { execute: async () => undefined, select: () => Promise.reject(new Error("rota")) };
+    const datos = await cargarDatos(new AlmacenSqlite(db));
+    expect(datos.almacen.tipo).toBe("local");
+    expect(datos.almacen.errorAlmacen).toBe(true);
+    expect(datos.sesiones).toEqual([]);
+    vi.restoreAllMocks();
+  });
+
+  it("nunca lanza, aunque falle cualquier almacén", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const roto = new AlmacenMemoria();
+    roto.leerTeclas = () => Promise.reject(new Error("rota"));
+    const datos = await cargarDatos(roto);
+    expect(datos).toMatchObject({ sesiones: [], propias: [] });
+    expect(datos.teclas.size).toBe(0);
+    vi.restoreAllMocks();
+  });
+});
+
+describe("restaurar una copia con demasiadas lecciones", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("no pasa del límite y cuenta las que no han cabido", async () => {
+    const lecciones = Array.from({ length: LIMITES.lecciones + 5 }, (_, i) => ({
+      id: `propia:x${i}`, titulo: `x${i}`, descripcion: "", texto: "una frase cualquiera",
+      creadaEn: "2026-09-01T10:00:00.000Z", actualizadaEn: "2026-09-01T10:00:00.000Z", borradaEn: null,
+    }));
+    const almacen = new AlmacenLocal();
+    const r = await almacen.importar(JSON.stringify({ version: 1, creadaEn: "2026-09-01T10:00:00.000Z", sesiones: [], teclas: {}, lecciones }));
+    expect(r.leccionesSinSitio).toBe(5);
+    expect(await almacen.leerLecciones()).toHaveLength(LIMITES.lecciones);
+  });
+});
+
+describe("importar sin sitio en localStorage", () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
+
+  const copia = JSON.stringify({
+    version: 1,
+    creadaEn: "2026-09-01T10:00:00.000Z",
+    sesiones: [{ leccion: "reposo", ppm: 20, pctAcierto: 95, aciertos: 19, escritos: 20, ms: 1000, terminadaEn: "2026-09-01T10:00:00.000Z" }],
+    teclas: {},
+    lecciones: [],
+  });
+
+  it("avisa en vez de decir que ha ido bien, y deja lo que había", async () => {
+    const almacen = new AlmacenLocal();
+    const propia: Sesion = { leccion: "mia", ppm: 10, pctAcierto: 50, aciertos: 5, escritos: 10, ms: 1000, terminadaEn: "2026-08-01T10:00:00.000Z" };
+    await almacen.guardar(propia);
+
+    // Lo primero cabe y lo segundo no: es el caso que dejaría una copia a medias.
+    const real = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, clave: string, valor: string) {
+      if (clave === "libretype.teclas") throw new DOMException("sin sitio", "QuotaExceededError");
+      real.call(this, clave, valor);
+    });
+
+    await expect(almacen.importar(copia)).rejects.toThrow(/no cabe/);
+    expect((await almacen.leerTodas()).map((s) => s.leccion)).toEqual(["mia"]);
   });
 });

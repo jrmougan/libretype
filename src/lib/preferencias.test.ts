@@ -56,6 +56,12 @@ describe('normalizar', () => {
     expect(normalizar({ ultimaLeccion: 'leccion-inexistente' }).ultimaLeccion).toBe('reposo');
     expect(normalizar({ ultimaLeccion: 123 }).ultimaLeccion).toBe('reposo');
   });
+
+  it('admite una lección personalizada por su forma, sin dar por buena cualquier cosa', () => {
+    expect(normalizar({ ultimaLeccion: 'propia:abc-1' }).ultimaLeccion).toBe('propia:abc-1');
+    expect(normalizar({ ultimaLeccion: 'propia:../x' }).ultimaLeccion).toBe('reposo');
+    expect(normalizar({ ultimaLeccion: 'propia:' }).ultimaLeccion).toBe('reposo');
+  });
 });
 
 describe('guardar y cargar', () => {

@@ -111,6 +111,19 @@ describe('récords', () => {
     expect(esRecord(undefined, sesion({ ppm: 15 }))).toBe(true);
   });
 
+  it('a 0 ppm no hay marca, ni siquiera la primera', () => {
+    expect(esRecord(undefined, sesion({ ppm: 0, pctAcierto: 100 }))).toBe(false);
+  });
+
+  it('el texto libre no tiene récord: cada vez es un texto distinto', () => {
+    const r = sesion({ leccion: 'texto-propio', ppm: 90, pctAcierto: 100 });
+    expect(esRecord(undefined, r)).toBe(false);
+    expect(esRecord(undefined, { ...r, leccion: 'refuerzo-suelto' })).toBe(false);
+    expect(esRecord(undefined, { ...r, leccion: 'refuerzo' })).toBe(false);
+    expect(esRecord(undefined, { ...r, leccion: 'practica-continua' })).toBe(false);
+    expect(esRecord(undefined, { ...r, leccion: 'propia:mia' })).toBe(true);
+  });
+
   it('un primer intento sucio no lo es', () => {
     expect(esRecord(undefined, sesion({ ppm: 80, pctAcierto: 40 }))).toBe(false);
   });
@@ -349,6 +362,7 @@ describe('resumen de evolución y racha', () => {
       sesiones: 3,
       mejorPpm: 35,
       msTotales: 100000,
+      comparables: 3,
       ppmMedia: 35,
       pctMedio: 89,
     });
@@ -378,5 +392,28 @@ describe('resumen de evolución y racha', () => {
     const eRoto = resumirEvolucion(sesiones, '2026-09-10');
     expect(eRoto.rachaActual).toBe(0);
     expect(eRoto.rachaMax).toBe(3);
+  });
+});
+
+describe('la media del día', () => {
+  const dia = '2026-09-01T10:00:00.000Z';
+
+  it('no incluye textos a medida, igual que la mejor marca', () => {
+    const e = resumirEvolucion([
+      sesion({ leccion: 'reposo', ppm: 20, pctAcierto: 95, terminadaEn: dia }),
+      sesion({ leccion: 'propia:a', ppm: 200, pctAcierto: 100, terminadaEn: dia }),
+      sesion({ leccion: 'texto-propio', ppm: 300, pctAcierto: 100, terminadaEn: dia }),
+    ]);
+    expect(e.dias[0]).toMatchObject({ sesiones: 3, comparables: 1, mejorPpm: 20, ppmMedia: 20, pctMedio: 95 });
+  });
+
+  it('un día solo con textos a medida no tiene media', () => {
+    const e = resumirEvolucion([sesion({ leccion: 'propia:a', ppm: 200, terminadaEn: dia })]);
+    expect(e.dias[0]).toMatchObject({ sesiones: 1, comparables: 0, ppmMedia: 0, pctMedio: 0 });
+  });
+
+  it('el refuerzo con texto repetido tampoco entra en la media', () => {
+    const e = resumirEvolucion([sesion({ leccion: 'refuerzo-suelto', ppm: 200, terminadaEn: dia })]);
+    expect(e.dias[0]).toMatchObject({ sesiones: 1, comparables: 0, ppmMedia: 0 });
   });
 });

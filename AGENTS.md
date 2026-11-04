@@ -112,6 +112,10 @@ Otras piezas:
 - `components/Keyboard.svelte` — SVG, no canvas (escala nítido al 200%, se
   estiliza con tokens, es inspeccionable).
 
+El campo de captura es invisible, así que perder el foco no se notaba. `.aviso-foco`
+lo enseña solo con CSS (`:has(.capture:not(:focus, :disabled))`): no toca el campo,
+no ocupa sitio y deja pasar el clic a la etiqueta, que es quien devuelve el foco.
+
 ## Todo cabe en la ventana, sin scroll
 
 No es una preferencia estética: el alumno necesita ver **a la vez** el texto, la
@@ -120,9 +124,11 @@ enseña a no mirarse las manos.
 
 Cómo se sostiene:
 
-- `.app` ocupa `100dvh` con `overflow: hidden`. La barra de arriba lleva el
-  selector de lección, las métricas en vivo y los botones; sustituyó a diez
-  botones que ocupaban dos filas.
+- `.app` ocupa `100dvh` con `overflow: clip`, **no `hidden`**: una caja con
+  `hidden` se sigue desplazando por programa, y enfocar un campo de captura fuera
+  de vista movía la aplicación entera (al 200% la lección cero quedaba en blanco).
+  La barra de arriba lleva el selector de lección, las métricas en vivo y los
+  botones; sustituyó a diez botones que ocupaban dos filas.
 - **El teclado absorbe la diferencia**: es lo último de la rejilla y se lleva el
   espacio que sobra. El SVG escala solo, así que encoger no lo rompe.
 - **Ajustes y progreso son paneles superpuestos**, no bloques en el flujo:
@@ -134,9 +140,24 @@ sacrificio explícito** y conviene respetarlo:
 1. Se pliega la explicación de la lección (`espacioJusto`).
 2. El texto se desplaza dentro de su caja (`max-height: 30vh`).
 3. El teclado se encoge, **pero nunca por debajo de `min(34vh, 230px)`**: un
-   teclado ilegible es peor que uno al que haya que desplazarse.
-4. Si aún así no cabe, se desplaza `.escena`. Desplazarse es malo; recortar
-   contenido y que nadie lo encuentre es peor.
+   teclado ilegible es peor que uno al que haya que desplazarse. Ese suelo se
+   multiplica por `--ui-scale` y se topa con el ancho (`--suelo-teclado`): cuando
+   manda el ancho el SVG ya no crece, y lo que pasara de ahí sería hueco vacío.
+4. Si aún así no cabe, se desplaza `.escena`, y al empezar a teclear el texto sube
+   a la vista una vez por intento. Desplazarse es malo; recortar contenido y que
+   nadie lo encuentre es peor.
+
+A partir del 140% (`espacioJusto`) hay **modo compacto** en la barra, la lección y
+la lección cero: cada fila cuesta el doble, así que se aparta de la vista lo que
+se repite (la marca, las etiquetas de métricas con unidad, el título que ya está
+en el selector) sin sacarlo del árbol de accesibilidad, y la barra son siempre dos
+filas: si dependiera de lo que cabe, pasar de 100% a 99% de precisión la cambiaría
+de altura a mitad de lección. Medido con Chromium y WebKit: la práctica cabe sin
+desplazarse a 1280x800 y 1024x640, también al 200%. Con la barra extra de práctica
+continua o texto propio, a 1024x640 al 200% sobran unos 50px y actúa el paso 4.
+
+Los paneles miden en función de `--ui-scale`, como la letra; fijos, al 200% cabían
+dos palabras por línea.
 
 Al tocar esta zona, comprobar las cuatro vistas al 100% y al 200%.
 
@@ -228,20 +249,26 @@ Tres cosas deliberadas que no hay que "optimizar":
 Cada paso interactivo tiene salida (*Saltar esta comprobación*) por si una tecla
 no responde: nunca se puede quedar nadie encallado.
 
+El suelo del teclado también vale aquí, y aquí lo que limita es el ancho: la
+columna pide `min(34vh, 230px)` pasado a ancho con `--teclado-proporcion`, y por
+debajo de 1120px se apila antes que dejar al texto en una columna de cuatro
+palabras. Quien vuelve a repasar esta pantalla regresa a su lección, no a la
+primera, y sin perder `ultimaLeccion`.
+
 ## Las lecciones (no reordenar a ojo)
 
-`src/lib/lessons.ts`. El orden **no** es el tradicional (reposo, fila superior,
+`src/lib/lecciones/cursos/espanol.ts`. El orden **no** es el tradicional (reposo, fila superior,
 fila inferior). Ese viene de las academias de mecanografía en inglés. Este sale
 de contar frecuencias sobre un corpus real: `investigacion/frecuencias.py`.
 
 Lo que dicen los datos, y que no es intuitivo:
 
-- **El 12,97% de las palabras que se escriben en español llevan tilde, diéresis
+- **El 13% de las palabras que se escriben en español llevan tilde, diéresis
   o eñe**, y la tecla `´` se pulsa más que la `p`. Las tildes van en la lección
-  5 de 9, no al final. No son un tema avanzado del español: son el español.
+  5 de 14 (de las 9 que enseñan el alfabeto), no al final. No son un tema avanzado del español: son el español.
 - **Con la fila de reposo entera solo se escribe el 5,5% de las palabras.**
   `asdfjklñ` contiene cuatro de las letras más raras (`f`, `j`, `k`, `ñ`) y
-  ninguna de las cinco que sostienen el idioma. Sigue siendo el ancla anatómica
+  solo dos de las cinco más usadas (`a` y `s`). Sigue siendo el ancla anatómica
   correcta —los relieves de la F y la J son lo que permite volver sin mirar—,
   pero hay que salir pronto o el alumno teclea sílabas sin sentido.
 - **Comparar por lección engaña**: el temario tradicional parece rápido porque
@@ -253,6 +280,91 @@ Los textos son palabras reales ordenadas por frecuencia, generadas con
 lección, `lessons.test.ts` comprueba lo que importa: que no use teclas sin
 enseñar, que practique las que estrena, que ninguna meta más de cinco de golpe
 y que las tildes lleguen con las cinco vocales ya dadas.
+
+Cada lección del alfabeto practica **todas** sus teclas nuevas (la k solo tiene
+«ka» en la fila de reposo; no es un descuido), con 25 palabras o más y sin
+repetir ninguna. Las dos últimas (`un-dia`, `refranes`) son textos seguidos de
+consolidación y estrenan los signos que faltaban (`: ; " ( )`).
+
+El público incluye menores y el corpus son subtítulos, con tacos entre las
+palabras frecuentes: `lecciones/contenido.test.ts` tiene una lista de exclusión
+para lecciones, vocabulario y prosa, y vigila que toda pregunta o exclamación abra
+y cierre. `mayusculas` no lleva puntuación porque todavía no se ha enseñado.
+
+### Cómo está montado el temario
+
+`src/lib/lecciones/`, con los datos separados de la lógica:
+
+- `cursos/` son **solo datos**. `cursos/index.ts` es la lista de cursos.
+- `catalogo.ts` es el **punto único de consulta**: lección por id, siguiente,
+  desbloqueo, alfabeto y vocabulario. Ningún módulo recorre un array de lecciones:
+  con dos cursos, ese array ya no sería «el temario». `lessons.ts` queda como
+  fachada por índice del curso principal solo para los tests de ese curso, y
+  `catalogo.test.ts` impide importarla desde el código de la aplicación.
+- `garantias.ts` son las propiedades que debe cumplir **cualquier** curso.
+- `ids.ts` dice qué significa cada familia de identificadores.
+- `ejercicio.ts` convierte lo que se practique en una sola forma, para que `App`
+  tenga un solo `<Drill>`.
+
+**Añadir una lección:** añade el objeto a su curso. Los identificadores no se
+reordenan ni se renombran sin entrada en `equivalencias.ts`.
+
+**Añadir un curso:** crea `cursos/mi-curso.ts` (con su `idioma`, que es lo que dice
+la cifra de cobertura), ponlo en `cursos/index.ts`, y ya está: el selector le da un grupo, el progreso le da filas y `catalogo.test.ts` lo
+somete a `comprobarCurso()` sin escribir ningún test. Cada curso se desbloquea por
+su cuenta y acumula su propio alfabeto, y el refuerzo solo pide palabras del curso
+que se está siguiendo. Los identificadores de lección son únicos
+entre cursos, porque es lo que guarda el histórico: el catálogo se niega a arrancar
+si se repiten o si usan uno reservado.
+
+### Lecciones personalizadas
+
+`lecciones/personalizadas.ts` (modelo, validación y formato) y
+`components/LeccionesPropias.svelte` (el panel). Son datos del alumno, así que van
+en `almacen.ts`, con migración v3 en SQLite y respaldo en localStorage, y **no**
+pasan por el catálogo. Eso no es un descuido: objetivos, repaso y dificultad solo
+saben preguntar al catálogo, y por eso no pueden colarse ahí.
+
+Decisiones que no hay que deshacer sin rehacer el razonamiento:
+
+- **Los identificadores llevan el prefijo `propia:`** y nunca chocan con el temario.
+  Un fichero importado con `"id": "reposo"` recibe uno nuevo.
+- **No desbloquean nada** ni entran en objetivos, repaso o dificultad.
+- **Su marca exige `PCT_MINIMO_PARA_RECORD`** como cualquier otra, pero **no fija la
+  mejor marca global ni la del día**: una frase corta y repetida da una velocidad
+  que no se compara con nada. Lo mismo vale para `texto-propio`.
+- **No alimentan el dominio por tecla**, tampoco `texto-propio`. Ocho aciertos en
+  «aaaa aaaa» retirarían la ayuda sin demostrar nada, y el error es asimétrico: una
+  letra visible de más no perjudica a nadie, una retirada antes de tiempo sí. El
+  coste asumido es que quien solo practique con textos propios no ve retirarse
+  ninguna letra.
+- **Borrar deja una lápida**: nombre sin texto, para que el panel de progreso pueda
+  nombrar lo practicado. «Borrar progreso» se lleva las lápidas, **no** las lecciones
+  vivas: son trabajo de alguien, no progreso.
+- **Importar nunca pisa.** Mismo id con otro contenido entra aparte; mismo contenido
+  se omite; una lápida con ese id resucita y recupera su histórico.
+- **Restaurar una copia de seguridad** se queda con la versión más reciente de cada
+  lección y no toca las que no vengan en la copia.
+- **Editar conserva id e histórico**: es la misma lección. Para empezar de cero está
+  duplicar.
+- **Los acentos sueltos (`´`, `¨`…) no se aceptan**: es el hallazgo 2 de los spikes.
+  Darían fallos falsos según la plataforma, así que `caracteresEscribibles()` los
+  excluye aunque estén en la distribución.
+- **El texto pegado se normaliza antes de validar** (`lecciones/texto.ts`): NFC,
+  comillas y rayas tipográficas, caracteres invisibles. No es culpa de quien pega.
+  El error dice qué carácter, en qué línea y en qué palabra, y no reprende.
+
+**Ficheros:** `src/lib/ficheros.ts`. En Tauri, `<a download>` no es fiable porque
+WebKitGTK y WKWebView no tienen gestor de descargas propio, así que el comando
+`guardar_en_descargas` de `lib.rs` escribe en Descargas sin pisar nada y devuelve la
+ruta para enseñarla. Solo admite un nombre plano `.json`. Se descartó
+`tauri-plugin-dialog` + `tauri-plugin-fs`: dos dependencias por lado y permisos más
+amplios para poder elegir carpeta. Importar usa `<input type="file">`. La copia de
+seguridad de Progreso va por la misma vía.
+
+El formato de exportación es `{ formato: "libretype-lecciones", version: 1, creadoEn,
+lecciones: [...] }`. Al cambiarlo, sube `VERSION_EXPORTACION`: una versión más nueva
+que la que se entiende se rechaza con una frase, no se interpreta a medias.
 
 ## Compilación continua
 
@@ -296,9 +408,10 @@ Reglas que están ahí por algo:
 - **Fallar al comprobar es silencioso**, salvo si alguien pulsó «Buscar
   actualizaciones» y está esperando respuesta. Sin red no puede aparecer un
   aviso que nadie pidió.
-- **El aviso de la barra no añade altura.** Está medido al 100% y al 200%: la
-  barra ya envolvía a dos y tres filas respectivamente, y el aviso encaja en el
-  hueco. Si se le añade texto hay que volver a medirlo, porque el orden de
+- **El aviso de la barra no añade altura.** Está medido a 1280 y 1024 de ancho, al
+  100% y al 200%: por debajo de 1100px la marca y el detalle del `<small>` salen
+  de la vista y le dejan el hueco, y al 200% el `<small>` tampoco se ve, aunque
+  sigue para el lector de pantalla. Si se le añade texto hay que volver a medirlo, porque el orden de
   sacrificio de la ventana no se negocia.
 - **La comprobación es la única petición de red de la aplicación**, y por eso
   hay preferencia para apagarla (`buscarActualizaciones`). Viene activada
@@ -372,11 +485,20 @@ la misma lección con otro nombre.** Traducir `top` a alguna actual regalaría u
 marca en teclas que nadie practicó, y `esRecord()` la daría por buena; lo que no
 tiene equivalente honesto se marca retirado y el panel lo enseña aparte, con su
 nombre de entonces. Al renombrar una lección, la entrada va en el mismo commit:
-hay test que lo comprueba contra `LESSONS`.
+hay test que lo comprueba contra el catálogo.
 
 Se traduce al agregar y no con un `UPDATE` en SQL porque el respaldo de
 localStorage no tiene migraciones: en TypeScript se arreglan los dos backends
 con el mismo código, y sin tocar lo que ya está escrito en disco.
+
+Las lecciones personalizadas son datos del alumno y viven aquí también, en
+`lecciones_propias` (migración v3). `lecciones-almacen.test.ts` ejecuta las
+migraciones reales de `lib.rs` contra un SQLite de verdad (`node:sqlite`).
+
+Restaurar una copia en SQLite **no usa `BEGIN`**: `tauri-plugin-sql` reparte cada
+llamada por un pool y nada asegura que el `COMMIT` llegue a la misma conexión. Cada
+tabla se escribe en una sola sentencia desde JSON (`json_each`), que sí es atómica, y
+lo antiguo se borra lo último.
 
 El esquema está en `src-tauri/src/lib.rs` como migración versionada. Al cambiarlo
 hay que añadir una migración nueva, no editar la que ya se aplicó.
@@ -390,10 +512,25 @@ reducido en ese punto.
 
 Reglas que aplican a cualquier UI nueva:
 
+- Los campos, `button.primario`, `button.peligro` y `button:disabled` son globales
+  en `tokens.css`: no se redeclaran en cada componente. Una copia local se quedó con
+  un borde de 1,4:1 y otra perdía el `:hover`. Los campos de captura están excluidos
+  a propósito: su caja de 1px es parte de cómo funcionan.
+- Si el botón pulsado desaparece (pedir confirmación, cancelar, borrar), hay que
+  decir adónde va el foco; si no, se va al documento. Al pedir confirmación, a la
+  salida segura.
+- Lo que el usuario ha escrito no se pierde por un Escape: `intentarCerrar()` de
+  «Tus lecciones» pregunta antes. La validación en vivo no regaña a quien aún
+  escribe: lo que falta se dice al salir del campo; lo que no se arregla escribiendo
+  más (una letra imposible, pasarse del límite), al momento.
+
 - Ningún estado se comunica solo por color. El error lleva fondo, subrayado
   doble y color; la tecla objetivo lleva triángulo además del contorno.
 - Todo tamaño de texto se deriva de `--ui-scale` (100–200%).
 - Objetivo de pulsación mínimo `--target-min` (48px; WCAG 2.2 pide 44).
+- Recorrer una lista con el teclado no puede cambiar de contexto (WCAG 3.2.2): un
+  `<select>` cuya elección abandona el intento va en `SelectConfirmado`, donde las
+  flechas con la lista cerrada solo marcan e Intro confirma.
 - El bucle de práctica es visual y motor, así que el lector de pantalla importa
   sobre todo en el *chrome* (menús, ajustes, progreso) y el feedback de audio es
   más portante aquí que en una app normal.
@@ -417,7 +554,7 @@ avise. Los dos bugs que ha tenido el motor están fijados como tests con nombre.
 importa es que un intento rápido y lleno de fallos no fije récord.
 
 `layouts.test.ts` comprueba, entre otras cosas, que **todo carácter de toda
-lección sea escribible** con la distribución. Si añades una lección con un
+lección sea escribible** con la distribución (`garantias.ts` lo extiende a todo curso). Si añades una lección con un
 carácter que ES-ISO no produce, falla ahí en vez de dejar al alumno atascado sin
 pista.
 

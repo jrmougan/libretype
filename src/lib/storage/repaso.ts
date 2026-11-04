@@ -20,9 +20,9 @@
  * una tecla olvidada no tiene por qué tener mal histórico acumulado: lo tuvo
  * bueno, hace un mes. Son dos señales distintas.
  */
-import { LESSONS } from '../lessons';
+import { catalogo as catalogoApp, type Catalogo } from '../lecciones/catalogo';
 import { idCanonico } from './equivalencias';
-import { leccionesSuperadas, nivelDisponible } from './objetivos';
+import { leccionesSuperadas } from './objetivos';
 import type { Sesion } from './progreso';
 
 /**
@@ -77,8 +77,7 @@ interface Intento {
  * Intentos que valen para estas cuentas: con el identificador ya traducido, de
  * lecciones del temario actual y habiendo tecleado algo.
  */
-function intentosUtiles(sesiones: readonly Sesion[]): Intento[] {
-  const actuales = new Set(LESSONS.map((l) => l.id));
+function intentosUtiles(sesiones: readonly Sesion[], catalogo: Catalogo): Intento[] {
   const intentos: Intento[] = [];
 
   for (const s of sesiones) {
@@ -87,10 +86,11 @@ function intentosUtiles(sesiones: readonly Sesion[]): Intento[] {
     const t = Date.parse(s.terminadaEn);
     const dia = diaUTC(s.terminadaEn);
     if (!Number.isFinite(t) || !Number.isFinite(dia)) continue;
-    // Fuera la práctica libre y las retiradas: ni envejecen ni cuentan como
-    // haber seguido avanzando. Las primeras porque repasar ya es lo que hacen.
+    // Fuera la práctica libre, las retiradas y las personalizadas: ni envejecen ni
+    // cuentan como haber seguido avanzando. Las primeras porque repasar ya es lo
+    // que hacen; las últimas porque pueden no tener nada que ver con el temario.
     const id = idCanonico(s.leccion);
-    if (!actuales.has(id)) continue;
+    if (!catalogo.tiene(id)) continue;
     intentos.push({ id, t, dia });
   }
 
@@ -111,8 +111,9 @@ export function leccionesOxidadas(
   sesiones: readonly Sesion[],
   hoyISO?: string,
   enCurso?: string | null,
+  catalogo: Catalogo = catalogoApp,
 ): LeccionOxidada[] {
-  const superadas = leccionesSuperadas(sesiones);
+  const superadas = leccionesSuperadas(sesiones, catalogo);
   if (superadas.size === 0) return [];
 
   const hoy = diaUTC(hoyISO ?? new Date().toISOString());
@@ -121,13 +122,12 @@ export function leccionesOxidadas(
   // Solo se invita a repasar lo que se puede abrir: con un histórico importado
   // puede haber lecciones superadas por encima del nivel desbloqueado, y la
   // práctica continua no llega hasta ellas.
-  const tope = nivelDisponible(sesiones);
   const abierta = enCurso === undefined || enCurso === null ? null : idCanonico(enCurso);
-  const intentos = intentosUtiles(sesiones);
+  const intentos = intentosUtiles(sesiones, catalogo);
   const oxidadas: LeccionOxidada[] = [];
 
-  for (let ix = 0; ix < LESSONS.length && ix <= tope; ix++) {
-    const leccion = LESSONS[ix];
+  for (const leccion of catalogo.lecciones) {
+    if (!catalogo.estaDesbloqueada(leccion.id, superadas)) continue;
     if (leccion.id === abierta || !superadas.has(leccion.id)) continue;
 
     // Cuenta la última vez que se tocó, sea cual sea la precisión de entonces:
@@ -146,7 +146,7 @@ export function leccionesOxidadas(
     oxidadas.push({ id: leccion.id, diasSinRepasar });
   }
 
-  // Los empates conservan el orden del temario: se recorre `LESSONS` en orden y
+  // Los empates conservan el orden del temario: se recorre el catálogo en orden y
   // `sort` es estable. Va antes la que más tiempo lleva sin salir, que es la que
   // más se está oxidando y además sostiene a todas las que vinieron después.
   return oxidadas.sort((a, b) => b.diasSinRepasar - a.diasSinRepasar);

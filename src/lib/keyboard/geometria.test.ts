@@ -62,6 +62,7 @@ import { LAYOUTS } from './layouts';
 // desde donde vitest ejecuta (`pnpm test`).
 import teclado from '../components/Keyboard.svelte?raw';
 import drill from '../components/Drill.svelte?raw';
+import leccionCero from '../components/LeccionCero.svelte?raw';
 
 const tokens = (() => {
   try {
@@ -291,8 +292,40 @@ describe('las dos palancas siguen enchufadas', () => {
     // `min(34vh, calc(230px * var(--ui-scale)))` —lo que proponía la issue— NO
     // funciona: min() coge el menor, y a 771px de alto el menor sigue siendo
     // 34vh. Medido: da 15,2px al 200% en vez de 33,4px.
-    const suelo = capturar(drill, /\.teclado\s*\{[^}]*min-height:\s*([^;]+);/, 'el suelo de `.teclado`');
+    expect(drill).toMatch(/\.teclado\s*\{[^}]*min-height:\s*var\(--suelo-teclado\);/);
+    // La segunda rama de este min() es el tope por ancho, del test siguiente.
+    const suelo = capturar(drill, /--suelo-teclado:\s*min\((.*?),\s*\d+cqw\);/s, 'el suelo de `.teclado`');
     expect(suelo).toContain('var(--ui-scale)');
     expect(suelo.replace(/\s+/g, '')).toBe('calc(min(34vh,230px)*var(--ui-scale))');
+  });
+
+  it('el tope por ancho del suelo nunca recorta una letra', () => {
+    // El suelo se limita a una fracción del ancho porque, cuando manda el ancho, lo
+    // que sobra es hueco vacío. Esa fracción tiene que ser al menos la proporción
+    // real del teclado: por debajo, ya sí le quitaría altura al SVG y encogería las
+    // letras, que es justo lo que este fichero protege.
+    const tope = capturar(drill, /--suelo-teclado:\s*min\(.*?(\d+)cqw\);/s, 'el tope por ancho');
+    const U = 62, GAP = 5, H = 58, MARGEN_ARRIBA = 16;
+    for (const layout of LAYOUTS) {
+      const ancho = Math.max(...layout.rows.map((fila) =>
+        fila.reduce((s, k) => s + (k.width ?? 1) * U + ((k.width ?? 1) - 1) * GAP + GAP, 0))) - GAP;
+      const alto = layout.rows.length * (H + GAP) - GAP + MARGEN_ARRIBA;
+      expect(Number(tope) / 100, layout.id).toBeGreaterThanOrEqual(alto / ancho);
+    }
+  });
+
+  it('en la lección cero, la columna da para el suelo aunque mande el ancho', () => {
+    // Allí el teclado va en una columna y lo que limita es su ancho: con 641px se
+    // dibujaba a 209px de alto, por debajo de los 230 del suelo, y con cientos de
+    // píxeles libres alrededor. La columna tiene que pedir el suelo pasado a ancho.
+    expect(leccionCero.replace(/\s+/g, '')).toContain('calc(min(34vh,230px)*var(--teclado-proporcion))');
+    const proporcion = Number(capturar(tokens, /--teclado-proporcion:\s*([\d.]+);/, '`--teclado-proporcion`'));
+    const U = 62, GAP = 5, H = 58, MARGEN_ARRIBA = 16;
+    for (const layout of LAYOUTS) {
+      const ancho = Math.max(...layout.rows.map((fila) =>
+        fila.reduce((s, k) => s + (k.width ?? 1) * U + ((k.width ?? 1) - 1) * GAP + GAP, 0))) - GAP;
+      const alto = layout.rows.length * (H + GAP) - GAP + MARGEN_ARRIBA;
+      expect(proporcion, layout.id).toBeGreaterThanOrEqual(ancho / alto);
+    }
   });
 });

@@ -37,6 +37,8 @@
     titulo?: string;
     explicacion?: string;
     cobertura?: string;
+    /** El idioma de esa cobertura, tras «del» y «en». */
+    idioma?: string;
     /**
      * Con la letra muy grande no cabe todo. El orden de sacrificio es
      * explícito: primero se pliega la explicación, luego el texto se desplaza
@@ -55,7 +57,7 @@
 
   let {
     layout, target, activo = true, onDone, onTecla, dominios, onStats,
-    titulo = '', explicacion = '', cobertura = '', espacioJusto = false,
+    titulo = '', explicacion = '', cobertura = '', idioma = '', espacioJusto = false,
     movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar,
   }: Props = $props();
 
@@ -137,9 +139,61 @@
       .filter(Boolean).join(' + ');
     const base = `${mods ? mods + ' + ' : ''}${key} · ${FINGER_NAMES[nextStep.finger]}`;
     if (nextStep.dead) {
-      return `${base} — acento: no verás nada hasta pulsar la ${nextChar} después`;
+      return `${base} — acento: no verás nada hasta pulsar la vocal`;
     }
     return base;
+  });
+
+  /**
+   * El texto se reparte por palabras para que el salto de línea no parta ninguna:
+   * cada carácter es su propio elemento, y sin este envoltorio se podría cortar
+   * «por» en «po» y «r». El espacio va con la palabra de delante, y un espacio al
+   * final de la línea se sigue viendo cuando le toca al cursor.
+   */
+  const palabras = $derived.by(() => {
+    const trozos: { inicio: number; caracteres: string[] }[] = [];
+    let actual: { inicio: number; caracteres: string[] } | null = null;
+    [...target].forEach((ch, i) => {
+      actual ??= { inicio: i, caracteres: [] };
+      actual.caracteres.push(ch);
+      if (ch === ' ') { trozos.push(actual); actual = null; }
+    });
+    if (actual) trozos.push(actual);
+    return trozos;
+  });
+
+  let cajaTexto = $state<HTMLLabelElement>();
+
+  /**
+   * El texto se desplaza dentro de su caja (paso 2 del orden de sacrificio), así
+   * que hay que llevar el cursor a la vista: nadie va a soltar el teclado para
+   * mover la rueda a mitad de una lección. Se sitúa su línea arriba del todo para
+   * dejar a la vista lo que viene. Sin animación: lo que importa es que esté ya.
+   */
+  $effect(() => {
+    void states;
+    const caja = cajaTexto;
+    const cursor = caja?.querySelector('.ch.current');
+    if (!caja || !cursor) return;
+    const c = caja.getBoundingClientRect();
+    const r = cursor.getBoundingClientRect();
+    if (r.top < c.top || r.bottom > c.bottom) {
+      caja.scrollTop += r.top - c.top - caja.clientTop;
+    }
+  });
+
+  /**
+   * Último paso del orden de sacrificio: si con la letra grande no cabe todo, la
+   * escena se desplaza. Pero antes de teclear interesa ver el título y, al
+   * empezar, el texto, la pista y el teclado juntos; lo que no quepa, que sea lo
+   * de arriba. Una vez por intento: después el alumno manda en su desplazamiento.
+   */
+  let textoEnVista = false;
+  $effect(() => {
+    if (typed.length === 0) { textoEnVista = false; return; }
+    if (textoEnVista) return;
+    textoEnVista = true;
+    cajaTexto?.scrollIntoView?.({ block: 'start' });
   });
 
   onMount(() => {
@@ -151,7 +205,14 @@
     field.setAttribute('autocorrect', 'off');
 
     engine = new TypingEngine(field, {
-      physical: () => { held = new Set(engine!.heldCodes); },
+      // El motor avisa de cada suelta ANTES de vaciar su lista al perder el foco: sin
+      // quitarla aquí, la tecla con la que se salió del campo (Tab) se quedaba
+      // encendida en pantalla al volver.
+      physical: (ev) => {
+        const pulsadas = new Set(engine!.heldCodes);
+        if (!ev.down) pulsadas.delete(ev.code);
+        held = pulsadas;
+      },
       text: (s) => {
         // Se usa lo confirmado, no lo que se ve: mientras hay un acento a
         // medias el campo muestra `´` pero la posición de la lección no debe
@@ -259,13 +320,13 @@
   }
 </script>
 
-<div class="drill" class:sin-animaciones={sinAnimaciones}>
+<div class="drill" class:sin-animaciones={sinAnimaciones} class:compacta={espacioJusto}>
   <header class="cab">
     <h2>{titulo}</h2>
     {#if cobertura}
       <span class="cobertura"
-            aria-label="Al terminarla podrás escribir el {cobertura}% de las palabras del español">
-        {cobertura}% del español
+            aria-label="Al terminarla podrás escribir el {cobertura}% de las palabras que se escriben en {idioma}">
+        {cobertura}% del {idioma}
       </span>
     {/if}
     {#if explicacion}
@@ -274,29 +335,31 @@
         {explicacionAbierta ? 'Ocultar' : '¿Qué se practica?'}
       </button>
     {/if}
-    <button onclick={enfocar} disabled={!activo || pausado}>Seguir escribiendo</button>
-    <button type="button" class="reiniciar" onclick={restart} aria-label="Empezar de nuevo esta lección">
-      Empezar de nuevo
-    </button>
   </header>
 
   {#if explicacionAbierta && explicacion}
-    <p class="focus">{explicacion}</p>
+    <!-- Con la letra grande la cifra de cobertura no cabe en la fila y baja aquí. -->
+    <p class="focus">{explicacion}{#if espacioJusto && cobertura}{' '}Al terminarla podrás escribir el {cobertura}% de las palabras que se escriben en {idioma}.{/if}</p>
+  {/if}
+
+  <!-- Hermano de la etiqueta, no hijo: un botón dentro de un <label> es HTML
+       inválido, y comparte su celda de la rejilla para taparla solo a ella. Sin
+       eso se quedaba sin caja de referencia y cubría la aplicación entera,
+       incluida la barra desde la que también se puede reanudar. -->
+  {#if pausado}
+    <div class="pausa-cartel" role="status">
+      <span>Ejercicio pausado</span>
+      {#if onReanudar}
+        <button type="button" class="primario" onclick={onReanudar}>
+          Reanudar
+        </button>
+      {/if}
+    </div>
   {/if}
 
   <!-- La etiqueta devuelve el foco al pulsar el texto sin interceptar teclas.
        El campo real conserva la composición del método de entrada del sistema. -->
-  <label class="text" aria-label={`Texto de la lección: ${target}`}>
-    {#if pausado}
-      <div class="pausa-cartel" role="status" aria-live="polite">
-        <span>Ejercicio pausado</span>
-        {#if onReanudar}
-          <button type="button" class="btn-reanudar" onclick={onReanudar}>
-            Reanudar
-          </button>
-        {/if}
-      </div>
-    {/if}
+  <label class="text" bind:this={cajaTexto} aria-label={`Texto de la lección: ${target}`}>
     <textarea
       bind:this={field}
       class="capture"
@@ -313,11 +376,21 @@
       }}
     ></textarea>
     <span aria-hidden="true">
-      {#each [...target] as ch, i (i)}
-        <span class="ch {states[i]}">{ch === ' ' ? '\u00a0' : ch}</span>
+      {#each palabras as p (p.inicio)}
+        <span class="palabra">
+          {#each p.caracteres as ch, j (j)}
+            <span class="ch {states[p.inicio + j]}">{ch === ' ' ? '\u00a0' : ch}</span>
+          {/each}
+        </span>
       {/each}
     </span>
   </label>
+
+  <!-- El campo es invisible, así que perder el foco no se notaba: se tecleaba y no
+       pasaba nada. Lo enseña el CSS, sin tocar el foco ni el campo, y lo deja pasar
+       el clic hasta la etiqueta, que es quien lo devuelve. Con el teclado no hace
+       falta: el campo está justo después de los controles de arriba. -->
+  <span class="aviso-foco" aria-hidden="true">Pulsa aquí para seguir escribiendo</span>
 
   <!-- Para lector de pantalla: el bucle de práctica es visual y motor, pero la
        pista sí tiene que ser audible, y el progreso legible. -->
@@ -338,31 +411,21 @@
 </div>
 
 <style>
+  /* Misma celda que `.text`: la tapa sin moverla, y el teclado sigue en su sitio. */
   .pausa-cartel {
-    position: absolute;
-    inset: 0;
-    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    grid-area: texto;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    border: 1px solid var(--border-strong);
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: var(--space-3);
-    z-index: 5;
+    gap: var(--space-2) var(--space-4);
+    padding: var(--space-2);
+    z-index: 1;
     border-radius: var(--radius);
     font-size: var(--text-lg);
     font-weight: 500;
-  }
-
-  .btn-reanudar {
-    min-height: var(--target-min);
-    background: var(--accent);
-    color: var(--accent-fg);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius);
-    padding: 0 var(--space-4);
-    font-size: var(--text-base);
-    font-weight: 500;
-    cursor: pointer;
   }
 
   /* El teclado se lleva el espacio que sobre; todo lo demás ocupa lo justo.
@@ -375,10 +438,38 @@
        la rejilla puede encogerlas hasta que texto y teclado se solapen. */
     grid-template-rows: auto auto
       minmax(calc(1.7 * var(--text-drill) + 2 * var(--space-3) + 2px), auto)
-      auto minmax(min(34vh, 230px), 1fr);
+      auto minmax(var(--suelo-teclado), 1fr);
     gap: var(--space-2);
     min-height: 0;
+    /* El suelo de `.teclado` solo sirve mientras el límite sea el alto: cuando lo es
+       el ancho, el SVG ya no crece y lo que queda por encima es hueco vacío que
+       empuja a desplazar (120px a 1024x640 al 200%). El 0,33 es el alto entre el
+       ancho del teclado, un poco por encima de la proporción real para no recortarle
+       nunca una letra; `cqw` se mide contra `.escena`. Lo comprueba geometria.test.ts.
+       Va también en la fila: si solo lo tuviera el hijo, el texto se quedaría el
+       sitio y el teclado desbordaría, y el orden de sacrificio dice lo contrario. */
+    --suelo-teclado: min(calc(min(34vh, 230px) * var(--ui-scale)), 33cqw);
   }
+
+  /* Letra grande: cada fila cuesta el doble y el título ya está en el selector de
+     la barra, así que la pista y la explicación comparten fila encima del teclado.
+     El título sigue en el árbol para el lector de pantalla. */
+  .compacta {
+    gap: calc(var(--space-1) / 2);
+    grid-template-areas: 'explicacion explicacion' 'texto texto' 'pista cabecera' 'teclado teclado';
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto
+      minmax(calc(1.7 * var(--text-drill) + 2 * var(--space-1) + 2px), auto)
+      auto minmax(var(--suelo-teclado), 1fr);
+  }
+  .compacta .cab h2 {
+    position: absolute; width: 1px; height: 1px;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .compacta .cobertura { display: none; }
+  .compacta .text { padding: var(--space-1) var(--space-3); }
+  .compacta .hint { font-size: var(--text-base); }
+  .compacta .explica { padding: 0 var(--space-3); }
 
   .capture {
     position: absolute;
@@ -389,14 +480,16 @@
   }
 
   .cab { grid-area: cabecera; display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-  .cab h2 { margin: 0; font-size: var(--text-lg); }
+  /* `anywhere`, no `break-word`: solo el primero reduce el ancho mínimo. Un título sin
+     espacios, que la validación admite, ensancharía si no toda la lección. */
+  .cab h2 { margin: 0; font-size: var(--text-lg); min-width: 0; overflow-wrap: anywhere; }
 
   .cobertura {
     font-size: var(--text-sm);
     font-variant-numeric: tabular-nums;
     color: var(--accent);
     border: 1px solid var(--accent);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 1px var(--space-2);
     white-space: nowrap;
   }
@@ -411,7 +504,7 @@
     font-size: var(--text-sm);
   }
 
-  .focus { grid-area: explicacion; margin: 0; color: var(--fg-muted); max-width: 78ch; font-size: var(--text-sm); }
+  .focus { grid-area: explicacion; margin: 0; color: var(--fg-muted); max-width: 78ch; min-width: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
 
   .text {
     grid-area: texto;
@@ -429,13 +522,31 @@
        arrastra a la página entera. */
     overflow-y: auto;
     max-height: 30vh;
+    scroll-margin-top: var(--space-2);
   }
+
+  /* Comparte celda con el texto y no ocupa sitio: que aparezca no mueve nada. */
+  .aviso-foco {
+    grid-area: texto;
+    display: none;
+    align-self: end;
+    justify-self: end;
+    margin: var(--space-1);
+    padding: 0 var(--space-2);
+    font-size: var(--text-sm);
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-radius: var(--radius);
+    pointer-events: none;
+  }
+  .drill:has(.capture:not(:focus, :disabled)) .aviso-foco { display: block; }
 
   .text:has(.capture:focus-visible) {
     outline: 3px solid var(--accent);
     outline-offset: 2px;
   }
 
+  .palabra { display: inline-block; }
   .ch { padding: 1px 0; border-bottom: 3px solid transparent; }
   .ch.pending { color: var(--fg-muted); }
   .ch.correct { color: var(--ok); border-bottom-color: var(--ok); }
@@ -457,7 +568,6 @@
   }
 
   @keyframes blink { 50% { opacity: 0.62; } }
-  @keyframes pulse { 50% { opacity: 0.62; } }
   @media (prefers-reduced-motion: reduce) {
     .ch.current {
       animation: none;
@@ -501,7 +611,25 @@
      el ALTO; cuando lo es el ancho, el que trabaja es `--factor-tecla`. */
   .teclado {
     grid-area: teclado;
-    min-height: calc(min(34vh, 230px) * var(--ui-scale));
+    min-height: var(--suelo-teclado);
     display: grid;
+  }
+
+  /* Colores forzados: el fondo no llega, y el cursor y el error dependían de él. */
+  @media (forced-colors: active) {
+    /* El subrayado transparente de lo pendiente se volvía visible y todo parecía
+       acertado. Aquí se declara cada estado con los colores del sistema. */
+    .ch { forced-color-adjust: none; border-bottom-color: Canvas; }
+    .ch.pending { color: CanvasText; }
+    .ch.correct { color: CanvasText; border-bottom-color: CanvasText; }
+    .ch.wrong {
+      color: CanvasText;
+      background: Canvas;
+      border-bottom-color: CanvasText;
+      text-decoration: line-through;
+    }
+    .ch.current { background: Highlight; color: HighlightText; }
+    .aviso-foco { border: 1px solid CanvasText; }
+    .swatch { forced-color-adjust: none; }
   }
 </style>

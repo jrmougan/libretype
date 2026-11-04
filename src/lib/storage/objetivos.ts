@@ -1,4 +1,4 @@
-import { LESSONS, nivelDesbloqueado } from '../lessons';
+import { catalogo as catalogoApp, type Catalogo } from '../lecciones/catalogo';
 import { idCanonico } from './equivalencias';
 import { type Sesion } from './progreso';
 
@@ -10,6 +10,9 @@ import { type Sesion } from './progreso';
  * en los componentes, para que el umbral y cómo se cuenta no puedan separarse.
  */
 export const PCT_OBJETIVO = 90;
+
+/** Para decidir sin enseñar la cifra: las vistas no pueden tocar `PCT_OBJETIVO`. */
+export const alcanzaObjetivo = (precision: number): boolean => precision >= PCT_OBJETIVO;
 
 /**
  * Vocabulario que acompaña siempre al umbral. Un número suelto plantea una meta
@@ -46,17 +49,16 @@ export const OBJETIVO_PANEL =
 export const FILA_DISPONIBLE = 'Disponible · a tu ritmo';
 
 /** Las sesiones solo se registran al terminar un ejercicio. */
-export function leccionesSuperadas(sesiones: readonly Sesion[]): Set<string> {
-  const actuales = new Set(LESSONS.map((l) => l.id));
+export function leccionesSuperadas(
+  sesiones: readonly Sesion[],
+  catalogo: Catalogo = catalogoApp,
+): Set<string> {
   return new Set(sesiones
     .filter((s) => s.escritos > 0 && Number.isFinite(s.pctAcierto)
       && s.pctAcierto >= PCT_OBJETIVO && s.pctAcierto <= 100)
     .map((s) => idCanonico(s.leccion))
-    .filter((id) => actuales.has(id)));
-}
-
-export function nivelDisponible(sesiones: readonly Sesion[]): number {
-  return nivelDesbloqueado(leccionesSuperadas(sesiones));
+    // Solo el catálogo: ni práctica libre, ni retiradas, ni lecciones personalizadas.
+    .filter((id) => catalogo.tiene(id)));
 }
 
 /** El recorte del respaldo local nunca debe volver a bloquear una lección. */

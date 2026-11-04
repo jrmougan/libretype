@@ -58,7 +58,21 @@
   --space-6: calc(1.5rem * var(--ui-scale));
   --space-8: calc(2rem * var(--ui-scale));
   --radius: 8px;
+  /* Lo que sobresale el contorno de foco (3px + 2px de separación) y un poco de aire. */
+  --margen-foco: 6px;
+  /* Ancho entre alto del teclado dibujado, un poco por encima del real (3,07) para no
+   * quedarse corto: convierte su suelo de alto en el ancho que necesita. */
+  --teclado-proporcion: 3.1;
+  /* Desde donde empieza a ceder el selector de lección en la barra. */
+  --selector-base: calc(13.75rem * var(--ui-scale));
   --radius-key: 6px;
+  --radius-pill: 999px;
+  --borde-grueso: 2px;
+
+  /* Sombras de lo que va superpuesto: la del panel cae hacia la izquierda porque
+   * entra por la derecha. */
+  --sombra-capa: 0 12px 40px rgb(0 0 0 / 0.28);
+  --sombra-panel: -12px 0 40px rgb(0 0 0 / 0.22);
 
   /* Objetivo mínimo de pulsación. 44px es el mínimo de WCAG 2.2 (2.5.8);
    * usamos 48 porque el público incluye niños y personas mayores. */
@@ -180,6 +194,18 @@
   --finger-ring: var(--finger-l-ring);
   --finger-middle: var(--finger-l-middle);
   --finger-index: var(--finger-l-index);
+}
+
+/* Quien pide más contraste en el sistema pero no colores forzados (macOS, GNOME):
+ * lo atenuado deja de estarlo y los bordes se ven. */
+@media (prefers-contrast: more) {
+  /* Con los selectores del oscuro: `:root` a secas pesa menos que ellos y no surte efecto. */
+  :root,
+  :root:not([data-theme="light"]),
+  :root[data-theme="dark"] {
+    --fg-muted: var(--fg);
+    --border: var(--border-strong);
+  }
 }
 
 /* Alto contraste del sistema. forced-colors lo aplica Windows por su cuenta;
@@ -306,7 +332,6 @@ body {
 :focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 3px;
 }
 
 button {
@@ -321,6 +346,57 @@ button {
   transition: background var(--motion-fast) var(--ease);
 }
 button:hover { background: var(--surface-sunken); }
+
+/* La acción principal de cada pantalla. Una sola por pantalla, o deja de decir
+ * cuál es el siguiente paso. El selector lleva `button` a propósito: tiene que
+ * ganarle a `button:hover`, que la dejaría con letra clara sobre fondo claro. */
+button.primario {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+button.primario:hover {
+  background: color-mix(in srgb, var(--accent) 85%, var(--fg));
+}
+
+/* Sin esto un botón desactivado es idéntico a uno activo, solo que no hace nada.
+ * Lleva `cursor` además de la opacidad: no todo el mundo aprecia el atenuado. */
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+button:disabled:hover { background: var(--surface); }
+button.primario:disabled:hover { background: var(--accent); }
+
+/* Borrar y compañía: el borde y el texto ya dicen qué hace, el color lo refuerza. */
+button.peligro { border-color: var(--error); color: var(--error); }
+
+/* Los campos, iguales en todas las pantallas. Sin esto cada componente traía su
+ * copia y una de ellas se quedó con un borde de 1,4:1 que no se veía. */
+select,
+/* Los campos de captura se quedan fuera: son invisibles a propósito y su caja de
+   1px es parte de cómo funcionan. */
+textarea:not(.capture, .captura),
+input:not([type='range'], [type='file'], [type='checkbox'], [type='radio']) {
+  font: inherit;
+  min-height: var(--target-min);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+}
+input[type='range'] {
+  width: 100%;
+  min-height: var(--target-min);
+  accent-color: var(--accent);
+}
+::placeholder { color: var(--fg-muted); opacity: 1; }
+
+/* El error no se marca solo con color: el borde engorda y debajo va el mensaje. */
+[aria-invalid='true'] {
+  border: var(--borde-grueso) solid var(--error);
+}
 
 /* Solo para lectores de pantalla. */
 .sr-only {

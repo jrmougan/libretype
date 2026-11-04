@@ -2,7 +2,9 @@ import appSvelte from "../App.svelte?raw";
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import drillSvelte from "./components/Drill.svelte?raw";
+import resultadoSvelte from "./components/ResultadoLeccion.svelte?raw";
 import leccionCeroSvelte from "./components/LeccionCero.svelte?raw";
+import leccionesPropiasSvelte from "./components/LeccionesPropias.svelte?raw";
 import { DOMINADA, opacidadEtiqueta } from "./keyboard/dominio";
 
 const tokensCss = readFileSync("src/styles/tokens.css", "utf8");
@@ -107,6 +109,14 @@ describe("Accesibilidad visual (WCAG 2.2)", () => {
       });
     }
 
+    it("prefers-contrast: more alcanza también al oscuro", () => {
+      const inicio = tokensCss.indexOf("@media (prefers-contrast: more)");
+      expect(inicio).toBeGreaterThan(tokensCss.lastIndexOf(':root[data-theme="dark"] {', inicio));
+      const selectores = tokensCss.slice(inicio, tokensCss.indexOf("--fg-muted", inicio));
+      expect(selectores).toContain(':root:not([data-theme="light"])');
+      expect(selectores).toContain(':root[data-theme="dark"]');
+    });
+
     it("define los 5 alias de dedos y pulgar en tokens.css", () => {
       expect(tokensCss).toContain("--finger-pinky:");
       expect(tokensCss).toContain("--finger-ring:");
@@ -138,10 +148,10 @@ describe("Accesibilidad visual (WCAG 2.2)", () => {
       expect(appSvelte).toContain('id="panel-dialogo"');
     });
 
-    it("App.svelte: el diálogo de resultado anuncia estado con aria-live y aria-describedby", () => {
-      expect(appSvelte).toContain('id="dialogo-resultado"');
-      expect(appSvelte).toContain('aria-live="polite"');
-      expect(appSvelte).toContain('aria-describedby="resultado-desc"');
+    it("ResultadoLeccion: el diálogo de resultado anuncia estado con aria-live y aria-describedby", () => {
+      expect(resultadoSvelte).toContain('id="dialogo-resultado"');
+      expect(resultadoSvelte).toContain('aria-live="polite"');
+      expect(resultadoSvelte).toContain('aria-describedby="resultado-desc"');
     });
   });
 
@@ -170,3 +180,23 @@ describe("Accesibilidad visual (WCAG 2.2)", () => {
     });
   });
 });
+
+describe("lo que escribe el alumno no ensancha el panel «Tus lecciones»", () => {
+  // Medido: una URL en «Qué se practica» dejaba «Borrar» a 2889 px en una ventana de 1280.
+  it.each(["h3", ".note", ".confirmar p", ".aviso", ".error"])("%s puede partir cualquier palabra", (selector) => {
+    const estilo = leccionesPropiasSvelte.slice(leccionesPropiasSvelte.indexOf("<style"));
+    const regla = estilo.match(new RegExp(`(?:^|\\n)\\s*${selector.replace(".", "\\.")}\\s*\\{([^}]*)\\}`))?.[1];
+    expect(regla).toContain("overflow-wrap: anywhere");
+  });
+});
+
+describe("un título sin espacios no ensancha la lección", () => {
+  // La validación admite un nombre de fichero como título. Sin esto, `.drill` crecía
+  // hasta sacar el teclado por la derecha: medido, jsdom no maqueta, ver AGENTS.md.
+  it.each([".cab h2", ".focus"])("%s puede partir cualquier palabra", (selector) => {
+    const estilo = drillSvelte.slice(drillSvelte.indexOf("<style"));
+    const regla = estilo.match(new RegExp(`(?:^|\\n)\\s*${selector.replace(".", "\\.")}\\s*\\{([^}]*)\\}`))?.[1];
+    expect(regla).toContain("overflow-wrap: anywhere");
+  });
+});
+

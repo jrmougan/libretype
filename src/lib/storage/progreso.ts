@@ -10,6 +10,7 @@
  * de versiones anteriores los arregla para los dos backends de golpe, y sin
  * tocar lo que hay escrito en disco.
  */
+import { cuentaParaMarcaGlobal, tieneMarcaPropia } from '../lecciones/ids';
 import { idCanonico } from './equivalencias';
 
 export interface Sesion {
@@ -47,6 +48,9 @@ export interface ResumenDia {
   sesiones: number;
   mejorPpm: number;
   msTotales: number;
+  /** Sesiones que entran en la media: sin textos a medida, como la mejor marca. */
+  comparables: number;
+  /** Cero si ese día no hubo ninguna comparable. */
   ppmMedia: number;
   pctMedio: number;
 }
@@ -107,7 +111,9 @@ export function resumirGlobal(sesiones: readonly Sesion[]): ResumenGlobal {
   for (const s of sesiones) {
     msTotales += s.ms;
     lecciones.add(idCanonico(s.leccion));
-    if (s.pctAcierto >= PCT_MINIMO_PARA_RECORD && s.ppm > mejorPpm) mejorPpm = s.ppm;
+    if (cuentaParaMarcaGlobal(s.leccion) && s.pctAcierto >= PCT_MINIMO_PARA_RECORD && s.ppm > mejorPpm) {
+      mejorPpm = s.ppm;
+    }
   }
 
   return {
@@ -121,6 +127,8 @@ export function resumirGlobal(sesiones: readonly Sesion[]): ResumenGlobal {
 /** ¿Este resultado mejora la marca anterior de esa lección? */
 export function esRecord(previo: ResumenLeccion | undefined, s: Sesion): boolean {
   if (s.pctAcierto < PCT_MINIMO_PARA_RECORD) return false;
+  // Un texto de una letra se acaba con 0 ppm: eso no es una marca, ni siquiera la primera.
+  if (s.ppm <= 0 || !tieneMarcaPropia(s.leccion)) return false;
   if (!previo) return true;
   return s.ppm > previo.mejorPpm;
 }
@@ -147,6 +155,7 @@ export function resumirEvolucion(
     sesiones: number;
     mejorPpm: number;
     msTotales: number;
+    comparables: number;
     sumaPpm: number;
     sumaPct: number;
   }>();
@@ -154,7 +163,8 @@ export function resumirEvolucion(
   for (const s of sesiones) {
     const dia = s.terminadaEn.slice(0, 10);
     const previo = mapaDias.get(dia);
-    const cuenta = s.pctAcierto >= PCT_MINIMO_PARA_RECORD;
+    const comparable = cuentaParaMarcaGlobal(s.leccion);
+    const cuenta = s.pctAcierto >= PCT_MINIMO_PARA_RECORD && comparable;
     const mejor = cuenta ? s.ppm : 0;
 
     if (!previo) {
@@ -162,15 +172,19 @@ export function resumirEvolucion(
         sesiones: 1,
         mejorPpm: mejor,
         msTotales: s.ms,
-        sumaPpm: s.ppm,
-        sumaPct: s.pctAcierto,
+        comparables: comparable ? 1 : 0,
+        sumaPpm: comparable ? s.ppm : 0,
+        sumaPct: comparable ? s.pctAcierto : 0,
       });
     } else {
       previo.sesiones++;
       if (cuenta && s.ppm > previo.mejorPpm) previo.mejorPpm = s.ppm;
       previo.msTotales += s.ms;
-      previo.sumaPpm += s.ppm;
-      previo.sumaPct += s.pctAcierto;
+      if (comparable) {
+        previo.comparables++;
+        previo.sumaPpm += s.ppm;
+        previo.sumaPct += s.pctAcierto;
+      }
     }
   }
 
@@ -182,8 +196,9 @@ export function resumirEvolucion(
       sesiones: d.sesiones,
       mejorPpm: d.mejorPpm,
       msTotales: d.msTotales,
-      ppmMedia: Math.round(d.sumaPpm / d.sesiones),
-      pctMedio: Math.round(d.sumaPct / d.sesiones),
+      comparables: d.comparables,
+      ppmMedia: d.comparables > 0 ? Math.round(d.sumaPpm / d.comparables) : 0,
+      pctMedio: d.comparables > 0 ? Math.round(d.sumaPct / d.comparables) : 0,
     };
   });
 

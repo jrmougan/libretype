@@ -16,7 +16,7 @@
  * marca como retirado y se enseña aparte, con su nombre de entonces.
  *
  * Al renombrar una lección en el futuro: añadir aquí la entrada en el mismo
- * commit. `equivalencias.test.ts` comprueba contra `LESSONS` que ningún destino
+ * commit. `equivalencias.test.ts` comprueba contra el catálogo que ningún destino
  * apunte al vacío y que ninguna tabla pise un identificador vivo.
  */
 

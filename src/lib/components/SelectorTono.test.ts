@@ -51,7 +51,7 @@ describe('SelectorTono.svelte (Issue #36)', () => {
     expect(nombres).toEqual(['Con celebración', 'Tranquila']);
 
     const chips = Array.from(botones).map((b) => b.querySelector('.chip')?.textContent?.trim());
-    expect(chips).toEqual(['¡Lección superada!', 'Lección terminada.']);
+    expect(chips).toEqual(['¡Has llegado al final!', 'Lección terminada.']);
 
     // Las muestras visuales están ocultas para el lector de pantalla para no duplicar información
     const muestras = document.querySelectorAll('.muestra');

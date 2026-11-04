@@ -1,10 +1,14 @@
+import { catalogo } from '../lecciones/catalogo';
 import { describe, expect, it } from 'vitest';
 import { LESSONS } from '../lessons';
 import type { Sesion } from './progreso';
 import {
-  conservarLogros, FILA_DISPONIBLE, leccionesSuperadas, nivelDisponible, OBJETIVO_PANEL,
+  conservarLogros, FILA_DISPONIBLE, leccionesSuperadas, OBJETIVO_PANEL,
   OBJETIVO_PENDIENTE, objetivoLeccion, PCT_OBJETIVO, SIN_PRESION,
 } from './objetivos';
+
+const nivelDisponible = (sesiones: Parameters<typeof leccionesSuperadas>[0]): number =>
+  catalogo.nivelDesbloqueado(leccionesSuperadas(sesiones));
 
 function sesion(leccion = 'reposo', pctAcierto = 90): Sesion {
   return { leccion, pctAcierto, ppm: 1, aciertos: 90, escritos: 100, ms: 60000, terminadaEn: '2026-09-08T12:00:00Z' };

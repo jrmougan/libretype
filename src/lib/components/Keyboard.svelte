@@ -91,6 +91,15 @@
     return false;
   }
 
+  /**
+   * Las etiquetas pequeñas tienen que leerse también sobre la tecla pulsada: con el
+   * gris sobre el fondo de acento apenas llegaban a 1,5:1.
+   */
+  function colorSecundario(st: 'pressed' | 'next' | 'idle', opac: number): string {
+    if (st === 'pressed' && !lastWrong) return 'var(--accent-fg)';
+    return opac < 1 ? 'var(--fg)' : 'var(--fg-muted)';
+  }
+
   const label = $derived(
     etiqueta ??
       (next
@@ -149,7 +158,7 @@
       {:else}
         {#if k.shift}
           <text x={k.x + 9} y={k.y + 19} class="lbl tiny sup" opacity={opac}
-                fill={opac < 1 ? "var(--fg)" : "var(--fg-muted)"}>{k.shift}</text>
+                fill={colorSecundario(st, opac)}>{k.shift}</text>
         {/if}
         <text
           x={k.x + 9} y={k.y + H - 17} class="lbl main" opacity={opac}
@@ -157,7 +166,7 @@
         >{k.base}</text>
         {#if k.altgr}
           <text x={k.x + k.w - 9} y={k.y + H - 17} class="lbl tiny alt" opacity={opac}
-                fill={opac < 1 ? "var(--fg)" : "var(--fg-muted)"}>{k.altgr}</text>
+                fill={colorSecundario(st, opac)}>{k.altgr}</text>
         {/if}
         <!-- La tecla aprendida no se queda vacía, que parecería un fallo de
              dibujo: lleva una marca que significa «esta ya te la sabes». -->

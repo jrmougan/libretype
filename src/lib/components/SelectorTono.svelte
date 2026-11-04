@@ -7,6 +7,7 @@
    * Se describe lo que va a pasar y que la persona elija.
    */
   import type { Tono } from '../preferencias';
+  import { VOCES } from '../voz';
 
   interface Props {
     onElegir: (tono: Tono) => void;
@@ -26,7 +27,7 @@
   <div class="opciones">
     <button class="opcion" onclick={() => onElegir('juego')}>
       <span class="muestra juego" aria-hidden="true">
-        <span class="chip">¡Lección superada!</span>
+        <span class="chip">{VOCES.juego.terminada}</span>
       </span>
       <span class="nombre">Con celebración</span>
       <span class="detalle">
@@ -36,7 +37,7 @@
 
     <button class="opcion" onclick={() => onElegir('sobrio')}>
       <span class="muestra sobrio" aria-hidden="true">
-        <span class="chip">Lección terminada.</span>
+        <span class="chip">{VOCES.sobrio.terminada}</span>
       </span>
       <span class="nombre">Tranquila</span>
       <span class="detalle">
@@ -53,11 +54,11 @@
     max-width: 72ch;
   }
   h2 { margin: 0; font-size: var(--text-xl); }
-  .intro { margin: 0; color: var(--fg-muted); font-size: var(--text-lg); }
+  .intro { margin: 0; color: var(--fg-muted); font-size: var(--text-base); }
 
   .opciones {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17.5rem), 1fr));
     gap: var(--space-4);
   }
 
@@ -79,7 +80,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 64px;
+    min-height: calc(var(--target-min) * 1.25);
+    padding: var(--space-2);
     border-radius: var(--radius);
     margin-bottom: var(--space-1);
   }
@@ -91,7 +93,7 @@
     font-size: var(--text-sm);
     font-weight: 600;
     padding: var(--space-1) var(--space-3);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
   }
   .muestra.juego .chip {
     background: var(--muestra-juego-chip);

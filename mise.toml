@@ -1,6 +1,6 @@
 [tools]
 node = "26.13.0" # CI y releases usan Node 26; el lockfile exige ^22.13 || >=24.
-pnpm = "12.16.1" # Igual que packageManager en package.json.
+pnpm = "12.18.0" # Igual que packageManager en package.json.
 rust = { version = "1.99.1", components = "rustfmt,clippy", profile = "minimal" }
 
 [tasks.setup]

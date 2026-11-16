@@ -37,5 +37,5 @@
   },
   "description": "Tutor de mecanografía multiplataforma, visual y accesible",
   "license": "MIT",
-  "packageManager": "pnpm@12.20.0"
+  "packageManager": "pnpm@12.21.0"
 }

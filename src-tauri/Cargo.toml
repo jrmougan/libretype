@@ -6,7 +6,9 @@ authors = ["Jesus Romeo"]
 license = "MIT"
 repository = "https://github.com/jrmougan/libretype"
 edition = "2021"
-rust-version = "1.77.2"
+# Es el mínimo que declaran tauri 2.12 y todos sus plugins (y el máximo de todo
+# el árbol de dependencias): por debajo no compila. Subir solo si alguna lo pide.
+rust-version = "1.90"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,16 +20,16 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
-serde_json = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-log = "0.4"
+serde_json = "1.0.154"
+serde = { version = "1.0.229", features = ["derive"] }
+log = "0.4.35"
 tauri = { version = "2.12.5", features = [] }
-tauri-plugin-log = "2"
-tauri-plugin-sql = { version = "2.4.1", features = ["sqlite"] }
+tauri-plugin-log = "2.10.2"
+tauri-plugin-sql = { version = "2.6.0", features = ["sqlite"] }
 
 # El actualizador solo existe en escritorio: en móvil actualiza la tienda, no
 # la app. Se declaran aparte para no arrastrar reqwest ni zip a un build de
 # Android, donde además no compilarían.
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2.11.0"
-tauri-plugin-process = "2.3.1"
+tauri-plugin-updater = "2.14.1"
+tauri-plugin-process = "2.4.0"

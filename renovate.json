@@ -4,7 +4,23 @@
     "config:recommended"
   ],
   "minimumReleaseAge": "3 days",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "updateNotScheduled": false,
+  "rebaseWhen": "conflicted",
   "packageRules": [
+    {
+      "description": "One weekly PR with every non-major update (all managers); majors keep their own PRs on the same schedule",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "groupName": "non-major updates"
+    },
     {
       "description": "svelte-check 4.x peer is typescript ^5 || ^6; TS7 is the native port without a JS API",
       "matchPackageNames": [

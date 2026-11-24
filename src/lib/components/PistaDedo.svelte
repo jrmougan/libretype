@@ -210,9 +210,16 @@
      comerse el suelo del teclado. */
   .compacta { grid-template-columns: minmax(0, 1fr); }
   .compacta .manos { display: none; }
-  .compacta .tarjeta { padding: var(--space-1) var(--space-3); }
-  .compacta .teja { --lado: calc(2.25rem * var(--ui-scale)); font-size: calc(1.25rem * var(--ui-scale)); }
+  /* Medido a 1280x800 al 200%: con la teja a 2,25rem y el título grande, la pista
+     de una tilde (dos líneas) empujaba la última fila del teclado fuera de la
+     ventana. La teja no baja de --target-min a esa escala y el texto se queda
+     en el tamaño base, que es el que tenía la pista antes de ser tarjeta. */
+  .compacta .tarjeta { padding: 0 var(--space-3); gap: var(--space-2); }
+  .compacta .teja { --lado: calc(1.75rem * var(--ui-scale)); font-size: calc(1.125rem * var(--ui-scale)); }
   .compacta .teja.larga { font-size: var(--text-sm); }
+  .compacta .textos { gap: 0; }
+  .compacta .titulo { font-size: var(--text-base); line-height: 1.2; }
+  .compacta .descripcion { font-size: var(--text-sm); line-height: 1.2; }
 
   /* Con poco ancho, la tarjeta de manos también es lo primero que se va. */
   @media (max-width: 40rem) {

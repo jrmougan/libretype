@@ -376,3 +376,31 @@ describe('prueba de colocación', () => {
     expect(document.querySelector('.barra option[value="colocacion"]')).toBeNull();
   });
 });
+
+describe('teclas recién dominadas', () => {
+  const logro = (): string | undefined => document.querySelector('#dialogo-resultado .logro')?.textContent ?? undefined;
+  // Todas dominadas menos la K, que está a un acierto rápido de pasar el umbral.
+  const dominada = { intentos: 20, aciertos: 20, msTotal: 20 * 250 };
+  const casi = { intentos: 7, aciertos: 7, msTotal: 7 * 250 };
+  const REPOSO = ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyL', 'Semicolon', 'Space'];
+
+  it('al terminar se cuenta como logro la tecla que acaba de dejar de necesitar la letra', async () => {
+    localStorage.setItem('libretype.teclas', JSON.stringify([...REPOSO.map((c) => [c, dominada]), ['KeyK', casi]]));
+    await abrir();
+    expect(textoMostrado()).toContain('k');
+    await teclear(textoMostrado());
+    expect(logro()).toBe('Ya escribes sin mirar la K.');
+  });
+
+  it('muchas de golpe se cuentan en vez de enumerarse', async () => {
+    await abrir();
+    await teclear(textoMostrado());
+    expect(logro()).toMatch(/^Ya escribes sin mirar \d+ teclas nuevas\.$/);
+  });
+
+  it('sin ninguna tecla nueva dominada no se dice nada', async () => {
+    await abrir();
+    await teclear('x'.repeat(textoMostrado().length));
+    expect(logro()).toBeUndefined();
+  });
+});

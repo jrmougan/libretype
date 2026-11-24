@@ -31,11 +31,13 @@
     costaron?: string;
     /** Cómo practicar justo esas teclas, si se puede con lo que ya ha visto. */
     refuerzoTeclas?: Accion | null;
+    /** Teclas que acaban de dejar de necesitar la letra en pantalla, ya enumeradas. */
+    logro?: string;
   }
 
   let {
     stats, record, celebra, voz, avance, onRepetir,
-    nota = null, errorGuardado = false, repaso = null, costaron = '', refuerzoTeclas = null,
+    nota = null, errorGuardado = false, repaso = null, costaron = '', refuerzoTeclas = null, logro = '',
   }: Props = $props();
 
   /** Por debajo del objetivo lo natural es repetir; por encima, seguir. */
@@ -74,6 +76,8 @@
       <span class="cifras">{stats.wpm} palabras por minuto, {stats.accuracy}% de precisión.</span>
       <span class="animo">{animo}</span>
     </div>
+    <!-- Un logro medido con uno mismo: es lo que el teclado en pantalla deja de enseñar. -->
+    {#if logro}<p class="logro">Ya escribes sin mirar {logro}.</p>{/if}
     {#if nota}<p class="note">{nota}</p>{/if}
     {#if errorGuardado}
       <p class="note">No se ha podido guardar el resultado. Este intento solo contará hasta que cierres la aplicación.</p>
@@ -139,6 +143,7 @@
   .cifras { font-variant-numeric: tabular-nums; }
   .animo { color: var(--fg-muted); }
   .note { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
+  .logro { margin: 0; font-weight: 600; }
   .botones { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
   .repaso {
     display: grid; gap: var(--space-2);

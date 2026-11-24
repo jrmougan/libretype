@@ -677,3 +677,64 @@ describe("Progreso: los modos de práctica no son lecciones retiradas", () => {
     expect(onImportar).not.toHaveBeenCalled();
   });
 });
+
+describe("Progreso.svelte - comparado con uno mismo", () => {
+  const dominada = { intentos: 20, aciertos: 20, msTotal: 20 * 250 };
+  const dia = (fecha: string, extra: Partial<Sesion> = {}): Sesion =>
+    ({ ...sesionPrueba, terminadaEn: `${fecha}T12:00:00.000Z`, ...extra });
+
+  function montar(sesiones: Sesion[], teclas = new Map<string, typeof dominada>()): void {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones, lecciones: LESSONS, tipoAlmacen: "sqlite", teclas, onBorrar: () => {} },
+    });
+    flushSync();
+  }
+
+  it("abre con una frase que resume lo conseguido y dice cuántas teclas salen ya sin mirar", () => {
+    montar([sesionPrueba], new Map([["KeyA", dominada], ["KeyS", dominada]]));
+    const resumen = document.querySelector(".resumen")?.textContent ?? "";
+    expect(resumen).toContain(`Has superado 1 de ${LESSONS.length} lecciones`);
+    // Con «reposo» superada está abierta la segunda: asdfjklñ más la e y la o.
+    expect(resumen).toContain("ya escribes 2 de 10 teclas sin mirar");
+    const dt = [...document.querySelectorAll("dl.global dt")].find((x) => x.textContent === "Teclas que ya escribes sin mirar");
+    expect(dt?.nextElementSibling?.textContent?.replace(/\s+/g, " ").trim()).toBe("2 de 10");
+  });
+
+  it("la gráfica es una imagen con nombre y descripción, y conserva la tabla como alternativa", () => {
+    montar([dia("2026-09-01", { ppm: 10 }), dia("2026-09-02", { ppm: 20 }), dia("2026-09-03", { ppm: 30 })]);
+    const svg = document.querySelector(".grafica svg")!;
+    expect(svg.getAttribute("role")).toBe("img");
+    const [idTitulo, idDesc] = svg.getAttribute("aria-labelledby")!.split(" ");
+    expect(document.getElementById(idTitulo)?.textContent).toBe("Palabras por minuto, media de cada día");
+    const desc = document.getElementById(idDesc)?.textContent ?? "";
+    expect(desc).toContain("3 días con práctica");
+    expect(desc).toContain("El primero, 10 palabras por minuto de media; el último, 30");
+    expect(svg.querySelectorAll("rect.barra")).toHaveLength(3);
+    // Sin metas ni líneas de objetivo: una sola línea, la base.
+    expect(svg.querySelectorAll("line")).toHaveLength(1);
+    expect(document.querySelector("#titulo-evolucion")?.closest("section")?.querySelector("table")).not.toBeNull();
+  });
+
+  it("un día solo con una lección propia no dibuja una barra a cero", () => {
+    montar([dia("2026-09-01", { ppm: 10 }), dia("2026-09-02", { leccion: "propia:abc", ppm: 99 })]);
+    expect(document.querySelectorAll(".grafica rect.barra")).toHaveLength(1);
+  });
+
+  it("compara con los comienzos solo cuando hay historia, y sin la última sesión como vara", () => {
+    montar([sesionPrueba]);
+    expect(document.querySelector("#titulo-comparacion")).toBeNull();
+  });
+
+  it("con historia suficiente dice lo que ha mejorado frente a los comienzos", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-21T18:00:00Z"));
+    try {
+      montar([dia("2026-09-01", { pctAcierto: 86, ppm: 6 }), dia("2026-09-21", { pctAcierto: 97, ppm: 16 })]);
+      const bloque = document.querySelector("#titulo-comparacion")?.closest("section");
+      expect(bloque?.textContent).toContain("Tu precisión media ha pasado del 86% de tus primeros días al 97% de esta semana.");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

@@ -24,7 +24,8 @@
   import { LIMITES, type Borrador, type LeccionPropia } from './lib/lecciones/personalizadas';
   import { caracteresEscribibles, normalizarTextoLibre } from './lib/lecciones/texto';
   import { generarRefuerzoDeTeclas, type EjercicioRefuerzo } from './lib/refuerzo';
-  import { anotarFallo, enumerar, teclasConMasFallos, type TeclaConFallos } from './lib/fallos';
+  import { anotarFallo, enumerar, nombreTecla, teclasConMasFallos, type TeclaConFallos } from './lib/fallos';
+  import { recienDominadas } from './lib/storage/comparacion';
   import type { Stats } from './lib/keyboard/engine';
   import {
     contarDominadas, mapaDeDominio, registrar, type EstadoTecla,
@@ -75,7 +76,7 @@
   let errorGuardado = $state(false);
   let pausado = $state(false);
   let drill = $state<ReturnType<typeof Drill> | null>(null);
-  let result = $state<{ stats: Stats; record: boolean; costaron: TeclaConFallos[] } | null>(null);
+  let result = $state<{ stats: Stats; record: boolean; costaron: TeclaConFallos[]; logro: string } | null>(null);
   /** Fallos por tecla del intento en curso; aparte del dominio, que es una media de semanas. */
   let fallosIntento = new Map<string, number>();
   let dialogoPanel = $state<HTMLDialogElement | null>(null);
@@ -285,6 +286,14 @@
     teclas = m;
   }
 
+  /** Pocas se nombran; muchas de golpe se cuentan, que una lista de ocho no se lee. */
+  function logroDe(codigos: readonly string[]): string {
+    if (codigos.length === 0) return '';
+    return codigos.length <= 4
+      ? enumerar(codigos.map((code) => nombreTecla(code, layout)))
+      : `${codigos.length} teclas nuevas`;
+  }
+
   async function terminada(stats: Stats): Promise<void> {
     const idLeccion = ejercicio.idSesion;
     const sesion: Sesion = {
@@ -321,7 +330,12 @@
     const record = esRecord(porLeccion.get(idLeccion), sesion);
     errorGuardado = false;
     sesiones = [...sesiones, sesion];
-    result = { stats, record, costaron: teclasConMasFallos(fallosIntento, 3, layout) };
+    result = {
+      stats, record,
+      costaron: teclasConMasFallos(fallosIntento, 3, layout),
+      // Contra lo guardado antes de este ejercicio: las que acaban de perder la letra.
+      logro: logroDe(recienDominadas(teclasBase, teclas)),
+    };
     fallosIntento = new Map();
     if (prefs.sonido) sonido.fin(prefs.volumen);
     // Este intento ya no se descarta aunque falle el guardado: al siguiente se reintenta.
@@ -922,6 +936,7 @@
       repaso={repasoResultado}
       costaron={costaronResultado}
       refuerzoTeclas={refuerzoResultado}
+      logro={result.logro}
       onRepetir={again}
     />
   {/if}
@@ -982,6 +997,7 @@
             {almacen}
             {teclas}
             cursoActual={catalogo.cursoDe(leccionId)?.id}
+            {layout}
             onBorrar={borrarProgreso}
             onExportar={exportarProgreso}
             onImportar={importarProgreso}

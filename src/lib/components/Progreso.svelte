@@ -9,6 +9,9 @@
     FILA_DISPONIBLE, leccionesSuperadas, OBJETIVO_PANEL,
   } from "../storage/objetivos";
   import { catalogo } from "../lecciones/catalogo";
+  import { ES_ISO, type Layout } from "../keyboard/layouts";
+  import { comparacionPropia, fraseResumen, serieGrafica, teclasSinMirar } from "../storage/comparacion";
+  import GraficaEvolucion from "./GraficaEvolucion.svelte";
   import { guardarFichero } from "../ficheros";
   import { esIdPropio, ID_FLUIDEZ, ID_PRACTICA_CONTINUA, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_TEXTO_PROPIO } from "../lecciones/ids";
   import { LIMITES, type LeccionPropia } from "../lecciones/personalizadas";
@@ -39,6 +42,8 @@
     onGestionarLecciones?: () => void;
     /** Salida del estado vacío: cerrar esto y ponerse a practicar. */
     onIrAPracticar?: () => void;
+    /** Para saber qué teclas pide lo ya abierto; ES-ISO si no se dice. */
+    layout?: Layout;
   }
 
   let {
@@ -56,6 +61,7 @@
     onPracticarRefuerzo,
     onGestionarLecciones,
     onIrAPracticar,
+    layout = ES_ISO,
   }: Props = $props();
 
   const esDegradado = $derived(errorAlmacen || Boolean(almacen?.errorAlmacen));
@@ -68,6 +74,13 @@
   const listaTeclas = $derived(teclas ? obtenerTeclasOrdenadas(teclas) : []);
   const teclasFlojas = $derived(listaTeclas.filter((t) => t.esFloja));
   const idsActuales = $derived(new Set(lecciones.map((l) => l.id)));
+  /** Sobre lo abierto en el curso que se sigue: lo que aún no se ha enseñado no cuenta en contra. */
+  const sinMirar = $derived(teclasSinMirar(
+    teclas ?? new Map(), catalogo.ultimaDisponible(superadas, cursoActual).id, layout,
+  ));
+  /** Contra medias y contra los comienzos, nunca contra la última sesión. */
+  const comparacion = $derived(comparacionPropia(sesiones));
+  const serie = $derived(serieGrafica(evolucion.dias));
 
   /**
    * Los modos de práctica también salen aquí abajo, pero no son lecciones retiradas.
@@ -288,7 +301,14 @@
       <button class="primario empezar" onclick={onIrAPracticar}>Ir a practicar</button>
     {/if}
   {:else}
+    <!-- Lo primero, en una frase: seis cifras sueltas no dicen si vas bien. -->
+    <p class="resumen">{fraseResumen({
+      superadas: superadas.size, lecciones: lecciones.length, sinMirar,
+      diasEstaSemana: evolucion.diasEstaSemana,
+    })}</p>
+
     <dl class="global">
+      <div><dt>Teclas que ya escribes sin mirar</dt><dd>{sinMirar.dominadas} <small>de {sinMirar.total}</small></dd></div>
       <div><dt>Lecciones practicadas</dt><dd>{tocadasActuales} <small>de {lecciones.length}</small></dd></div>
       <div><dt>Sesiones</dt><dd>{global.sesiones}</dd></div>
       <div><dt>Esta semana</dt><dd>{evolucion.diasEstaSemana} <small>{evolucion.diasEstaSemana === 1 ? 'día' : 'días'}</small></dd></div>
@@ -296,6 +316,15 @@
       <div><dt>Tiempo total</dt><dd>{formatearDuracion(global.msTotales)}</dd></div>
       <div><dt>Mejor marca</dt><dd>{global.mejorPpm} <small>ppm</small></dd></div>
     </dl>
+
+    {#if comparacion.length > 0}
+      <section class="seccion-bloque" aria-labelledby="titulo-comparacion">
+        <h3 id="titulo-comparacion">Frente a tus comienzos</h3>
+        <ul class="comparacion">
+          {#each comparacion as frase (frase)}<li>{frase}</li>{/each}
+        </ul>
+      </section>
+    {/if}
 
     <!-- Al 200% las seis columnas no caben en el panel. Que se desplace la
          tabla dentro de su caja, no que se recorten la marca y la fecha. -->
@@ -438,6 +467,9 @@
     {#if evolucion.dias.length > 0}
       <section class="seccion-bloque" aria-labelledby="titulo-evolucion">
         <h3 id="titulo-evolucion">Evolución por días</h3>
+        <!-- La gráfica dice la tendencia de un vistazo; la tabla de debajo es su
+             alternativa textual y el detalle para quien lo quiera. -->
+        <GraficaEvolucion dias={serie} />
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <div class="tabla" role="region" aria-label="Evolución por días" tabindex="0">
           <table>
@@ -611,6 +643,8 @@
   .empezar { justify-self: start; }
   .vacio { margin: 0; color: var(--fg-muted); }
 
+  .resumen { margin: 0; font-size: var(--text-lg); line-height: 1.4; overflow-wrap: anywhere; }
+  .comparacion { margin: 0; padding-left: var(--space-4); display: grid; gap: var(--space-1); }
   .global { display: flex; flex-wrap: wrap; gap: var(--space-6); margin: 0; }
   .global div { display: flex; flex-direction: column; }
   .global dt { font-size: var(--text-sm); color: var(--fg-muted); }

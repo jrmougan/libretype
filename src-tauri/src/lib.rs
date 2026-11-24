@@ -61,6 +61,59 @@ fn migraciones() -> Vec<Migration> {
     ]
 }
 
+/// El fichero que abre tauri-plugin-sql, dentro de `app_config_dir()`.
+const BASE_DE_DATOS: &str = "libretype.db";
+/// Junto a la base de datos: la versión del esquema que ya tiene copia hecha.
+const MARCA_ESQUEMA: &str = "libretype.db.esquema";
+
+/// La versión más alta del esquema que conoce este binario (van en orden).
+fn version_esquema() -> i64 {
+    migraciones().last().map_or(0, |m| m.version)
+}
+
+/// Copia la base de datos antes de que una migración nueva la toque.
+///
+/// Las migraciones las aplica tauri-plugin-sql al cargar la base de datos
+/// desde la interfaz, que es después de `setup`. Aquí no se puede preguntar a
+/// SQLite qué versión tiene sin abrirla, así que se lleva la cuenta en un
+/// fichero al lado: si este binario trae un esquema más nuevo que el último
+/// copiado, se copia `libretype.db` (y su `-wal`/`-shm`, si los hay) a
+/// `libretype-antes-de-esquema-N.db`. Una copia que ya existe no se pisa: si
+/// escribir la marca falla, el siguiente arranque no puede sustituir la copia
+/// buena por una ya migrada.
+///
+/// Devuelve la ruta de la copia, si se hizo.
+fn copiar_antes_de_migrar(dir: &Path, version: i64) -> io::Result<Option<PathBuf>> {
+    let marca = dir.join(MARCA_ESQUEMA);
+    let copiada: i64 = std::fs::read_to_string(&marca)
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0);
+    if copiada >= version {
+        return Ok(None);
+    }
+
+    let db = dir.join(BASE_DE_DATOS);
+    let mut copia = None;
+    if db.is_file() {
+        let destino = dir.join(format!("libretype-antes-de-esquema-{version}.db"));
+        if !destino.exists() {
+            std::fs::copy(&db, &destino)?;
+            for sufijo in ["-wal", "-shm"] {
+                let origen = dir.join(format!("{BASE_DE_DATOS}{sufijo}"));
+                if origen.is_file() {
+                    let nombre = format!("libretype-antes-de-esquema-{version}.db{sufijo}");
+                    std::fs::copy(&origen, dir.join(nombre))?;
+                }
+            }
+        }
+        copia = Some(destino);
+    }
+    std::fs::create_dir_all(dir)?;
+    std::fs::write(&marca, version.to_string())?;
+    Ok(copia)
+}
+
 /// Tope de lo que se puede escribir de una vez. Una copia de seguridad enorme
 /// sigue siendo unos pocos megas; más que esto no sale de esta aplicación.
 const MAX_BYTES_FICHERO: usize = 64 * 1024 * 1024;
@@ -192,6 +245,17 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Antes de que la interfaz cargue la base de datos y se apliquen
+            // las migraciones. Que falle la copia no impide practicar.
+            match app.path().app_config_dir() {
+                Ok(dir) => match copiar_antes_de_migrar(&dir, version_esquema()) {
+                    Ok(Some(copia)) => log::info!("copia previa a la migración en {copia:?}"),
+                    Ok(None) => {}
+                    Err(e) => log::warn!("no se pudo copiar la base de datos: {e}"),
+                },
+                Err(e) => log::warn!("sin directorio de configuración para la copia: {e}"),
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -222,6 +286,7 @@ mod tests {
             .sql
             .contains("CREATE TABLE IF NOT EXISTS lecciones_propias"));
         assert!(migs[2].sql.contains("borrada_en"));
+        assert_eq!(version_esquema(), migs.len() as i64);
 
         // Invariantes generales
         for (idx, m) in migs.iter().enumerate() {
@@ -229,6 +294,59 @@ mod tests {
             assert!(!m.sql.trim().is_empty());
             assert!(!m.description.trim().is_empty());
         }
+    }
+
+    /// Un directorio temporal propio de cada test, para que no se pisen.
+    fn dir_de_prueba(nombre: &str) -> PathBuf {
+        let nombre = format!("libretype-test-{}-{nombre}", std::process::id());
+        let dir = std::env::temp_dir().join(nombre);
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn copia_la_base_de_datos_antes_de_un_esquema_nuevo_y_solo_una_vez() {
+        let dir = dir_de_prueba("copia");
+        let db = dir.join(BASE_DE_DATOS);
+        std::fs::write(&db, b"version 2").unwrap();
+        let wal_original = dir.join("libretype.db-wal");
+        std::fs::write(&wal_original, b"wal").unwrap();
+
+        let hecha = copiar_antes_de_migrar(&dir, 3).unwrap();
+        let copia = hecha.expect("debe copiar");
+        assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
+        let wal = dir.join("libretype-antes-de-esquema-3.db-wal");
+        assert_eq!(std::fs::read(wal).unwrap(), b"wal");
+
+        // Ya migrada: el siguiente arranque no vuelve a copiar.
+        std::fs::write(&db, b"version 3").unwrap();
+        assert!(copiar_antes_de_migrar(&dir, 3).unwrap().is_none());
+        assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
+
+        // Si la marca se perdió, la copia buena tampoco se pisa.
+        std::fs::remove_file(dir.join(MARCA_ESQUEMA)).unwrap();
+        copiar_antes_de_migrar(&dir, 3).unwrap();
+        assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
+
+        // Un esquema posterior sí hace su propia copia, con lo que haya entonces.
+        let siguiente = copiar_antes_de_migrar(&dir, 4)
+            .unwrap()
+            .expect("debe copiar");
+        assert!(siguiente.ends_with("libretype-antes-de-esquema-4.db"));
+        assert_eq!(std::fs::read(&siguiente).unwrap(), b"version 3");
+        assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn en_una_instalacion_nueva_no_hay_nada_que_copiar() {
+        let dir = dir_de_prueba("nueva");
+        assert!(copiar_antes_de_migrar(&dir, 3).unwrap().is_none());
+        let marca = std::fs::read_to_string(dir.join(MARCA_ESQUEMA)).unwrap();
+        assert_eq!(marca, "3");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

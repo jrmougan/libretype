@@ -75,6 +75,21 @@ describe('refuerzo de teclas flojas', () => {
       expect(new Set(palabras).size).toBe(palabras.length);
     });
 
+    it('el caso que lo destapó: a quien va por las vocales no se le pide «cabeza»', () => {
+      // Con T y E flojas y el temario abierto hasta «Las cinco vocales», todo lo que
+      // se pide sale de lo enseñado hasta ahí, y la T se practica de verdad.
+      const flojas = new Map<string, EstadoTecla>([
+        ['KeyT', { intentos: 12, aciertos: 7, msTotal: 10800 }],
+        ['KeyE', { intentos: 12, aciertos: 7, msTotal: 10800 }],
+        ['KeyA', { intentos: 30, aciertos: 30, msTotal: 7500 }],
+      ]);
+      const { text } = generarEjercicioRefuerzo(flojas, new Set(['reposo', 'vocales-1', 'nasales']))!;
+      const permitidas = catalogo.alfabetoHasta('vocales-2');
+      expect([...new Set(text)].filter((ch) => ch !== ' ' && !permitidas.has(ch))).toEqual([]);
+      expect(text).toMatch(/t/);
+      expect(text).not.toContain('cabeza');
+    });
+
     it('la tecla que se refuerza se pide aunque no esté en lo abierto, y aunque no haya palabras', () => {
       const raro = new Map<string, EstadoTecla>([['KeyZ', { intentos: 20, aciertos: 5, msTotal: 1000 }]]);
       const { text } = generarEjercicioRefuerzo(raro)!;

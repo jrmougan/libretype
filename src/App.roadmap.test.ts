@@ -112,3 +112,34 @@ describe('longitud de los textos de práctica', () => {
     expect(palabras()).toBe(10);
   });
 });
+
+describe('Esc para pausar desde el campo', () => {
+  const esc = (): KeyboardEvent => new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+
+  it('pausa, deja el foco en «Reanudar» y al reanudar vuelve al campo', async () => {
+    await abrir();
+    await teclear(catalogo.primera.text.slice(0, 3));
+    campo().dispatchEvent(esc());
+    await tick();
+    await tick();
+    expect(document.querySelector('.pausa-cartel')?.textContent).toContain('Ejercicio pausado');
+    expect(campo().disabled).toBe(true);
+    const reanudar = document.querySelector<HTMLButtonElement>('.pausa-cartel button')!;
+    expect(document.activeElement).toBe(reanudar);
+    reanudar.click();
+    await tick();
+    await tick();
+    expect(document.querySelector('.pausa-cartel')).toBeNull();
+    expect(document.activeElement).toBe(campo());
+    // Lo tecleado sigue ahí: pausar no es reiniciar.
+    expect(campo().value).toBe(catalogo.primera.text.slice(0, 3));
+  });
+
+  it('Esc fuera del campo no pausa: no hay manejador global de teclas', async () => {
+    await abrir();
+    window.dispatchEvent(esc());
+    document.body.dispatchEvent(esc());
+    await tick();
+    expect(document.querySelector('.pausa-cartel')).toBeNull();
+  });
+});

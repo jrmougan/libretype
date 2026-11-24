@@ -53,12 +53,18 @@
     pausado?: boolean;
     /** Callback para reanudar desde el cartel de pausa. */
     onReanudar?: () => void;
+    /**
+     * Esc desde el propio campo. Se escucha en el `<textarea>` y no en la
+     * ventana: un manejador global de teclas es justo lo que descartaron los
+     * spikes, y además así Esc solo pausa cuando se está escribiendo.
+     */
+    onPausar?: () => void;
   }
 
   let {
     layout, target, activo = true, onDone, onTecla, dominios, onStats,
     titulo = '', explicacion = '', cobertura = '', idioma = '', espacioJusto = false,
-    movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar,
+    movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar, onPausar,
   }: Props = $props();
 
   /** Para enlazar el campo con su descripción aunque haya más de un Drill montado. */
@@ -376,6 +382,15 @@
       aria-label={titulo ? `Campo de práctica: ${titulo}` : 'Campo de práctica'}
       aria-describedby="{uid}-texto"
       onpaste={(e) => e.preventDefault()}
+      onkeydown={(e) => {
+        if (e.key !== 'Escape' || !onPausar) return;
+        // A mitad de un acento, Esc es del método de entrada: cancela la
+        // composición. Robárselo dejaría el ´ colgado en el campo. 229 es el
+        // keyCode que dan algunos motores mientras compone el IME.
+        if (e.isComposing || composing || e.keyCode === 229) return;
+        e.preventDefault();
+        onPausar();
+      }}
       onbeforeinput={(e) => {
         if ((e as InputEvent).inputType === 'insertFromPaste') {
           e.preventDefault();

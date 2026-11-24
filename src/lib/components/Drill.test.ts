@@ -328,3 +328,54 @@ describe('pulido de la lección', () => {
     expect(document.querySelector('.aviso-foco')?.getAttribute('aria-hidden')).toBe('true');
   });
 });
+
+describe('Esc pausa desde el campo', () => {
+  function montarConPausa() {
+    const onPausar = vi.fn();
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'ás', titulo: 'Tildes', onPausar },
+    });
+    flushSync();
+    return { campo: document.querySelector('textarea')!, onPausar };
+  }
+
+  const esc = (init: KeyboardEventInit = {}) =>
+    new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true, ...init });
+
+  it('Esc en el campo pide la pausa y no deja que el motor haga nada más', () => {
+    const { campo, onPausar } = montarConPausa();
+    const ev = esc();
+    campo.dispatchEvent(ev);
+    expect(onPausar).toHaveBeenCalledTimes(1);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it('a mitad de un acento, Esc es del método de entrada y no pausa', () => {
+    const { campo, onPausar } = montarConPausa();
+    campo.dispatchEvent(esc({ isComposing: true }));
+    campo.dispatchEvent(esc({ keyCode: 229 }));
+    // Composición en curso según el propio motor (el ´ ya está en el campo).
+    campo.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    campo.value = '´';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+    flushSync();
+    campo.dispatchEvent(esc());
+    expect(onPausar).not.toHaveBeenCalled();
+  });
+
+  it('Esc fuera del campo no lo escucha nadie: no hay manejador global', () => {
+    const { onPausar } = montarConPausa();
+    document.body.dispatchEvent(esc());
+    window.dispatchEvent(esc());
+    expect(onPausar).not.toHaveBeenCalled();
+  });
+
+  it('las demás teclas pasan sin tocar', () => {
+    const { campo, onPausar } = montarConPausa();
+    const ev = new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', bubbles: true, cancelable: true });
+    campo.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    expect(onPausar).not.toHaveBeenCalled();
+  });
+});

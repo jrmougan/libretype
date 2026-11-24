@@ -518,6 +518,17 @@
     }
   }
 
+  /**
+   * Esc desde el campo. Al pausar el campo se desactiva y el foco se iría al
+   * documento: va a «Reanudar», para que Intro devuelva a la práctica.
+   */
+  async function pausarDesdeCampo(): Promise<void> {
+    if (pausado) return;
+    pausado = true;
+    await tick();
+    document.querySelector<HTMLElement>('.pausa-cartel button')?.focus();
+  }
+
   async function practicarRefuerzo(ej: EjercicioRefuerzo): Promise<void> {
     soltarIntento();
     refuerzo = ej;
@@ -748,6 +759,7 @@
           activo={!panel && !result}
           {pausado}
           onReanudar={alternarPausa}
+          onPausar={pausarDesdeCampo}
           target={ejercicio.texto}
           titulo={ejercicio.titulo}
           explicacion={ejercicio.explicacion}

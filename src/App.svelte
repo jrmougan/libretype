@@ -5,8 +5,10 @@
   import LeccionCero from './lib/components/LeccionCero.svelte';
   import LeccionesPropias from './lib/components/LeccionesPropias.svelte';
   import PanelAjustes from './lib/components/PanelAjustes.svelte';
+  import Perfiles from './lib/components/Perfiles.svelte';
   import Progreso from './lib/components/Progreso.svelte';
   import PruebaColocacion from './lib/components/PruebaColocacion.svelte';
+  import QuienPractica from './lib/components/QuienPractica.svelte';
   import RecordatorioPausa from './lib/components/RecordatorioPausa.svelte';
   import ResultadoLeccion, { type Accion } from './lib/components/ResultadoLeccion.svelte';
   import SelectConfirmado from './lib/components/SelectConfirmado.svelte';
@@ -31,8 +33,10 @@
     contarDominadas, mapaDeDominio, registrar, type EstadoTecla,
   } from './lib/keyboard/dominio';
   import {
-    abrirAlmacen, cargarDatos, type Almacen, type ModoImportacion, type ResultadoRestauracion,
+    abrirAlmacen, buscarPerfil, cargarDatos, PERFIL_PRINCIPAL,
+    type Almacen, type ModoImportacion, type Perfil, type ResultadoRestauracion,
   } from './lib/storage/almacen';
+  import { leerPolitica } from './lib/politica';
   import { leccionesOxidadas } from './lib/storage/repaso';
   import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
   import { leccionesSuperadas, OBJETIVO_PENDIENTE } from './lib/storage/objetivos';
@@ -93,8 +97,16 @@
   let propias = $state<LeccionPropia[]>([]);
   let tipoAlmacen = $state<'sqlite' | 'local'>('local');
   let errorAlmacen = $state(false);
-  /** 'tono' solo aparece la primera vez; 'cero' es la colocación de manos; 'continua' y 'propio' son práctica libre. */
-  let vista = $state<'tono' | 'cero' | 'leccion' | 'continua' | 'propio' | 'fluidez' | 'colocacion'>('leccion');
+  /**
+   * 'perfil' pregunta quién practica y solo aparece con más de un perfil; 'tono' solo
+   * la primera vez; 'cero' es la colocación de manos; el resto son formas de practicar.
+   */
+  let vista = $state<'perfil' | 'tono' | 'cero' | 'leccion' | 'continua' | 'propio' | 'fluidez' | 'colocacion'>('leccion');
+
+  /** Los perfiles de este equipo y cuál está practicando. Ver `storage/almacen.ts`. */
+  let perfiles = $state<Perfil[]>([]);
+  let perfilActivo = $state(PERFIL_PRINCIPAL);
+  const aliasActivo = $derived(perfiles.find((p) => p.id === perfilActivo)?.alias ?? '');
 
   /** La prueba de colocación en curso; solo cuenta mientras `vista` es 'colocacion'. */
   let colocacion = $state<Colocacion | null>(null);
@@ -216,20 +228,14 @@
 
   onMount(async () => {
     try {
-      const datos = await cargarDatos(await abrirAlmacen());
-      almacen = datos.almacen;
-      tipoAlmacen = datos.almacen.tipo;
-      errorAlmacen = Boolean(datos.almacen.errorAlmacen);
-      sesiones = datos.sesiones;
-      propias = datos.propias;
-      fijarLeccion(resolverLeccion(prefs.ultimaLeccion, leccionesSuperadas(sesiones), propias, layout));
-      teclas = datos.teclas;
-      teclasBase = new Map(teclas);
-
-      // Primera vez: primero cómo quiere la aplicación, luego dónde van las
-      // manos. Nunca soltarle un ejercicio a alguien que no ha tecleado nunca.
-      if (prefs.tono === null) vista = 'tono';
-      else if (sesiones.length === 0) vista = 'cero';
+      const abierto = await abrirAlmacen();
+      almacen = abierto;
+      tipoAlmacen = abierto.tipo;
+      errorAlmacen = Boolean(abierto.errorAlmacen);
+      const elegido = await perfilDeArranque(abierto);
+      // Con varios perfiles y sin nada que decida por la persona, se pregunta.
+      if (elegido === null) vista = 'perfil';
+      else await entrarConPerfil(elegido);
     } catch (err) {
       console.warn('[libretype] no se pudo preparar el progreso:', err);
     } finally {
@@ -237,6 +243,95 @@
       progresoCargado = true;
     }
   });
+
+  /**
+   * Con qué perfil se abre, o `null` si hay que preguntarlo. La política del
+   * equipo manda (crea el perfil si no existe); con uno solo no hay nada que
+   * preguntar; y en el respaldo, con SQLite caído, se sigue con el último usado:
+   * los perfiles de verdad están en la base de datos que no se ha podido abrir.
+   */
+  async function perfilDeArranque(a: Almacen): Promise<number | null> {
+    if (a.errorAlmacen) return prefs.perfil;
+    perfiles = await a.listarPerfiles();
+    const { perfilPorDefecto } = await leerPolitica();
+    if (perfilPorDefecto) {
+      const existente = buscarPerfil(perfiles, perfilPorDefecto);
+      if (existente) return existente.id;
+      try {
+        const creado = await a.crearPerfil(perfilPorDefecto);
+        perfiles = await a.listarPerfiles();
+        return creado.id;
+      } catch (err) {
+        console.warn('[libretype] no se pudo crear el perfil de la política:', err);
+      }
+    }
+    return perfiles.length > 1 ? null : (perfiles[0]?.id ?? PERFIL_PRINCIPAL);
+  }
+
+  /**
+   * Carga lo de ese perfil y lo deja listo para practicar. Sirve al arrancar y al
+   * cambiar de perfil: lo que hubiera a medias era de otra persona y no cuenta.
+   */
+  async function entrarConPerfil(id: number): Promise<void> {
+    if (!almacen) return;
+    soltarIntento();
+    refuerzo = null;
+    almacen.usarPerfil(id);
+    const datos = await cargarDatos(almacen);
+    almacen = datos.almacen;
+    tipoAlmacen = datos.almacen.tipo;
+    errorAlmacen = Boolean(datos.almacen.errorAlmacen);
+    perfilActivo = id;
+    sesiones = datos.sesiones;
+    propias = datos.propias;
+    teclas = datos.teclas;
+    teclasBase = new Map(teclas);
+    // `ultimaLeccion` es del último perfil que practicó aquí: a otro no le dice nada.
+    const guardada = prefs.perfil === id ? prefs.ultimaLeccion : undefined;
+    if (prefs.perfil !== id) prefs = { ...prefs, perfil: id };
+    fijarLeccion(resolverLeccion(guardada, leccionesSuperadas(sesiones), propias, layout));
+
+    // Primera vez: primero cómo quiere la aplicación, luego dónde van las
+    // manos. Nunca soltarle un ejercicio a alguien que no ha tecleado nunca.
+    if (prefs.tono === null) vista = 'tono';
+    else if (sesiones.length === 0) vista = 'cero';
+    else vista = 'leccion';
+  }
+
+  async function cambiarDePerfil(id: number): Promise<void> {
+    await entrarConPerfil(id);
+    await tick();
+    drill?.restart();
+    drill?.enfocar();
+  }
+
+  /** Desde «¿Quién practica?»: quien no está en la lista se añade y entra. */
+  async function crearYEntrar(alias: string): Promise<void> {
+    if (!almacen) return;
+    const creado = await almacen.crearPerfil(alias);
+    perfiles = await almacen.listarPerfiles();
+    await entrarConPerfil(creado.id);
+  }
+
+  async function crearPerfil(alias: string): Promise<void> {
+    if (!almacen) return;
+    await almacen.crearPerfil(alias);
+    perfiles = await almacen.listarPerfiles();
+  }
+
+  async function renombrarPerfil(id: number, alias: string): Promise<void> {
+    if (!almacen) return;
+    await almacen.renombrarPerfil(id, alias);
+    perfiles = await almacen.listarPerfiles();
+  }
+
+  /** Si se borra el que está practicando, se sigue con el principal. */
+  async function borrarPerfil(id: number): Promise<void> {
+    if (!almacen) return;
+    await almacen.borrarPerfil(id);
+    perfiles = await almacen.listarPerfiles();
+    if (id === perfilActivo) await cambiarDePerfil(PERFIL_PRINCIPAL);
+  }
 
   onMount(() => {
     let temporizador: ReturnType<typeof setTimeout> | null = null;
@@ -749,8 +844,9 @@
   <header class="barra">
     <h1>LibreType</h1>
 
-    <!-- Antes de elegir el tono no hay nada que elegir aquí: se vería vacío. -->
-    {#if vista !== 'tono'}
+    <!-- Antes de elegir el tono, o de saber quién practica, no hay nada que elegir
+         aquí: se vería vacío. -->
+    {#if vista !== 'tono' && vista !== 'perfil'}
       <SelectorLeccion
         valor={vista === 'leccion' ? (refuerzo ? 'refuerzo' : leccionId) : vista}
         deshabilitado={!progresoCargado}
@@ -825,6 +921,7 @@
         aria-expanded={panel === 'progreso'}
         aria-controls="panel-dialogo"
         aria-haspopup="dialog"
+        disabled={vista === 'perfil'}
         onclick={() => { panel = panel === 'progreso' ? null : 'progreso'; }}
       >
         Progreso
@@ -843,6 +940,13 @@
   <main class="escena">
     {#if !progresoCargado}
       <p class="note" role="status">Cargando progreso…</p>
+    {:else if vista === 'perfil'}
+      <!-- También aquí el tamaño: es la primera pantalla de un equipo compartido. -->
+      <div class="centrado primera">
+        <TamanoTexto id="tamano-perfil" escala={prefs.escala}
+                     onCambiar={(escala) => (prefs = { ...prefs, escala })} />
+        <QuienPractica {perfiles} onElegir={(id) => void entrarConPerfil(id)} onCrear={crearYEntrar} />
+      </div>
     {:else if vista === 'tono'}
       <!-- El tamaño va ya aquí: quien necesita la letra grande no puede tener que
            leer en pequeño para encontrar dónde se agranda. -->
@@ -960,7 +1064,8 @@
       onclose={alCerrarseDialogo}
     >
       <div class="panel-cab">
-        <h2 tabindex="-1">{panel === 'ajustes' ? 'Ajustes' : panel === 'lecciones' ? 'Tus lecciones' : voz.progreso}</h2>
+        <!-- Con más de un perfil, el título dice de quién es lo que se enseña. -->
+        <h2 tabindex="-1">{panel === 'ajustes' ? 'Ajustes' : panel === 'lecciones' ? 'Tus lecciones' : voz.progreso}{#if panel !== 'ajustes' && perfiles.length > 1 && aliasActivo}{' · '}{aliasActivo}{/if}</h2>
         <button onclick={cerrarPanel} disabled={importando}>Cerrar</button>
       </div>
 
@@ -1006,7 +1111,19 @@
             onPracticarRefuerzo={practicarRefuerzo}
             onGestionarLecciones={() => abrirLecciones()}
             onIrAPracticar={cerrarPanelYa}
+            alias={perfiles.length > 1 ? aliasActivo : ''}
           />
+          <!-- Con SQLite caído los perfiles de verdad no se pueden leer: no se gestionan. -->
+          {#if !errorAlmacen && perfiles.length > 0}
+            <Perfiles
+              {perfiles}
+              activo={perfilActivo}
+              onCambiar={(id) => void cambiarDePerfil(id)}
+              onCrear={crearPerfil}
+              onRenombrar={renombrarPerfil}
+              onBorrar={borrarPerfil}
+            />
+          {/if}
         {/if}
       </div>
     </dialog>

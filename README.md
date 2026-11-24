@@ -206,9 +206,10 @@ Es la única petición de red que hace la aplicación —un fichero JSON públic
 
 ### Aulas, bibliotecas y centros de mayores
 
-Quien administra equipos compartidos puede apagar las actualizaciones con un
-fichero de política del sistema, e instalar en Windows sin red (el instalador
-lleva WebView2 completo). Está en
+Varias personas pueden compartir un equipo con un perfil cada una (un alias,
+sin contraseña). Quien administra los equipos puede apagar las actualizaciones
+y fijar el perfil con el que se abre con un fichero de política del sistema, e
+instalar en Windows sin red (el instalador lleva WebView2 completo). Está en
 [`docs/instalacion-gestionada.md`](docs/instalacion-gestionada.md).
 
 ### Puesta en marcha (solo para quien publique)

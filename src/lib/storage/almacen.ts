@@ -49,6 +49,12 @@ function aliasLimpio(alias: string): string {
 const mismoAlias = (a: string, b: string): boolean =>
   a.localeCompare(b, "es", { sensitivity: "base" }) === 0;
 
+/** El perfil que se llama así, con la misma tolerancia que al crearlo. */
+export function buscarPerfil(perfiles: readonly Perfil[], alias: string): Perfil | undefined {
+  const buscado = alias.normalize("NFC").replace(/\s+/g, " ").trim();
+  return perfiles.find((p) => mismoAlias(p.alias, buscado));
+}
+
 function aliasDisponible(alias: string, perfiles: readonly Perfil[], excepto?: number): string {
   const limpio = aliasLimpio(alias);
   if (perfiles.some((p) => p.id !== excepto && mismoAlias(p.alias, limpio))) {
@@ -1086,7 +1092,12 @@ export async function cargarDatos(almacen: Almacen): Promise<DatosGuardados> {
     };
   } catch (err) {
     console.warn("[libretype] no se pudo leer el progreso:", err);
-    if (almacen.tipo === "sqlite") return cargarDatos(new AlmacenLocal(true));
+    if (almacen.tipo === "sqlite") {
+      // En el respaldo, con el mismo perfil: así el traspaso sabrá de quién es.
+      const respaldo = new AlmacenLocal(true);
+      respaldo.usarPerfil(almacen.perfil);
+      return cargarDatos(respaldo);
+    }
     return { almacen, sesiones: [], propias: [], teclas: new Map() };
   }
 }

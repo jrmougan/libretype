@@ -5,8 +5,9 @@ personas: un aula de informática, el ordenador de una biblioteca, la sala de
 un centro de mayores. Lo que se cuenta aquí:
 
 - cómo apagar las actualizaciones automáticas;
+- cómo fijar el perfil con el que se abre;
 - cómo instalar en Windows sin red;
-- dónde están los datos.
+- cómo funcionan los perfiles y dónde están los datos.
 
 LibreType no tiene cuentas ni servidor. Ningún dato del alumno sale del
 equipo. La única petición de red es la comprobación de actualizaciones, y en
@@ -32,20 +33,29 @@ la política.
 
 ```json
 {
-  "actualizaciones": false
+  "actualizaciones": false,
+  "perfilPorDefecto": "Biblioteca"
 }
 ```
+
+Los dos campos son opcionales.
 
 - **`actualizaciones`**: con `false`, LibreType no comprueba si hay versiones
   nuevas ni ofrece el botón de actualizar. En Ajustes dice que las
   actualizaciones las gestiona quien administra el equipo. Cualquier otro
   valor, o no ponerlo, deja el comportamiento normal: comprobar al arrancar,
   si la persona no lo ha desactivado en Ajustes.
+- **`perfilPorDefecto`**: el alias de un perfil. La aplicación se abre
+  directamente con él (lo crea si no existe) y no pregunta «¿Quién practica?».
+  Es para equipos donde nadie quiere un perfil propio, como el ordenador de
+  una biblioteca. Cambiar de perfil sigue siendo posible desde el panel de
+  progreso. En un aula donde cada alumno tiene el suyo, es mejor no ponerlo:
+  así la pregunta sale al abrir.
 
 **Si el fichero existe pero no es JSON válido, o no se puede leer, las
 actualizaciones se apagan.** Alguien quiso configurar el equipo y no se sabe
 qué. De las dos formas de equivocarse, no conectar con ningún servidor es la
-que no sorprende a nadie.
+que no sorprende a nadie. El perfil por defecto se ignora en ese caso.
 
 ### Linux
 
@@ -57,7 +67,7 @@ sudo chmod 644 /etc/libretype/politica.json
 
 Instalado desde el `.deb` o el repositorio apt, LibreType ya no se actualiza
 solo: las versiones nuevas llegan con `apt upgrade`. La política sirve para el
-AppImage.
+AppImage y para fijar el perfil por defecto.
 
 ### Windows
 
@@ -96,6 +106,29 @@ El coste es el tamaño: el instalador pasa de unos pocos MB a unos 130 MB, y
 lo mismo cada actualización automática en Windows. Si algún día pesa
 demasiado para quien instala en casa, la salida es publicar dos
 instaladores, no quitar este.
+
+## Perfiles
+
+Cada perfil tiene su propio progreso, sus teclas aprendidas y sus lecciones
+propias. Son un alias, sin contraseña y sin edad. **No son privados entre sí**:
+cualquiera que use el equipo puede abrir cualquier perfil, y la aplicación lo
+dice. Sirven para que cada alumno siga por donde iba. El tamaño de letra, el
+tema y el resto de ajustes son del equipo y valen para todos los perfiles.
+
+- Se crean, se renombran y se borran en **Progreso → Quién practica en este
+  equipo**. Hay un máximo de 60 por equipo.
+- Con más de un perfil, la aplicación pregunta **«¿Quién practica?»** al abrir.
+  Quien no esté en la lista puede añadirse ahí mismo.
+- El primer perfil («Principal») es el dueño de lo que se practicó antes de
+  que hubiera perfiles. Se puede renombrar y vaciar, pero no borrar.
+- La copia de seguridad es **del perfil que está practicando**, y lleva su
+  alias dentro y en el nombre del fichero. Al importarla entra en el perfil
+  que esté activo en ese momento, se llame como se llame.
+
+Si varios alumnos comparten **la misma cuenta del sistema**, comparten el
+directorio de datos y los perfiles son la forma de separarlos. Si cada alumno
+entra con **su propia cuenta**, cada uno tiene su base de datos y los perfiles
+no hacen falta.
 
 ## Dónde están los datos
 

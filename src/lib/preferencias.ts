@@ -96,6 +96,12 @@ export interface Preferencias {
    * una doble letra legítima tecleada muy rápido. Ver `keyboard/temblor.ts`.
    */
   ignorarRepeticion: boolean;
+  /**
+   * El último perfil con el que se practicó en este equipo. Es de este equipo y
+   * no del alumno: dice con quién abrir cuando no hay que preguntar, y a qué
+   * perfil pertenece `ultimaLeccion`. El progreso sigue en el almacén.
+   */
+  perfil: number;
 }
 
 /**
@@ -144,6 +150,7 @@ export const POR_DEFECTO: Preferencias = {
   longitudTexto: 'normal',
   recordatorioPausa: 20,
   ignorarRepeticion: false,
+  perfil: 1,
 };
 
 const CLAVE = 'libretype.preferencias';
@@ -192,6 +199,7 @@ export function normalizar(crudo: unknown): Preferencias {
       ? (o.recordatorioPausa as number)
       : POR_DEFECTO.recordatorioPausa,
     ignorarRepeticion: o.ignorarRepeticion === true,
+    perfil: Number.isInteger(o.perfil) && (o.perfil as number) >= 1 ? (o.perfil as number) : POR_DEFECTO.perfil,
   };
 }
 

@@ -44,6 +44,8 @@
     onIrAPracticar?: () => void;
     /** Para saber qué teclas pide lo ya abierto; ES-ISO si no se dice. */
     layout?: Layout;
+    /** Alias del perfil, si hay varios: va en el nombre de la copia para no confundirlas. */
+    alias?: string;
   }
 
   let {
@@ -62,7 +64,17 @@
     onGestionarLecciones,
     onIrAPracticar,
     layout = ES_ISO,
+    alias = '',
   }: Props = $props();
+
+  /**
+   * El alias, como trozo de nombre de fichero: `guardar_en_descargas` solo admite
+   * letras sin tilde, cifras y guiones. Vacío si no queda nada aprovechable.
+   */
+  const aliasEnFichero = $derived(
+    alias.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30).replace(/-+$/, ''),
+  );
 
   const esDegradado = $derived(errorAlmacen || Boolean(almacen?.errorAlmacen));
   const porLeccion = $derived(resumirLecciones(sesiones));
@@ -175,7 +187,8 @@
       if (!json) return;
 
       const fechaHoy = new Date().toISOString().slice(0, 10);
-      const { ruta } = await guardarFichero(`libretype-progreso-${fechaHoy}.json`, json);
+      const quien = aliasEnFichero ? `${aliasEnFichero}-` : '';
+      const { ruta } = await guardarFichero(`libretype-progreso-${quien}${fechaHoy}.json`, json);
       mensajeEstado = {
         tipo: "exito",
         texto: ruta

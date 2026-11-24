@@ -184,3 +184,11 @@ describe('filtro de repetición por temblor', () => {
     expect(normalizar({ ignorarRepeticion: true }).ignorarRepeticion).toBe(true);
   });
 });
+
+describe('último perfil de este equipo', () => {
+  it('por defecto es el principal, y un valor raro cae a él', () => {
+    expect(normalizar({}).perfil).toBe(1);
+    for (const raro of [0, -3, 2.5, '2', null, Infinity]) expect(normalizar({ perfil: raro }).perfil).toBe(1);
+    expect(normalizar({ perfil: 7 }).perfil).toBe(7);
+  });
+});

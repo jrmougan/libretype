@@ -78,6 +78,17 @@ describe('Temario.svelte (0.3 y 2.3)', () => {
     expect(tarjeta(0).hasAttribute('aria-current')).toBe(false);
   });
 
+  it('la insignia de estado acompaña al texto, no lo sustituye', () => {
+    montar([superada('reposo')], { leccionActual: 1 });
+    const insignia = (i: number) => tarjeta(i).querySelector('.insignia')!;
+    // Oculta al lector: el estado ya se lee escrito en la tarjeta.
+    expect(insignia(0).getAttribute('aria-hidden')).toBe('true');
+    expect(insignia(0).textContent).toBe('✓');
+    expect(insignia(1).textContent).toBe('›');
+    expect(insignia(2).textContent).toBe('');
+    expect(tarjeta(2).querySelector('.estado')?.textContent).toContain('Cerrada');
+  });
+
   it('lleva a la lección cero y a la práctica libre', () => {
     const { onModo } = montar();
     document.querySelector<HTMLButtonElement>('[data-modo="cero"]')!.click();

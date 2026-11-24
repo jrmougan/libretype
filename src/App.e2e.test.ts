@@ -100,7 +100,7 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
     // Métricas en vivo actualizadas
     const dlMetricas = document.querySelector('dl.metricas');
     expect(dlMetricas).not.toBeNull();
-    expect(dlMetricas?.textContent).toContain(`${mitad}/${target.length}`);
+    expect(dlMetricas?.textContent).toContain(`${mitad} de ${target.length}`);
 
     // Teclea hasta completar la lección
     campo.value = target;
@@ -117,9 +117,14 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
 
     const resultadoTitulo = document.getElementById('resultado-titulo');
     expect(resultadoTitulo?.textContent).toBeTruthy();
-    // En tono 'juego' debe incluir felicitación y la estrella de récord
-    expect(resultadoTitulo?.textContent).toContain('★');
+    // En tono 'juego' debe incluir felicitación y la estrella de récord. La
+    // estrella va en su chip, con la palabra: el récord no se dice solo con color.
     expect(resultadoTitulo?.textContent).toContain('¡Nunca habías ido tan rápido en esta lección!');
+    const chipRecord = document.querySelector('#dialogo-resultado .chip-record');
+    expect(chipRecord?.textContent).toContain('★');
+    expect(chipRecord?.textContent).toContain('Récord');
+    // La franja con los colores de los dedos es del tono con celebración.
+    expect(document.querySelector('#dialogo-resultado .franja')?.getAttribute('aria-hidden')).toBe('true');
 
     const resultadoDesc = document.getElementById('resultado-desc');
     expect(resultadoDesc?.textContent).toContain('palabras por minuto');
@@ -144,7 +149,8 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
 
     // 10. Verifica que el resultado se ha cerrado y la lección 2 está activa
     expect(document.querySelector('#dialogo-resultado')).toBeNull();
-    expect(botonTemario.textContent).toContain(`2. ${LESSONS[1].title}`);
+    expect(botonTemario.textContent).toContain(`Lección 2 de ${LESSONS.length}`);
+    expect(botonTemario.textContent).toContain(LESSONS[1].title);
     expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title);
 
     const campoNuevo = campoCaptura();
@@ -158,7 +164,7 @@ describe('Prueba end-to-end / integración de la aplicación real (Issue #42)', 
     campoNuevo.dispatchEvent(new InputEvent('input', { bubbles: true }));
     flushSync();
     await tick();
-    expect(document.querySelector('dl.metricas')?.textContent).toContain(`3/${LESSONS[1].text.length}`);
+    expect(document.querySelector('dl.metricas')?.textContent).toContain(`3 de ${LESSONS[1].text.length}`);
   });
 
   it('permite repetir la lección terminada reiniciando el campo y las métricas', async () => {

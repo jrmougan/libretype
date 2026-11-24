@@ -132,6 +132,9 @@ Con la letra al 200% no cabe todo a tamaño completo, así que hay un **orden de
 sacrificio explícito** y conviene respetarlo:
 
 1. Se pliega la explicación de la lección (`espacioJusto`).
+   Con el mismo `espacioJusto`, la pista (`PistaDedo.svelte`) pliega la
+   tarjeta de manos y encoge la teja: el título y la descripción, que son la
+   pista de verdad, no se van nunca.
 2. El texto se desplaza dentro de su caja (`max-height: 30vh`).
 3. El teclado se encoge, **pero nunca por debajo de `min(34vh, 230px)`**: un
    teclado ilegible es peor que uno al que haya que desplazarse.

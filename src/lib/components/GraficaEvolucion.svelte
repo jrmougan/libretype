@@ -54,7 +54,7 @@
       <desc id="graf-desc">{descripcion}</desc>
       <line class="base" x1={M.lado} x2={W - M.lado} y1={M.arriba + alto} y2={M.arriba + alto} />
       {#each barras as b, i (b.d.fecha)}
-        <rect class="barra" x={b.x} y={b.y} width={ancho} height={b.h} rx="2">
+        <rect class="barra" x={b.x} y={b.y} width={ancho} height={b.h} rx="3">
           <title>{fecha(b.d.fecha)}: {b.d.ppmMedia} palabras por minuto de media, {b.d.pctMedio}% de precisión</title>
         </rect>
         <!-- Etiquetas directas solo en el primero y el último: un número en
@@ -71,13 +71,30 @@
 {/if}
 
 <style>
-  .grafica { margin: 0; display: grid; gap: var(--space-1); }
-  svg { width: 100%; height: auto; display: block; overflow: visible; }
+  /* Tarjeta hundida, como las de cifra del panel. */
+  .grafica {
+    margin: 0;
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    background: var(--surface-sunken);
+    border-radius: var(--radius-card);
+  }
+  /* Con todo el ancho del panel, la proporción del viewBox daría una gráfica
+     más alta que la ventana: se acota la altura y se centra. */
+  svg {
+    width: 100%;
+    height: auto;
+    max-height: calc(11rem * var(--ui-scale));
+    display: block;
+    overflow: visible;
+  }
+  /* Barras en acento pleno: atenuadas no llegarían a 3:1 sobre el fondo. */
   .barra { fill: var(--accent); }
-  .barra:hover { fill: var(--fg); }
+  .barra:hover { fill: var(--accent-deep); }
   .base { stroke: var(--border-strong); stroke-width: 1; }
   /* El texto lleva tinta de texto, nunca el color de la serie. */
-  .valor { fill: var(--fg); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .valor { fill: var(--fg); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .eje { fill: var(--fg-muted); font-size: 10px; }
   figcaption { font-size: var(--text-sm); color: var(--fg-muted); }
 </style>

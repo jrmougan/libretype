@@ -31,7 +31,9 @@ describe('Keyboard.svelte (Issue #36)', () => {
       const svg = montar();
       expect(svg).not.toBeNull();
       expect(svg.getAttribute('role')).toBe('img');
-      expect(svg.getAttribute('viewBox')).toMatch(/^0 -16 \d+ \d+$/);
+      // Margen arriba (triángulo y anillo de la tecla siguiente) y a los lados
+      // (el anillo sobresale de la tecla): dentro del viewBox, para que escalen.
+      expect(svg.getAttribute('viewBox')).toMatch(/^-\d+ -\d+ \d+ \d+$/);
       expect(svg.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet');
     });
 
@@ -92,7 +94,7 @@ describe('Keyboard.svelte (Issue #36)', () => {
   });
 
   describe('estados de las teclas (idle, next, pressed, error)', () => {
-    it('muestra la tecla objetivo (next) con el triángulo y clase next', () => {
+    it('muestra la tecla objetivo (next) rellena del dedo, con anillo y triángulo', () => {
       const pasoF: KeyStep = {
         code: 'KeyF',
         char: 'f',
@@ -108,10 +110,26 @@ describe('Keyboard.svelte (Issue #36)', () => {
       const texto = grupoF?.querySelector('text.main');
       expect(texto?.textContent).toBe('f');
 
-      // Comprueba el triángulo señalizador encima de la tecla
+      // Rellena del color del dedo y con la letra en el token que contrasta.
+      expect(grupoF?.querySelector('rect.cap')?.getAttribute('fill')).toBe('var(--finger-l-index)');
+      expect(texto?.getAttribute('fill')).toBe('var(--on-finger)');
+
+      // No depende solo del color: lleva anillo y triángulo (señales de forma).
+      const anillo = grupoF?.querySelector('rect.anillo');
+      expect(anillo?.getAttribute('fill')).toBe('none');
+      expect(anillo?.getAttribute('stroke')).toBe('var(--finger-l-index)');
       const triangulo = grupoF?.querySelector('path');
       expect(triangulo).not.toBeNull();
-      expect(triangulo?.getAttribute('fill')).toBe('var(--accent)');
+      expect(triangulo?.getAttribute('fill')).toBe('var(--on-finger)');
+    });
+
+    it('dibuja la tecla siguiente la última, para que su anillo quede encima', () => {
+      const pasoF: KeyStep = {
+        code: 'KeyF', char: 'f', finger: 'l-index', shift: false, altgr: false, dead: false,
+      };
+      montar({ next: pasoF });
+      const grupos = document.querySelectorAll('g.key');
+      expect(grupos[grupos.length - 1].classList.contains('next')).toBe(true);
     });
 
     it('marca la tecla como pressed cuando está en held', () => {
@@ -120,7 +138,7 @@ describe('Keyboard.svelte (Issue #36)', () => {
       expect(grupoJ).not.toBeNull();
       expect(grupoJ?.querySelector('text.main')?.textContent).toBe('j');
 
-      const rect = grupoJ?.querySelector('rect');
+      const rect = grupoJ?.querySelector('rect.cap');
       expect(rect?.getAttribute('fill')).toBe('var(--accent)');
       expect(grupoJ?.classList.contains('wrong')).toBe(false);
     });
@@ -130,7 +148,7 @@ describe('Keyboard.svelte (Issue #36)', () => {
       const grupoJ = document.querySelector('g.key.pressed.wrong');
       expect(grupoJ).not.toBeNull();
 
-      const rect = grupoJ?.querySelector('rect');
+      const rect = grupoJ?.querySelector('rect.cap');
       expect(rect?.getAttribute('fill')).toBe('var(--error-bg)');
       expect(rect?.getAttribute('stroke')).toBe('var(--error)');
     });
@@ -155,7 +173,7 @@ describe('Keyboard.svelte (Issue #36)', () => {
       expect(modCodes).toContain('Mayús');
 
       // Las teclas modificadoras inactivas llevan borde discontinuo
-      const rectMod = gruposMod[0].querySelector('rect');
+      const rectMod = gruposMod[0].querySelector('rect.cap');
       expect(rectMod?.getAttribute('stroke-dasharray')).toBe('7 4');
     });
 
@@ -176,19 +194,32 @@ describe('Keyboard.svelte (Issue #36)', () => {
   });
 
   describe('teclas de la fila de reposo y colores por dedo', () => {
-    it('muestra las marcas de la fila de reposo en las teclas base', () => {
+    it('lleva la muesca del relieve en la F y la J, y solo en ellas', () => {
       montar();
-      // Las teclas con home: true renderizan un rect adicional con opacity 0.75 y fill var(--fg-muted)
-      const grupos = document.querySelectorAll('g.key');
-      let muescas = 0;
-      for (const g of grupos) {
-        const rectMuesca = Array.from(g.querySelectorAll('rect')).find(
-          (r) => r.getAttribute('opacity') === '0.75',
-        );
-        if (rectMuesca) muescas++;
-      }
-      // En la fila de reposo hay 8 teclas con muesca: asdf jklñ
-      expect(muescas).toBe(8);
+      // Como en el teclado de verdad: el relieve es lo que permite volver a la
+      // fila de reposo sin mirar, y por eso solo lo llevan los dos índices.
+      const conMuesca = Array.from(document.querySelectorAll('g.key'))
+        .filter((g) => g.querySelector('rect.muesca'))
+        .map((g) => g.querySelector('text.main')?.textContent);
+      expect(conMuesca.sort()).toEqual(['f', 'j']);
+    });
+
+    it('las teclas de control van hundidas y con el rótulo centrado', () => {
+      montar();
+      const tab = Array.from(document.querySelectorAll('g.key.control')).find(
+        (g) => g.querySelector('text')?.textContent?.trim() === 'Intro',
+      );
+      expect(tab?.querySelector('rect.cap')?.getAttribute('fill')).toBe('var(--surface-sunken)');
+      expect(tab?.querySelector('text')?.classList.contains('small')).toBe(true);
+    });
+
+    it('las teclas de carácter se perfilan con el contorno de control (3:1)', () => {
+      montar();
+      const a = Array.from(document.querySelectorAll('g.key')).find(
+        (g) => g.querySelector('text.main')?.textContent === 'a',
+      );
+      expect(a?.querySelector('rect.cap')?.getAttribute('fill')).toBe('var(--surface)');
+      expect(a?.querySelector('rect.cap')?.getAttribute('stroke')).toBe('var(--border-strong)');
     });
 
     it('incluye barras de color del dedo en las teclas', () => {
@@ -219,9 +250,46 @@ describe('Keyboard.svelte (Issue #36)', () => {
 
       expect(teclasResaltadas).toHaveLength(4);
       for (const g of teclasResaltadas) {
-        const rect = g.querySelector('rect');
+        const rect = g.querySelector('rect.cap');
         expect(rect?.getAttribute('stroke')).toBe('var(--accent)');
       }
+    });
+
+    it('variante reposo: fondo suave y borde del dedo, letras centradas en mayúscula', () => {
+      const guia = new Set(['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon']);
+      montar({ guia, variante: 'reposo' });
+
+      const s = Array.from(document.querySelectorAll('g.key.guia')).find(
+        (g) => g.querySelector('text.main')?.textContent === 'S',
+      );
+      expect(s).not.toBeUndefined();
+      const cap = s!.querySelector('rect.cap')!;
+      expect(cap.getAttribute('stroke')).toBe('var(--finger-l-ring)');
+      expect(cap.getAttribute('fill')).toBe('color-mix(in srgb, var(--finger-l-ring) 18%, var(--surface))');
+      expect(s!.querySelector('text.main')?.classList.contains('centro')).toBe(true);
+      // Sin las etiquetas pequeñas de Mayús y AltGr.
+      expect(document.querySelector('text.sup')).toBeNull();
+    });
+
+    it('variante reposo: la F y la J se dibujan como la tecla siguiente', () => {
+      const guia = new Set(['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon']);
+      montar({ guia, variante: 'reposo' });
+      const siguientes = Array.from(document.querySelectorAll('g.key.next'))
+        .map((g) => g.querySelector('text.main')?.textContent);
+      expect(siguientes.sort()).toEqual(['F', 'J']);
+      expect(document.querySelectorAll('g.key.next path')).toHaveLength(2);
+    });
+
+    it('variante reposo: objetivos explícitos mandan sobre los de por defecto', () => {
+      montar({ guia: new Set(['Space']), variante: 'reposo', objetivos: new Set(['Space']) });
+      const siguientes = document.querySelectorAll('g.key.next');
+      expect(siguientes).toHaveLength(1);
+      expect(siguientes[0].querySelector('text')?.textContent?.trim()).toBe('Espacio');
+    });
+
+    it('sin variante, la guía no marca ninguna tecla como siguiente', () => {
+      montar({ guia: new Set(['KeyF', 'KeyJ']) });
+      expect(document.querySelector('g.key.next')).toBeNull();
     });
   });
 
@@ -250,8 +318,17 @@ describe('Keyboard.svelte (Issue #36)', () => {
       // Comprueba el círculo en vez de dejar la tecla vacía
       const punto = grupoA?.querySelector('circle');
       expect(punto).not.toBeNull();
-      expect(punto?.getAttribute('r')).toBe('3');
+      expect(punto?.getAttribute('r')).toBe('3.5');
       expect(punto?.getAttribute('fill')).toBe('var(--fg-muted)');
+    });
+
+    it('casi dominada: se atenúa pero no baja de 0,65 y sigue con letra', () => {
+      montar({ dominios: new Map([['KeyA', 0.84]]) });
+      const textoA = Array.from(document.querySelectorAll('text.main')).find(
+        (t) => t.textContent === 'a',
+      );
+      expect(Number(textoA?.getAttribute('opacity'))).toBeGreaterThanOrEqual(0.65);
+      expect(Number(textoA?.getAttribute('opacity'))).toBeLessThan(1);
     });
   });
 });

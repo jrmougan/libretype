@@ -203,25 +203,45 @@
 </section>
 
 <style>
-  .docente { display: grid; gap: var(--space-3); }
+  /* Bloque del panel de progreso, separado de lo anterior por una línea. */
+  .docente {
+    display: grid;
+    gap: var(--space-3);
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--border);
+  }
   h3 { margin: 0; font-size: var(--text-lg); }
   .nota { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
   .acciones { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .acciones button, td button { border-radius: var(--radius); }
+  /* En pantalla, la hoja es una tarjeta; en papel manda HOJA_CSS. */
   .hoja {
-    padding: var(--space-4);
+    padding: var(--space-4) var(--space-6);
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius);
+    border-radius: var(--radius-card);
     background: var(--surface);
   }
-  .tabla { overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; }
-  caption { text-align: left; font-size: var(--text-sm); color: var(--fg-muted); padding-bottom: var(--space-2); }
-  th, td { text-align: left; padding: var(--space-1) var(--space-2); border-bottom: 1px solid var(--border); }
+  .tabla {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  caption {
+    text-align: left;
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+    padding: var(--space-2) var(--space-3);
+  }
+  th, td { text-align: left; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); }
+  thead th { font-size: var(--text-sm); color: var(--fg-muted); font-weight: 700; background: var(--surface-sunken); }
+  tbody tr:last-child > * { border-bottom: 0; }
   th small { display: block; font-weight: 400; color: var(--fg-muted); }
   .errores {
     padding: var(--space-2) var(--space-3);
     border-left: 4px solid var(--error);
     background: var(--error-bg);
+    border-radius: 0 var(--radius) var(--radius) 0;
   }
   .errores p, .errores ul { margin: 0; }
 

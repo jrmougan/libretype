@@ -26,8 +26,9 @@
  *
  * ## Las constantes de aquí abajo están MEDIDAS, no supuestas
  *
- * No se pueden calcular: dependen de la métrica real de la fuente
- * monoespaciada del sistema (`--font-key`). Se midieron sobre el SVG real en
+ * No se pueden calcular: dependen de la métrica real de la fuente de las
+ * teclas (`--font-key`), que desde la dirección visual 1a es Atkinson
+ * Hyperlegible Mono, incluida con la app. Se midieron sobre el SVG real en
  * Chrome con la app corriendo, tomando el peor caso de todas las teclas del
  * layout ES-ISO. Para remedirlas: `pnpm dev`, abrir una lección y en la consola
  *
@@ -48,9 +49,18 @@
  * repetirlo con `--ui-scale` a 1 y a 2, porque el `hinting` cambia el bbox.
  *
  * Los valores de abajo son deliberadamente algo más pesimistas que lo medido
- * (medido: ascendente 0,952 · descendente 0,251 · avance 0,6022), para que el
- * test no dependa de la fuente exacta de la máquina que lo ejecuta ni del motor
- * (la app corre sobre WKWebView, WebKitGTK y WebView2, con métricas distintas).
+ * (medido con la monoespaciada del sistema: ascendente 0,952 · descendente
+ * 0,251 · avance 0,6022), para que el test no dependa del motor (la app corre
+ * sobre WKWebView, WebKitGTK y WebView2, con métricas distintas).
+ *
+ * Al pasar a Atkinson Hyperlegible Mono se remidió con el mismo método, en la
+ * misma máquina y contra la fuente anterior, para tener la diferencia y no solo
+ * el número: el ascendente BAJA (×0,93), el descendente sube 0,04 em y el
+ * avance crece ×1,11 en el peor caso (la fuente avanza 0,632 em por carácter,
+ * frente a 0,600 de la anterior, y su caja lateral es algo más ancha). El
+ * ascendente se deja como estaba, que ya era el peor de los dos; descendente y
+ * avance suben en lo medido más su margen. Con eso el tope de 1,25 sigue
+ * cabiendo (el máximo sale 1,276, y lo que ata sigue siendo el borde superior).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -77,9 +87,9 @@ const tokens = (() => {
 /** Ascendente del glifo por encima de la línea base, en múltiplos del font-size. */
 const ASCENDENTE_EM = 0.96;
 /** Descendente del glifo por debajo de la línea base, en múltiplos del font-size. */
-const DESCENDENTE_EM = 0.26;
+const DESCENDENTE_EM = 0.3;
 /** Ancho de un carácter de la monoespaciada, en múltiplos del font-size. */
-const AVANCE_EM = 0.61;
+const AVANCE_EM = 0.68;
 /**
  * Holgura mínima que le exigimos a cada lado de una etiqueta larga dentro de su
  * tecla. No es estética: sin ella el texto toca el borde y parece un fallo de

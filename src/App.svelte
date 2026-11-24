@@ -134,8 +134,8 @@
    */
   let actualizador = $state<Actualizador | null>(null);
   let estadoAct = $state<EstadoActualizacion>({ fase: 'inactivo' });
-  /** 'deb' o 'rpm' cuando el paquete lo gestiona apt o dnf, y no la app. */
-  let gestorDelSistema = $state<'deb' | 'rpm' | null>(null);
+  /** 'deb' o 'rpm' cuando el paquete lo gestiona apt o dnf, y 'politica' cuando lo apagó quien administra el equipo. */
+  let gestorDelSistema = $state<'deb' | 'rpm' | 'politica' | null>(null);
   /**
    * En la barra solo aparecen las tres fases que piden algo de la persona.
    * «Buscando», «al día» y los errores viven en Ajustes: son la respuesta a

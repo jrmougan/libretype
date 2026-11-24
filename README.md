@@ -204,6 +204,13 @@ En AppImage, macOS y Windows, LibreType mira al arrancar si hay una versión nue
 
 Es la única petición de red que hace la aplicación —un fichero JSON público en GitHub— y se puede desactivar en Ajustes. Instalada por apt o dnf, ni siquiera eso: manda el gestor de paquetes y la aplicación no consulta nada.
 
+### Aulas, bibliotecas y centros de mayores
+
+Quien administra equipos compartidos puede apagar las actualizaciones con un
+fichero de política del sistema, e instalar en Windows sin red (el instalador
+lleva WebView2 completo). Está en
+[`docs/instalacion-gestionada.md`](docs/instalacion-gestionada.md).
+
 ### Puesta en marcha (solo para quien publique)
 
 Ambos caminos necesitan secretos en el repositorio de GitHub. Sin ellos, `release.yml` y `apt.yml` fallan a propósito en vez de publicar algo roto.

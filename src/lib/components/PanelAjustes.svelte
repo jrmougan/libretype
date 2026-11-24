@@ -12,7 +12,7 @@
     layoutId: string;
     /** Teclas que ya no muestran su letra. */
     aprendidas: number;
-    gestorDelSistema: 'deb' | 'rpm' | null;
+    gestorDelSistema: 'deb' | 'rpm' | 'politica' | null;
     actualizador: Actualizador | null;
     estadoAct: EstadoActualizacion;
     /** Para que se oiga una muestra al encender el sonido o mover el volumen. */
@@ -190,11 +190,17 @@
   <div class="field">
     <span id="act-l">Actualizaciones</span>
     <p class="note">
-      LibreType se instaló con
-      {gestorDelSistema === 'deb' ? 'apt' : 'dnf'}, así que las
-      actualizaciones llegan con las del resto del sistema. La
-      aplicación no las descarga por su cuenta ni consulta nada por
-      internet.
+      {#if gestorDelSistema === 'politica'}
+        Las actualizaciones de este equipo las gestiona quien lo administra.
+        La aplicación no las descarga por su cuenta ni consulta nada por
+        internet.
+      {:else}
+        LibreType se instaló con
+        {gestorDelSistema === 'deb' ? 'apt' : 'dnf'}, así que las
+        actualizaciones llegan con las del resto del sistema. La
+        aplicación no las descarga por su cuenta ni consulta nada por
+        internet.
+      {/if}
     </p>
   </div>
 {:else if actualizador}

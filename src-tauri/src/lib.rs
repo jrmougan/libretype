@@ -187,6 +187,54 @@ fn guardar_en_descargas(
         .map_err(|e| format!("No se ha podido guardar el fichero: {e}"))
 }
 
+/// Dónde deja el administrador la política del equipo. Ver
+/// `docs/instalacion-gestionada.md`.
+#[cfg(target_os = "windows")]
+fn ruta_politica() -> PathBuf {
+    std::env::var_os("ProgramData")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\ProgramData"))
+        .join("LibreType")
+        .join("politica.json")
+}
+
+#[cfg(target_os = "macos")]
+fn ruta_politica() -> PathBuf {
+    PathBuf::from("/Library/Application Support/LibreType/politica.json")
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+fn ruta_politica() -> PathBuf {
+    PathBuf::from("/etc/libretype/politica.json")
+}
+
+/// Una política es un JSON de un par de campos: más que esto no es una política.
+const MAX_BYTES_POLITICA: u64 = 64 * 1024;
+
+/// Lee la política de una ruta: "" si no hay fichero, y un texto que no es JSON
+/// si existe pero no se puede leer o es desmesurado, para que la interfaz lo
+/// trate como ilegible (apaga las actualizaciones) y no como ausente.
+fn leer_politica(ruta: &Path) -> String {
+    match std::fs::metadata(ruta) {
+        Err(e) if e.kind() == ErrorKind::NotFound => String::new(),
+        Ok(m) if m.is_file() && m.len() <= MAX_BYTES_POLITICA => {
+            std::fs::read_to_string(ruta).unwrap_or_else(|_| "ilegible".into())
+        }
+        _ => "ilegible".into(),
+    }
+}
+
+/// El contenido de la política del sistema, o "" si no hay.
+///
+/// Solo lee: interpretar el JSON se hace en `src/lib/politica.ts`, que se
+/// puede probar sin compilar Rust. La ruta es fija y fuera del alcance del
+/// usuario normal a propósito: una variable de entorno la podría cambiar
+/// cualquiera, y entonces no sería una política.
+#[tauri::command]
+fn politica_del_sistema() -> String {
+    leer_politica(&ruta_politica())
+}
+
 /// Cómo se empaquetó este binario: "deb", "rpm", "appimage", "msi", "nsis",
 /// "app" o "" si no se sabe.
 ///
@@ -219,7 +267,8 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             tipo_de_paquete,
-            guardar_en_descargas
+            guardar_en_descargas,
+            politica_del_sistema
         ])
         .plugin(
             tauri_plugin_sql::Builder::default()
@@ -347,6 +396,35 @@ mod tests {
         let marca = std::fs::read_to_string(dir.join(MARCA_ESQUEMA)).unwrap();
         assert_eq!(marca, "3");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn la_politica_ausente_es_vacia_y_la_ilegible_no() {
+        let dir = dir_de_prueba("politica");
+        let ruta = dir.join("politica.json");
+
+        // Sin fichero no hay política: todo sigue como siempre.
+        assert_eq!(leer_politica(&ruta), "");
+
+        std::fs::write(&ruta, r#"{ "actualizaciones": false }"#).unwrap();
+        assert_eq!(leer_politica(&ruta), r#"{ "actualizaciones": false }"#);
+
+        // Bytes que no son UTF-8, o un directorio en su lugar: existe pero no se
+        // entiende, y eso no puede confundirse con que no haya política.
+        std::fs::write(&ruta, [0xff, 0xfe, 0x00]).unwrap();
+        assert_eq!(leer_politica(&ruta), "ilegible");
+        std::fs::remove_file(&ruta).unwrap();
+        std::fs::create_dir(&ruta).unwrap();
+        assert_eq!(leer_politica(&ruta), "ilegible");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn la_ruta_de_la_politica_es_fija_y_del_sistema() {
+        let ruta = ruta_politica();
+        assert!(ruta.is_absolute());
+        assert!(ruta.ends_with("politica.json"));
     }
 
     #[test]

@@ -186,7 +186,7 @@
     padding-top: var(--space-4);
     border-top: 1px solid var(--border);
   }
-  h3 { margin: 0; font-size: var(--text-base); }
+  h3 { margin: 0; font-size: var(--text-lg); }
   .nota { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
 
   .lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
@@ -196,26 +196,30 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-4);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-card);
     background: var(--surface);
   }
   /* El perfil activo no se distingue solo por color: lleva el texto
      «practicando ahora» y un borde más grueso. */
-  .lista li.activo { border: var(--borde-grueso) solid var(--accent); }
+  .lista li.activo {
+    border: var(--borde-grueso) solid var(--accent);
+    background: var(--accent-soft);
+  }
+  .activo .alias small { color: var(--fg); }
   .alias { font-weight: 700; overflow-wrap: anywhere; min-width: 0; }
   .alias small { font-weight: 400; color: var(--fg-muted); }
   .botones, .fila { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
-  label { font-weight: 600; }
+  label { font-weight: 700; }
   input { flex: 1 1 12rem; min-width: 0; }
 
   .confirmar-borrado {
     display: grid;
     gap: var(--space-2);
-    padding: var(--space-3);
+    padding: var(--space-3) var(--space-4);
     border: var(--borde-grueso) solid var(--error);
-    border-radius: var(--radius);
+    border-radius: var(--radius-card);
     background: var(--error-bg);
   }
   .confirmar-borrado p { margin: 0; overflow-wrap: anywhere; }

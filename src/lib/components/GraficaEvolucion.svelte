@@ -74,14 +74,14 @@
 {/if}
 
 <style>
-  /* Tarjeta hundida, como las de las teclas del panel. */
+  /* Tarjeta hundida, como las de cifra del panel. */
   .grafica {
     margin: 0;
     display: grid;
     gap: var(--space-2);
     padding: var(--space-4);
     background: var(--surface-sunken);
-    border-radius: var(--radius);
+    border-radius: var(--radius-card);
   }
   /* Con todo el ancho del panel, la proporción del viewBox daría una gráfica
      más alta que la ventana: se acota la altura y se centra. */
@@ -94,6 +94,7 @@
   }
   /* Barras en acento pleno: atenuadas no llegarían a 3:1 sobre el fondo. */
   .barra { fill: var(--accent); }
+  .barra:hover { fill: var(--accent-deep); }
   .base { stroke: var(--border-strong); stroke-width: 1; }
   /* El texto lleva tinta de texto, nunca el color de la serie. */
   .valor { fill: var(--fg); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }

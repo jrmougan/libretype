@@ -136,9 +136,9 @@
   /* Solo pantalla: en papel y en la página guardada manda HOJA_CSS, que no
      puede usar los tokens. */
   .informe { display: grid; gap: var(--space-2); overflow-wrap: anywhere; }
-  h2 { margin: 0; font-size: var(--text-lg); line-height: 1.2; }
-  h3 { margin: var(--space-3) 0 0; font-size: var(--text-base); }
-  h4 { margin: var(--space-2) 0 0; font-size: var(--text-base); font-weight: 600; }
+  h2 { margin: 0; font-size: var(--text-xl); line-height: 1.2; }
+  h3 { margin: var(--space-3) 0 0; font-size: var(--text-lg); }
+  h4 { margin: var(--space-2) 0 0; font-size: var(--text-base); font-weight: 700; }
   p, ul, ol { margin: 0; }
   .nota { font-size: var(--text-sm); color: var(--fg-muted); }
   .chips { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-1); }

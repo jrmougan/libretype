@@ -1121,6 +1121,8 @@
             onGestionarLecciones={() => abrirLecciones()}
             onIrAPracticar={cerrarPanelYa}
             alias={perfiles.length > 1 ? aliasActivo : ''}
+            leccionActual={vista === 'leccion' && !refuerzo ? leccionId : null}
+            celebra={prefs.tono === 'juego'}
           />
           <!-- Con SQLite caído los perfiles de verdad no se pueden leer: no se gestionan. -->
           {#if !errorAlmacen && perfiles.length > 0}

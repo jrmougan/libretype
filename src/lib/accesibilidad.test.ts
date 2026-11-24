@@ -330,6 +330,15 @@ describe("Paleta: texto sobre sus fondos (WCAG 1.4.3, 4,5:1)", () => {
       }
     });
 
+    it(`${tema}: lo que los paneles pintan encima de un fondo de estado`, () => {
+      // La insignia de lección superada (✓ en papel sobre --ok), la fila «Estás
+      // aquí» y el perfil activo (--fg sobre --accent-soft), la etiqueta de la
+      // tarjeta de precisión (--fg sobre --ok-bg) y la cifra de una tecla que
+      // pide refuerzo (--fg sobre --pending-bg).
+      par("--surface", "--ok");
+      for (const fondo of ["--accent-soft", "--ok-bg", "--pending-bg", "--error-bg"]) par("--fg", fondo);
+    });
+
     it(`${tema}: el contorno de controles llega a 3:1 (WCAG 1.4.11)`, () => {
       for (const fondo of ["--bg", "--surface", "--surface-sunken"]) {
         expect(contrast(t("--border-strong"), t(fondo))).toBeGreaterThanOrEqual(3);
@@ -427,6 +436,13 @@ describe("Alto contraste propio", () => {
         }
         expect(contrast(t["--on-celebracion"], t["--celebracion"])).toBeGreaterThanOrEqual(7);
         expect(contrast(t["--fg"], t["--celebracion-soft"])).toBeGreaterThanOrEqual(7);
+      });
+
+      it("lo que los paneles pintan encima de un fondo de estado también se lee", () => {
+        expect(contrast(t["--surface"], t["--ok"]), "--surface sobre --ok").toBeGreaterThanOrEqual(7);
+        for (const fondo of ["--accent-soft", "--ok-bg", "--pending-bg", "--error-bg"]) {
+          expect(contrast(t["--fg"], t[fondo]), `--fg sobre ${fondo}`).toBeGreaterThanOrEqual(7);
+        }
       });
 
       it("la letra atenuada de una tecla casi dominada sigue a 4,5:1 o más", () => {

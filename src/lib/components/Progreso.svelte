@@ -47,6 +47,10 @@
     layout?: Layout;
     /** Alias del perfil, si hay varios: va en el nombre de la copia para no confundirlas. */
     alias?: string;
+    /** La lección del temario en curso, para marcar su fila; null si no hay. */
+    leccionActual?: string | null;
+    /** Tono con celebración: la tarjeta de constancia lleva su color. */
+    celebra?: boolean;
   }
 
   let {
@@ -66,6 +70,8 @@
     onIrAPracticar,
     layout = ES_ISO,
     alias = '',
+    leccionActual = null,
+    celebra = false,
   }: Props = $props();
 
   /** `guardar_en_descargas` solo admite letras sin tilde, cifras y guiones. */
@@ -304,7 +310,9 @@
 
 <!-- El título lo pone el panel: dos seguidos y una caja dentro de otra eran ruido. -->
 <section class="progreso" aria-label="Tu progreso" bind:this={raiz}>
-  <p class="nota">{superadas.size} de {lecciones.length} lecciones superadas. {OBJETIVO_PANEL}</p>
+  <!-- Subtítulo del panel: el umbral se explica una vez, aquí, y siempre con la
+       frase de objetivos.ts. -->
+  <p class="nota subtitulo">{superadas.size} de {lecciones.length} lecciones superadas. {OBJETIVO_PANEL}</p>
 
   {#if global.sesiones === 0}
     <p class="vacio">
@@ -321,11 +329,13 @@
       diasEstaSemana: evolucion.diasEstaSemana,
     })}</p>
 
+    <!-- Tarjetas de cifra. La constancia de la semana lleva el color de la
+         celebración cuando el tono lo pide; la cifra y su texto dicen lo mismo sin él. -->
     <dl class="global">
       <div><dt>Teclas que ya escribes sin mirar</dt><dd>{sinMirar.dominadas} <small>de {sinMirar.total}</small></dd></div>
       <div><dt>Lecciones practicadas</dt><dd>{tocadasActuales} <small>de {lecciones.length}</small></dd></div>
       <div><dt>Sesiones</dt><dd>{global.sesiones}</dd></div>
-      <div><dt>Esta semana</dt><dd>{evolucion.diasEstaSemana} <small>{evolucion.diasEstaSemana === 1 ? 'día' : 'días'}</small></dd></div>
+      <div class:constancia={celebra}><dt>Esta semana</dt><dd>{evolucion.diasEstaSemana} <small>{evolucion.diasEstaSemana === 1 ? 'día' : 'días'}</small></dd></div>
       <div><dt>Días practicados</dt><dd>{evolucion.diasPracticados}</dd></div>
       <div><dt>Tiempo total</dt><dd>{formatearDuracion(global.msTotales)}</dd></div>
       <div><dt>Mejor marca</dt><dd>{global.mejorPpm} <small>ppm</small></dd></div>
@@ -362,8 +372,11 @@
         {#each lecciones as l (l.id)}
           {@const r = porLeccion.get(l.id)}
           {@const d = dificultad.get(l.id)}
-          <tr class:sin-hacer={!r}>
-            <th scope="row">{l.title}<small>{!catalogo.estaDesbloqueada(l.id, superadas) ? 'Bloqueada · supera las anteriores' : superadas.has(l.id) ? 'Superada' : FILA_DISPONIBLE}</small></th>
+          {@const estado = !catalogo.estaDesbloqueada(l.id, superadas) ? 'cerrada' : superadas.has(l.id) ? 'superada' : 'abierta'}
+          <tr class:sin-hacer={!r} class:actual={leccionActual === l.id}>
+            <!-- La insignia acompaña a la etiqueta escrita: no es lo único que dice
+                 el estado. Y la fila en curso lo dice con texto, no solo con el fondo. -->
+            <th scope="row"><span class="fila-tit"><span class="insignia {estado}" aria-hidden="true">{estado === 'superada' ? '✓' : estado === 'abierta' ? '›' : ''}</span><span class="nombre">{l.title}{#if leccionActual === l.id}{' '}<span class="aqui">Estás aquí</span>{/if}</span></span><small class="con-insignia">{estado === 'cerrada' ? 'Bloqueada · supera las anteriores' : estado === 'superada' ? 'Superada' : FILA_DISPONIBLE}</small></th>
             <td>{r ? r.intentos : "—"}</td>
             <td>
               {#if d}
@@ -558,7 +571,7 @@
       <div class="rejilla-teclas" role="list" aria-label="Lista de teclas practicadas ordenadas por dificultad">
         {#each listaTeclas as t (t.code)}
           <div class="tecla-card" class:tecla-floja={t.esFloja} role="listitem">
-            <span class="tecla-char">{t.char === " " ? "Espacio" : t.char.toUpperCase()}</span>
+            <span class="tecla-char" class:larga={t.char === " "}>{t.char === " " ? "Espacio" : t.char.toUpperCase()}</span>
             <span class="tecla-pct">{t.precision}%</span>
             {#if t.esFloja}
               <span class="badge-floja">reforzar</span>
@@ -661,6 +674,7 @@
 </section>
 
 <style>
+  /* El panel ya es la tarjeta: aquí dentro no hay otra caja alrededor. */
   .progreso {
     display: grid;
     gap: var(--space-4);
@@ -668,18 +682,47 @@
     min-width: 0;
     grid-template-columns: minmax(0, 1fr);
   }
+  .nota.subtitulo { font-size: var(--text-base); }
   .empezar { justify-self: start; }
   .vacio { margin: 0; color: var(--fg-muted); }
 
   .resumen { margin: 0; font-size: var(--text-lg); line-height: 1.4; overflow-wrap: anywhere; }
   .comparacion { margin: 0; padding-left: var(--space-4); display: grid; gap: var(--space-1); }
-  .global { display: flex; flex-wrap: wrap; gap: var(--space-6); margin: 0; }
-  .global div { display: flex; flex-direction: column; }
-  .global dt { font-size: var(--text-sm); color: var(--fg-muted); }
-  .global dd { margin: 0; font-size: var(--text-xl); font-variant-numeric: tabular-nums; }
-  .global small { font-size: var(--text-sm); color: var(--fg-muted); }
 
-  .tabla { overflow-x: auto; }
+  /* Tarjetas de cifra: hundidas, con la cifra grande y su unidad al lado. */
+  .global {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(9.5rem * var(--ui-scale))), 1fr));
+    gap: var(--space-3);
+    margin: 0;
+  }
+  .global div {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-sunken);
+    border-radius: var(--radius);
+  }
+  .global div.constancia { background: var(--celebracion-soft); }
+  .global dt { font-size: var(--text-sm); color: var(--fg-muted); }
+  .global .constancia dt { color: var(--fg); }
+  .global dd {
+    margin: 0;
+    font-size: var(--text-xl);
+    font-weight: 700;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .global small { font-size: var(--text-sm); font-weight: 400; color: var(--fg-muted); }
+  .global .constancia small { color: var(--fg); }
+
+  .tabla {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
   /* Se puede enfocar para desplazarla con las flechas, y eso tiene que verse. */
   .tabla:focus-visible { outline-offset: -3px; }
   table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
@@ -689,12 +732,18 @@
     padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--border);
   }
+  tbody tr:last-child > * { border-bottom: 0; }
   /* Las cifras no se parten: «22 ppm · 96%» en dos líneas cuesta más de leer. */
   td { white-space: nowrap; }
   /* Con la letra grande no caben ni así; mejor partidas que desplazar de lado. */
   :global(.compacta) td { white-space: normal; }
   :global(.compacta) th, :global(.compacta) td { padding: var(--space-1) var(--space-2); }
-  thead th { font-size: var(--text-sm); color: var(--fg-muted); font-weight: 600; }
+  thead th {
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+    font-weight: 700;
+    background: var(--surface-sunken);
+  }
   tbody th { font-weight: 500; }
   /* Las lecciones sin hacer se distinguen también por el guion de cada celda,
      no solo por el atenuado. */
@@ -709,6 +758,42 @@
     font-size: var(--text-sm);
     font-weight: 400;
     color: var(--fg-muted);
+  }
+  /* Alineada con el nombre, no con la insignia. */
+  tbody th small.con-insignia { padding-left: calc(1.75 * var(--text-xs) + var(--space-2)); }
+  .fila-tit { display: flex; align-items: center; gap: var(--space-2); }
+  .nombre { min-width: 0; }
+
+  /* Insignia redonda del estado de la lección: ✓ superada, › abierta y vacía
+     con borde si sigue cerrada. Siempre con la etiqueta escrita debajo. */
+  .insignia {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 50%;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    line-height: 1;
+    border: 2px solid var(--border-strong);
+  }
+  .insignia.superada { background: var(--ok); border-color: var(--ok); color: var(--surface); }
+  .insignia.abierta { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+  .insignia.cerrada { background: transparent; }
+
+  /* La fila en curso se marca con fondo y con el texto «Estás aquí». */
+  tr.actual > * { background: var(--accent-soft); color: var(--fg); }
+  tr.actual small, tr.actual .nota { color: var(--fg); }
+  .aqui {
+    display: inline-block;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-chip);
+    background: var(--accent);
+    color: var(--accent-fg);
+    white-space: nowrap;
   }
 
   .nota { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
@@ -734,6 +819,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
   }
   .copia {
     display: flex;
@@ -756,13 +843,14 @@
 
   .seccion-bloque {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-3);
     margin-top: var(--space-2);
+    align-content: start;
   }
   /* Vacía compensa el `gap`; con `display: none` dejaría de anunciar. */
-  .estado-refuerzo:empty { margin-bottom: calc(-1 * var(--space-2)); }
+  .estado-refuerzo:empty { margin-bottom: calc(-1 * var(--space-3)); }
   .seccion-bloque h3 {
-    font-size: var(--text-base);
+    font-size: var(--text-lg);
     margin: 0;
   }
   .cab-bloque {
@@ -772,6 +860,8 @@
     gap: var(--space-2);
     flex-wrap: wrap;
   }
+  /* El principal de base.css, sin el alto de más: aquí acompaña a un título. */
+  .btn-refuerzo { min-height: var(--target-min); padding-inline: var(--space-4); }
   .rejilla-teclas {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(calc(5rem * var(--ui-scale)), 1fr));
@@ -783,27 +873,41 @@
     align-items: center;
     justify-content: center;
     min-height: var(--target-min);
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-2);
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     font-variant-numeric: tabular-nums;
   }
   .tecla-char {
-    font-weight: 600;
-    font-size: var(--text-base);
+    font-family: var(--font-key);
+    font-weight: 700;
+    font-size: var(--text-cifra);
+    line-height: 1.2;
   }
+  /* «Espacio» no es una letra: a tamaño de tecla no cabría en la tarjeta. */
+  .tecla-char.larga { font-size: var(--text-sm); line-height: 1.9; }
   .tecla-pct {
     font-size: var(--text-xs);
     color: var(--fg-muted);
   }
+  /* Floja: borde doble y grueso, fondo, cifra en negrita y la palabra
+     «reforzar». El color es lo último que la distingue, no lo único. Va en
+     --pending y no en rojo: pide práctica, no señala un fallo. */
   .tecla-card.tecla-floja {
     border: 3px double var(--pending);
     background: var(--pending-bg);
   }
+  .tecla-floja .tecla-pct { color: var(--fg); font-weight: 700; }
   .badge-floja {
     font-size: var(--text-xs);
     color: var(--pending);
-    font-weight: bold;
+    font-weight: 700;
+  }
+  @media (forced-colors: active) {
+    .global div, .tecla-card { border: 1px solid CanvasText; }
+    .insignia { forced-color-adjust: none; border-color: CanvasText; background: Canvas; color: CanvasText; }
+    tr.actual > * { background: Canvas; }
+    .aqui { border: 1px solid CanvasText; }
   }
 </style>

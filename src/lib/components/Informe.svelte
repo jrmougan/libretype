@@ -228,15 +228,15 @@
     padding-top: var(--space-4);
     border-top: 1px solid var(--border);
   }
-  h3 { margin: 0; font-size: var(--text-base); }
+  h3 { margin: 0; font-size: var(--text-lg); }
   .nota { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); overflow-wrap: anywhere; }
   .estado:empty { display: none; }
   .acciones { display: flex; flex-wrap: wrap; gap: var(--space-2); }
   /* En pantalla, la hoja es una tarjeta; en papel manda HOJA_CSS. */
   .hoja {
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-4) var(--space-6);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-card);
     background: var(--surface);
   }
   .tabla {
@@ -252,7 +252,7 @@
     padding: var(--space-2) var(--space-3);
   }
   th, td { text-align: left; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); }
-  thead th { font-size: var(--text-sm); color: var(--fg-muted); font-weight: 600; background: var(--surface-sunken); }
+  thead th { font-size: var(--text-sm); color: var(--fg-muted); font-weight: 700; background: var(--surface-sunken); }
   tbody tr:last-child > * { border-bottom: 0; }
   th small { display: block; font-weight: 400; color: var(--fg-muted); }
   .errores {

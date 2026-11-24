@@ -16,6 +16,7 @@
   import { obtenerLayout } from './lib/keyboard/layouts';
   import { catalogo } from './lib/lecciones/catalogo';
   import { ejercicioDe, resolverLeccion, type Seleccion } from './lib/lecciones/ejercicio';
+  import { generarTanda, ritmoReferencia, valorarTanda } from './lib/lecciones/fluidez';
   import { semillaNueva, textoDeIntento } from './lib/lecciones/generador';
   import { cuentaParaDominio, esIdPropio } from './lib/lecciones/ids';
   import { LIMITES, type Borrador, type LeccionPropia } from './lib/lecciones/personalizadas';
@@ -88,7 +89,12 @@
   let tipoAlmacen = $state<'sqlite' | 'local'>('local');
   let errorAlmacen = $state(false);
   /** 'tono' solo aparece la primera vez; 'cero' es la colocación de manos; 'continua' y 'propio' son práctica libre. */
-  let vista = $state<'tono' | 'cero' | 'leccion' | 'continua' | 'propio'>('leccion');
+  let vista = $state<'tono' | 'cero' | 'leccion' | 'continua' | 'propio' | 'fluidez'>('leccion');
+
+  /** Tandas de fluidez: el texto, la clave para rehacer la práctica y el ritmo con el que se compara. */
+  let textoFluidez = $state('');
+  let fluidezKey = $state(0);
+  let ritmoFluidez = $state<number | null>(null);
 
   /** Variables para Práctica continua (Issue #19) */
   let nivelPractica = $state(catalogo.primera.id);
@@ -142,6 +148,8 @@
   const seleccion = $derived<Seleccion>(
     vista === 'continua'
       ? { tipo: 'continua', hasta: nivelPractica, texto: textoContinua, intento: continuaKey }
+      : vista === 'fluidez'
+        ? { tipo: 'fluidez', texto: textoFluidez, intento: fluidezKey, referencia: ritmoFluidez }
       : vista === 'propio'
         ? { tipo: 'libre', texto: textoPropioActivo, intento: propioKey }
         : refuerzo
@@ -157,7 +165,7 @@
   });
   /** La captura está activa solo si hay algo que teclear y nada encima. */
   const practicando = $derived(
-    vista === 'leccion' || vista === 'continua' || (vista === 'propio' && !enEdicionPropio),
+    vista === 'leccion' || vista === 'continua' || vista === 'fluidez' || (vista === 'propio' && !enEdicionPropio),
   );
   /** Con la letra grande cada fila cuesta el doble: barra y lección se aprietan. */
   const compacta = $derived(prefs.escala >= 1.4);
@@ -165,6 +173,7 @@
   /** Cómo se sigue al terminar: cada tipo de ejercicio tiene el suyo, y ninguno es un callejón. */
   const avance = $derived.by<Accion | null>(() => {
     if (vista === 'continua') return { texto: 'Nuevo texto', onclick: () => void nuevaContinua() };
+    if (vista === 'fluidez') return { texto: 'Otra tanda', onclick: () => void nuevaFluidez() };
     if (vista === 'propio') return { texto: 'Cambiar texto', onclick: cambiarTexto };
     if (refuerzo) return { texto: 'Volver a la lección', onclick: () => void elegirLeccion(leccionId) };
     if (siguiente) return { texto: voz.siguiente, onclick: () => void elegirLeccion(siguiente.id) };
@@ -172,6 +181,8 @@
     return { texto: 'Ver tu progreso', onclick: () => abrirDesdeResultado('progreso') };
   });
   const notaResultado = $derived.by(() => {
+    // La tanda se valora contra el ritmo de las anteriores, no contra una cifra.
+    if (vista === 'fluidez') return result ? valorarTanda(result.stats.wpm, result.stats.accuracy, ritmoFluidez) : null;
     if (!enTemario) return null;
     if (!superadas.has(leccionId)) return OBJETIVO_PENDIENTE;
     return catalogo.siguiente(leccionId)
@@ -441,6 +452,7 @@
       refuerzo = null;
       vista = 'cero';
     } else if (valor === 'continua') void activarContinua();
+    else if (valor === 'fluidez') void nuevaFluidez();
     else if (valor === 'propio') void activarPropio();
     else if (valor === 'gestionar') abrirLecciones();
     else if (valor !== 'refuerzo') void elegirLeccion(valor);
@@ -471,6 +483,19 @@
     soltarIntento();
     textoContinua = catalogo.textoPractica(nivelPractica, palabrasPorTexto(prefs.longitudTexto));
     continuaKey++;
+    await arrancarDrill();
+  }
+
+  /** Empieza o repite una tanda de fluidez con lo que hay abierto en el curso que se sigue. */
+  async function nuevaFluidez(): Promise<void> {
+    soltarIntento();
+    refuerzo = null;
+    const hasta = catalogo.ultimaDisponible(superadas, catalogo.cursoDe(leccionId)?.id).id;
+    textoFluidez = generarTanda(hasta, palabrasPorTexto(prefs.longitudTexto));
+    // Antes de esta tanda: después, ella misma ya contaría en su propia meta.
+    ritmoFluidez = ritmoReferencia(sesiones);
+    fluidezKey++;
+    vista = 'fluidez';
     await arrancarDrill();
   }
 

@@ -10,7 +10,7 @@
   } from "../storage/objetivos";
   import { catalogo } from "../lecciones/catalogo";
   import { guardarFichero } from "../ficheros";
-  import { esIdPropio, ID_PRACTICA_CONTINUA, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_TEXTO_PROPIO } from "../lecciones/ids";
+  import { esIdPropio, ID_FLUIDEZ, ID_PRACTICA_CONTINUA, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_TEXTO_PROPIO } from "../lecciones/ids";
   import { LIMITES, type LeccionPropia } from "../lecciones/personalizadas";
   import type { Lesson } from "../lecciones/tipos";
   import type { Almacen, ResultadoRestauracion } from "../storage/almacen";
@@ -76,6 +76,7 @@
    */
   const MODOS_PRACTICA: ReadonlyMap<string, string> = new Map([
     [ID_PRACTICA_CONTINUA, "Práctica continua"],
+    [ID_FLUIDEZ, "Fluidez"],
     [ID_TEXTO_PROPIO, "Texto propio"],
     [ID_REFUERZO, "Refuerzo de teclas"],
     [ID_REFUERZO_SUELTO, "Refuerzo con texto repetido"],

@@ -7,7 +7,8 @@ import type { Layout } from '../keyboard/layouts';
 import type { EjercicioRefuerzo } from '../refuerzo';
 import { objetivoLeccion } from '../storage/objetivos';
 import { catalogo as catalogoApp, type Catalogo } from './catalogo';
-import { esIdPropio, ID_PRACTICA_CONTINUA, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_TEXTO_PROPIO } from './ids';
+import { explicacionFluidez } from './fluidez';
+import { esIdPropio, ID_FLUIDEZ, ID_PRACTICA_CONTINUA, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_TEXTO_PROPIO } from './ids';
 import { activas, problemasDeTexto, type LeccionPropia } from './personalizadas';
 
 export interface Ejercicio {
@@ -33,6 +34,8 @@ export type Seleccion =
   | { tipo: 'leccion'; id: string; texto?: string | null; intento?: number }
   | { tipo: 'refuerzo'; ejercicio: EjercicioRefuerzo }
   | { tipo: 'continua'; hasta: string; texto: string; intento: number }
+  /** Una tanda de fluidez. `referencia` es el ritmo de las tandas anteriores, o null. */
+  | { tipo: 'fluidez'; texto: string; intento: number; referencia: number | null }
   | { tipo: 'libre'; texto: string; intento: number };
 
 /** En español el separador decimal es la coma, no el punto. */
@@ -69,6 +72,16 @@ export function ejercicioDe(
         idioma: catalogo.cursoDe(hasta.id)?.idioma ?? '',
       };
     }
+    case 'fluidez':
+      return {
+        clave: `fluidez:${s.intento}`,
+        idSesion: ID_FLUIDEZ,
+        titulo: 'Fluidez',
+        texto: s.texto,
+        explicacion: explicacionFluidez(s.referencia),
+        cobertura: '',
+        idioma: '',
+      };
     case 'libre':
       return {
         clave: `libre:${s.intento}`,

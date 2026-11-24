@@ -63,6 +63,7 @@
     {/each}
     <optgroup label="Práctica libre">
       <option value="continua">Práctica continua · vocabulario acumulado</option>
+      <option value="fluidez">Fluidez · las palabras más frecuentes</option>
       <option value="propio">Texto propio · sin guardar</option>
     </optgroup>
     <optgroup label="Tus lecciones">

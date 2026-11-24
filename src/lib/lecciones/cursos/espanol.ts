@@ -320,6 +320,31 @@ export const PALABRAS_BASE: readonly string[] = [
   'taxi', 'kilo', 'reloj', 'hoja', 'hijo', 'ayer', 'agua', 'sol', 'aire',
 ];
 
+/**
+ * Las palabras más frecuentes del español escrito, de más a menos. Las primeras
+ * cien cubren cerca de la mitad de lo que se escribe; aquí van las que sostienen
+ * las frases (artículos, preposiciones, verbos auxiliares). Para la fluidez.
+ */
+export const PALABRAS_FRECUENTES: readonly string[] = [
+  'de', 'la', 'que', 'el', 'en', 'y', 'a', 'los', 'se', 'del',
+  'las', 'un', 'por', 'con', 'no', 'una', 'su', 'para', 'es', 'al',
+  'lo', 'como', 'más', 'o', 'pero', 'sus', 'le', 'ha', 'me', 'si',
+  'sin', 'sobre', 'este', 'ya', 'entre', 'cuando', 'todo', 'esta', 'ser', 'son',
+  'dos', 'también', 'fue', 'había', 'era', 'muy', 'años', 'hasta', 'desde', 'está',
+  'mi', 'porque', 'qué', 'solo', 'han', 'yo', 'hay', 'vez', 'puede', 'todos',
+  'así', 'nos', 'ni', 'parte', 'tiene', 'él', 'uno', 'donde', 'bien', 'tiempo',
+  'mismo', 'ese', 'ahora', 'cada', 'e', 'vida', 'otro', 'después', 'te', 'otros',
+  'aunque', 'esa', 'eso', 'hace', 'otra', 'gobierno', 'tan', 'durante', 'siempre', 'día',
+  'tanto', 'ella', 'tres', 'sí', 'dijo', 'sido', 'gran', 'país', 'según', 'menos',
+];
+
+/** Pares de letras que más se encadenan en español. */
+export const BIGRAMAS_FRECUENTES: readonly string[] = [
+  'de', 'es', 'en', 'el', 'la', 'os', 'ue', 'ar', 'er', 'ra',
+  're', 'qu', 'an', 'as', 'on', 'co', 'ta', 'do', 'se', 'te',
+  'al', 'or', 'nt', 'st', 'ad', 'ci', 'to', 'ca', 'ie', 'io',
+];
+
 export const CURSO_ESPANOL: Curso = {
   id: 'espanol',
   titulo: 'Temario de español',
@@ -327,6 +352,8 @@ export const CURSO_ESPANOL: Curso = {
   lecciones: LECCIONES,
   vocabulario: BANCO_VOCABULARIO,
   palabrasRefuerzo: PALABRAS_BASE,
+  frecuentes: PALABRAS_FRECUENTES,
+  bigramas: BIGRAMAS_FRECUENTES,
   // Hasta aquí llega el alfabeto; después solo se añaden mayúsculas y signos.
   finAlfabeto: 'raras',
 };

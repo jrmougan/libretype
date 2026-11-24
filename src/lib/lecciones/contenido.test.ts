@@ -41,6 +41,7 @@ describe('contenido apto para todo el público', () => {
     const fuentes: [string, string[]][] = [
       ...lecciones.map((l): [string, string[]] => [l.id, palabrasDe([l.text, ...(l.frases ?? [])].join(' '))]),
       ...catalogo.cursos.map((c): [string, string[]] => [`vocabulario de ${c.id}`, [...(c.vocabulario ?? [])]]),
+      ...catalogo.cursos.map((c): [string, string[]] => [`frecuentes de ${c.id}`, [...(c.frecuentes ?? [])]]),
       ['palabras base del refuerzo', [...PALABRAS_BASE]],
     ];
     for (const [nombre, palabras] of fuentes) {

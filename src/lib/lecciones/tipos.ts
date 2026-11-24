@@ -41,6 +41,13 @@ export interface Curso {
   /** Palabras extra para el refuerzo de teclas, aparte de las de las lecciones. */
   palabrasRefuerzo?: readonly string[];
   /**
+   * Las palabras más frecuentes del idioma, de más a menos, para las tandas de
+   * fluidez. Sin ellas, la fluidez usa el vocabulario acumulado.
+   */
+  frecuentes?: readonly string[];
+  /** Pares de letras que más se encadenan; cada uno se practica con palabras de `frecuentes`. */
+  bigramas?: readonly string[];
+  /**
    * Última lección en la que se estrenan letras. Hasta ella la cobertura debe
    * subir y no se estrenan más de cinco teclas de golpe. Sin este campo, esas
    * dos garantías se aplican a todo el curso.

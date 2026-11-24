@@ -246,3 +246,48 @@ describe('las teclas que más costaron en el intento', () => {
     expect(dialogo()).not.toContain('costaron');
   });
 });
+
+describe('fluidez', () => {
+  async function abrirFluidez(sesiones: unknown[] = [SESION]): Promise<void> {
+    await abrir({}, sesiones);
+    const selector = document.querySelector<HTMLSelectElement>('.barra select')!;
+    selector.value = 'fluidez';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    await tick();
+  }
+  const guardadas = (): { leccion: string }[] => JSON.parse(localStorage.getItem('libretype.sesiones')!);
+
+  it('se abre desde el selector, con palabras escribibles con lo ya enseñado', async () => {
+    await abrirFluidez();
+    expect(document.querySelector('.drill h2')?.textContent).toBe('Fluidez');
+    const alfabeto = catalogo.alfabetoHasta(catalogo.primera.id);
+    expect(textoMostrado().split(' ')).toHaveLength(20);
+    expect([...textoMostrado()].filter((ch) => ch !== ' ' && !alfabeto.has(ch))).toEqual([]);
+    expect(document.activeElement).toBe(campo());
+  });
+
+  it('la primera tanda limpia fija el ritmo; la siguiente se compara con él, no con una cifra fija', async () => {
+    await abrirFluidez();
+    await teclear(textoMostrado());
+    const dialogo = (): string => document.querySelector('#dialogo-resultado')?.textContent ?? '';
+    expect(dialogo()).toContain('Primera tanda limpia');
+    expect(guardadas().at(-1)?.leccion).toBe('fluidez');
+
+    boton('Otra tanda').click();
+    await tick();
+    await tick();
+    expect(document.querySelector('#dialogo-resultado')).toBeNull();
+    expect(document.querySelector('.drill')?.textContent).toContain('Tu ritmo habitual en estas tandas');
+    await teclear(textoMostrado());
+    expect(dialogo()).toMatch(/ritmo habitual/);
+  });
+
+  it('una tanda no cuenta como lección del temario: ni objetivo ni desbloqueo', async () => {
+    await abrirFluidez();
+    await teclear(textoMostrado());
+    const texto = document.querySelector('#dialogo-resultado')!.textContent!;
+    expect(texto).not.toContain('Lección superada');
+    expect(texto).not.toContain('Objetivo');
+  });
+});

@@ -15,19 +15,21 @@ export const ID_TEXTO_PROPIO = 'texto-propio';
 export const ID_REFUERZO = 'refuerzo';
 /** El refuerzo cuando el texto es relleno: la tecla sola, o pocas palabras en bucle. */
 export const ID_REFUERZO_SUELTO = 'refuerzo-suelto';
+/** Tandas de palabras muy frecuentes: ver `fluidez.ts`. */
+export const ID_FLUIDEZ = 'fluidez';
 
 /**
  * Lo que un curso no puede usar como identificador de lección: los modos de
  * práctica del histórico y los valores del selector de la barra.
  */
 export const IDS_RESERVADOS: ReadonlySet<string> = new Set([
-  ID_PRACTICA_CONTINUA, ID_TEXTO_PROPIO, ID_REFUERZO, ID_REFUERZO_SUELTO,
+  ID_PRACTICA_CONTINUA, ID_TEXTO_PROPIO, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_FLUIDEZ,
   'cero', 'tono', 'leccion', 'continua', 'propio', 'gestionar',
 ]);
 
 /** Generan un texto nuevo en cada intento, bajo el mismo identificador. */
 const MODOS_DE_TEXTO_CAMBIANTE: ReadonlySet<string> = new Set([
-  ID_PRACTICA_CONTINUA, ID_TEXTO_PROPIO, ID_REFUERZO, ID_REFUERZO_SUELTO,
+  ID_PRACTICA_CONTINUA, ID_TEXTO_PROPIO, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_FLUIDEZ,
 ]);
 
 export function esIdPropio(id: unknown): id is string {
@@ -63,7 +65,10 @@ export function cuentaParaDominio(id: string): boolean {
  * Su marca propia, en su propia fila, sí existe.
  */
 export function cuentaParaMarcaGlobal(id: string): boolean {
-  return !esTextoSinVocabulario(id);
+  // Una tanda de fluidez son las palabras más cortas y repetidas del idioma: su
+  // velocidad sale más alta que la de cualquier texto y no se compara con ellos.
+  // Tiene su propia referencia, que es el ritmo de las tandas anteriores.
+  return !esTextoSinVocabulario(id) && id !== ID_FLUIDEZ;
 }
 
 /**

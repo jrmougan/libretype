@@ -397,3 +397,12 @@ describe("Contraste de controles y teclas (WCAG 1.4.11)", () => {
     }
   });
 });
+
+describe("tokens.css se puede compilar", () => {
+  // vitest sustituye el CSS por una cadena vacía, así que una llave sin cerrar no
+  // rompía ningún test: solo el `vite build`. Ya pasó una vez.
+  it("abre y cierra las mismas llaves", () => {
+    const sinComentarios = tokensCss.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(sinComentarios.split("{").length).toBe(sinComentarios.split("}").length);
+  });
+});

@@ -265,7 +265,10 @@
     border-bottom: 1px solid var(--border);
   }
   .ajustes-col .field:last-child { border-bottom: 0; }
-  .ajustes-col:first-child .field:first-child { padding-top: 0; }
+  /* El aire de arriba del primer campo se le quita al conjunto, no a una columna:
+     quitándoselo solo a la primera, «Tipografía» empezaba más abajo que «Tamaño
+     del texto». Con las columnas apiladas, la segunda lo conserva: ahí separa. */
+  .ajustes { margin-top: calc(-1 * var(--space-4)); }
   /* El grupo segmentado y el enlace-botón son globales (styles/base.css): la
      opción elegida lleva papel, contorno, negrita y «✓», nunca solo color. */
   .field .group { justify-self: start; max-width: 100%; }

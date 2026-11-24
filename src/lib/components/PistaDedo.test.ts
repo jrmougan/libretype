@@ -104,6 +104,28 @@ describe('PistaDedo.svelte', () => {
     expect(pistaSvelte).toMatch(/\.compacta \.manos\s*\{\s*display:\s*none/);
   });
 
+  it('compacta es de una sola línea: una tilde o una mayúscula no cambian el alto de la fila', () => {
+    // Con el texto partido en varias líneas, a 1024x640 al 200% el teclado bajaba
+    // 98px con cada letra acentuada y volvía a subir con la siguiente.
+    const css = pistaSvelte.slice(pistaSvelte.indexOf('<style>')).replace(/\/\*[\s\S]*?\*\//g, '');
+    const regla = (selector: string) =>
+      css.match(new RegExp(`${selector.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+    expect(regla('.compacta .titulo')).toMatch(/white-space:\s*nowrap/);
+    expect(regla('.compacta .titulo')).toMatch(/text-overflow:\s*ellipsis/);
+    expect(regla('.compacta .descripcion')).toMatch(/white-space:\s*nowrap/);
+    expect(regla('.compacta .textos')).toMatch(/max-height:\s*calc\(1\.2 \* var\(--text-base\)\)/);
+    expect(regla('.compacta .textos')).toMatch(/overflow:\s*hidden/);
+
+    // Lo que la descripción deja de decir a la vista lo siguen diciendo las dos
+    // tejas, y el título no se va nunca.
+    const [acento, vocal] = indice.get('á')!;
+    montar({ paso: acento, despues: vocal, compacta: true });
+    expect(document.querySelectorAll('.teja')).toHaveLength(2);
+    expect(document.querySelector('.teja.despues')?.textContent).toBe('a');
+    expect(document.querySelector('.titulo')?.textContent).toMatch(/^Acento con el /);
+    expect(document.querySelector('.descripcion')?.textContent).toContain('hasta que pulses la a');
+  });
+
   it('todos los tamaños escalan con --ui-scale: nada de px sueltos en el texto', () => {
     const css = pistaSvelte.slice(pistaSvelte.indexOf('<style>'));
     for (const m of css.matchAll(/(?:^|[\s;{])(?:font-size|(?:min-)?width|height|--lado):\s*([^;]+);/gm)) {

@@ -16,7 +16,12 @@
    *
    * 1. La tarjeta de manos (`compacta`, y por ancho con poco sitio).
    * 2. La teja se encoge (`compacta`).
-   * 3. El título y la descripción se quedan siempre: son la pista.
+   * 3. La descripción y la flecha entre tejas (`compacta`): la fila pasa a ser
+   *    de una sola línea y de alto fijo. La descripción sigue si cabe entera a
+   *    la derecha del título; lo que dice lo enseñan también la teja en hueco
+   *    (la vocal que completa la tilde) y la tecla Mayús o AltGr resaltada en
+   *    el teclado, y la región `aria-live` de Drill lo dice siempre.
+   * 4. El título se queda siempre: nombra la tecla y el dedo.
    */
   import { FINGER_NAMES, type Finger, type KeyStep } from '../keyboard/layouts';
 
@@ -211,11 +216,10 @@
   .compacta { grid-template-columns: minmax(0, 1fr); }
   .compacta .manos { display: none; }
   /* Medido a 1280x800 y a 1024x640 al 200%: con la teja a 2,25rem y el título
-     grande, la pista de una tilde (dos líneas) empujaba la última fila del
-     teclado fuera de la ventana. La fila no puede medir más que el botón
-     «¿Qué se practica?» que tiene al lado (--target-min): la teja cabe dentro
-     y el texto se queda en el tamaño base, el que tenía la pista antes de ser
-     tarjeta. */
+     grande, la pista de una tilde empujaba la última fila del teclado fuera de
+     la ventana. La fila no puede medir más que el botón «¿Qué se practica?»
+     que tiene al lado (--target-min): la teja cabe dentro y el texto se queda
+     en el tamaño base, el que tenía la pista antes de ser tarjeta. */
   .compacta .tarjeta { padding: 0 var(--space-3); gap: var(--space-2); }
   .compacta .teja {
     --lado: calc(var(--target-min) - 6px);
@@ -223,9 +227,33 @@
     box-shadow: 0 2px 0 var(--scrim), 0 2px 0 var(--dedo);
   }
   .compacta .teja.larga { font-size: var(--text-sm); }
-  .compacta .textos { gap: 0; }
-  .compacta .titulo { font-size: var(--text-base); line-height: 1.2; }
-  .compacta .descripcion { font-size: var(--text-sm); line-height: 1.2; }
+  /* Las dos tejas seguidas ya se leen como «primero esta, luego esa»; la
+     flecha le quitaba al título el ancho que le falta a 1024 de ventana. */
+  .compacta .flecha { display: none; }
+  /* Una sola línea, y siempre el mismo alto. Si el texto pudiera partirse, la
+     fila crecía solo cuando tocaba una tilde o una mayúscula (título y
+     descripción, hasta cuatro líneas a 1024x640 al 200%) y el teclado saltaba
+     98px hacia abajo y volvía a subir con cada letra acentuada. La descripción
+     va a la derecha del título si cabe entera; si no, baja a una segunda línea
+     que queda fuera de la caja: mejor ausente que cortada a media frase. */
+  .compacta .textos {
+    flex: 1 1 auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--target-min) var(--space-2);
+    max-height: calc(1.2 * var(--text-base));
+    overflow: hidden;
+  }
+  .compacta .titulo {
+    max-width: 100%;
+    font-size: var(--text-base);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .compacta .descripcion { font-size: var(--text-sm); line-height: 1.2; white-space: nowrap; }
 
   /* Con poco ancho, la tarjeta de manos también es lo primero que se va. */
   @media (max-width: 40rem) {

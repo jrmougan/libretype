@@ -32,6 +32,7 @@
     type Preferencias, type Tono,
   } from './lib/preferencias';
   import { vozDe } from './lib/voz';
+  import { crearSonido } from './lib/sonido';
   import {
     crearActualizador, detectarEntorno,
     type Actualizador, type EstadoActualizacion,
@@ -43,6 +44,9 @@
    */
   const prefsIniciales = typeof localStorage === 'undefined' ? { ...POR_DEFECTO } : cargar();
   let prefs = $state<Preferencias>(prefsIniciales);
+
+  /** Sintetizado con WebAudio y apagado por defecto: ver `lib/sonido.ts`. */
+  const sonido = crearSonido();
 
   /** Solo hay un panel superpuesto a la vez. */
   let panel = $state<'ajustes' | 'progreso' | 'lecciones' | null>(null);
@@ -228,6 +232,10 @@
   }
 
   function anotarTecla(code: string, acierto: boolean, ms: number): void {
+    if (prefs.sonido) {
+      if (acierto) sonido.acierto(prefs.volumen);
+      else sonido.fallo(prefs.volumen);
+    }
     if (!cuentaParaDominio(ejercicio.idSesion)) return;
     // Se muta un mapa nuevo para que Svelte lo vea cambiar.
     const m = new Map(teclas);
@@ -252,6 +260,7 @@
     errorGuardado = false;
     sesiones = [...sesiones, sesion];
     result = { stats, record };
+    if (prefs.sonido) sonido.fin(prefs.volumen);
     // Este intento ya no se descarta aunque falle el guardado: al siguiente se reintenta.
     teclasBase = new Map(teclas);
 
@@ -802,6 +811,7 @@
             {gestorDelSistema}
             {actualizador}
             {estadoAct}
+            onProbarSonido={(cual, volumen) => sonido[cual](volumen)}
           />
         {:else}
           <Progreso

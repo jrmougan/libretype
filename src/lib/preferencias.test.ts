@@ -133,3 +133,19 @@ describe('aplicar al documento', () => {
     expect(raiz.hasAttribute('data-tono')).toBe(false);
   });
 });
+
+describe('sonido', () => {
+  it('viene apagado y solo un true explícito lo enciende', () => {
+    expect(POR_DEFECTO.sonido).toBe(false);
+    expect(normalizar({}).sonido).toBe(false);
+    expect(normalizar({ sonido: 'sí' }).sonido).toBe(false);
+    expect(normalizar({ sonido: 1 }).sonido).toBe(false);
+    expect(normalizar({ sonido: true }).sonido).toBe(true);
+  });
+
+  it('el volumen se acota y nunca queda en cero con el sonido encendido', () => {
+    expect(normalizar({ volumen: 5 }).volumen).toBe(1);
+    expect(normalizar({ volumen: 0 }).volumen).toBe(0.1);
+    expect(normalizar({ volumen: 'alto' }).volumen).toBe(POR_DEFECTO.volumen);
+  });
+});

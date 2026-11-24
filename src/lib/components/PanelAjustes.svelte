@@ -14,9 +14,11 @@
     gestorDelSistema: 'deb' | 'rpm' | null;
     actualizador: Actualizador | null;
     estadoAct: EstadoActualizacion;
+    /** Para que se oiga una muestra al encender el sonido o mover el volumen. */
+    onProbarSonido?: (cual: 'acierto' | 'fin', volumen: number) => void;
   }
 
-  let { prefs, onCambiar, layoutId, aprendidas, gestorDelSistema, actualizador, estadoAct }: Props = $props();
+  let { prefs, onCambiar, layoutId, aprendidas, gestorDelSistema, actualizador, estadoAct, onProbarSonido }: Props = $props();
 
   const TEMAS = [['auto', 'Sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']] as const;
   const CONTRASTES = [['auto', 'Sistema'], ['normal', 'Normal'], ['alto', 'Alto']] as const;
@@ -87,6 +89,29 @@
     Las teclas que ya dominas dejan de mostrar su letra, para que dejes de
     mirar el teclado. {#if aprendidas > 0}Llevas {aprendidas}
     {aprendidas === 1 ? 'tecla aprendida' : 'teclas aprendidas'}.{/if}
+  </p>
+</div>
+
+<div class="field">
+  <span id="sonido-l">Sonido</span>
+  <div class="group" role="group" aria-labelledby="sonido-l">
+    <button aria-pressed={!prefs.sonido} onclick={() => onCambiar({ sonido: false })}>Sin sonido</button>
+    <button aria-pressed={prefs.sonido}
+            onclick={() => { onCambiar({ sonido: true }); onProbarSonido?.('fin', prefs.volumen); }}>
+      Con sonido
+    </button>
+  </div>
+  {#if prefs.sonido}
+    <label for="volumen">Volumen: {Math.round(prefs.volumen * 100)}%</label>
+    <input id="volumen" type="range" min="0.1" max="1" step="0.1"
+           value={prefs.volumen}
+           aria-valuetext={`${Math.round(prefs.volumen * 100)}%`}
+           oninput={(e) => onCambiar({ volumen: +e.currentTarget.value })}
+           onchange={(e) => onProbarSonido?.('acierto', +e.currentTarget.value)} />
+  {/if}
+  <p class="note">
+    Un toque suave al acertar, otro más grave al fallar y unas notas al
+    terminar. Se genera en tu equipo: no se descarga nada.
   </p>
 </div>
 

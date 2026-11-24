@@ -67,6 +67,13 @@ export interface Preferencias {
    * lo pida, por si alguien lo tiene activado para otras aplicaciones.
    */
   contraste: 'auto' | 'normal' | 'alto';
+  /**
+   * Sonido suave al acertar, al fallar y al terminar. Desactivado por
+   * defecto: el porqué, en `sonido.ts`.
+   */
+  sonido: boolean;
+  /** Volumen del sonido, de 0,1 a 1. */
+  volumen: number;
 }
 
 export const POR_DEFECTO: Preferencias = {
@@ -80,6 +87,8 @@ export const POR_DEFECTO: Preferencias = {
   ultimaLeccion: catalogo.primera.id,
   layout: 'es-iso',
   contraste: 'auto',
+  sonido: false,
+  volumen: 0.6,
 };
 
 const CLAVE = 'libretype.preferencias';
@@ -118,6 +127,10 @@ export function normalizar(crudo: unknown): Preferencias {
     ultimaLeccion: leccionValida ? (o.ultimaLeccion as string) : catalogo.primera.id,
     layout: typeof o.layout === 'string' && o.layout.trim() ? o.layout.trim() : POR_DEFECTO.layout,
     contraste: unaDe(o.contraste, ['auto', 'normal', 'alto'] as const, POR_DEFECTO.contraste),
+    // Solo un `true` explícito lo enciende: un valor raro no puede ponerse a
+    // sonar en un aula sin que nadie lo haya pedido.
+    sonido: o.sonido === true,
+    volumen: enRango(o.volumen, 0.1, 1, POR_DEFECTO.volumen),
   };
 }
 

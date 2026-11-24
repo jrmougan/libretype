@@ -380,7 +380,7 @@
             <td>{r ? r.intentos : "—"}</td>
             <td>
               {#if d}
-                {d.intentosHastaSuperar}{#if !d.superada} <span class="nota">sin superar</span>{/if}
+                {d.intentosHastaSuperar}{#if !d.superada}{' '}<span class="nota">sin superar</span>{/if}
               {:else}—{/if}
             </td>
             <td>

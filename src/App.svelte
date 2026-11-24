@@ -805,6 +805,7 @@
           {pausado}
           onReanudar={alternarPausa}
           onPausar={pausarDesdeCampo}
+          ignorarRepeticion={prefs.ignorarRepeticion}
           target={ejercicio.texto}
           titulo={ejercicio.titulo}
           explicacion={ejercicio.explicacion}

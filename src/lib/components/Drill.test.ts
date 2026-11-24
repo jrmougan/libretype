@@ -379,3 +379,65 @@ describe('Esc pausa desde el campo', () => {
     expect(onPausar).not.toHaveBeenCalled();
   });
 });
+
+describe('filtro de temblor en el campo', () => {
+  function montarFiltro(ignorarRepeticion: boolean) {
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'aab', titulo: 'Prueba', ignorarRepeticion },
+    });
+    flushSync();
+    return document.querySelector('textarea')!;
+  }
+
+  function escribe(campo: HTMLTextAreaElement, data: string, t: number): boolean {
+    vi.spyOn(performance, 'now').mockReturnValue(t);
+    const ev = new InputEvent('beforeinput', { inputType: 'insertText', data, bubbles: true, cancelable: true });
+    campo.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  }
+
+  it('activado, cancela el rebote antes de que llegue al campo', () => {
+    const campo = montarFiltro(true);
+    expect(escribe(campo, 'a', 1000)).toBe(false);
+    expect(escribe(campo, 'a', 1040)).toBe(true);
+    expect(escribe(campo, 'a', 1200)).toBe(false);
+  });
+
+  it('apagado (por defecto) no toca nada', () => {
+    const campo = montarFiltro(false);
+    expect(escribe(campo, 'a', 1000)).toBe(false);
+    expect(escribe(campo, 'a', 1010)).toBe(false);
+  });
+
+  it.each([MACOS_ACUTE_A, LINUX_ACUTE_A])('activado, no estorba a la composición del acento: $description', async (traza) => {
+    // Las trazas reales de los dos motores, con el filtro puesto: el acento a
+    // medias no avanza y la á se confirma igual que sin él.
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'ás', titulo: 'Tildes', ignorarRepeticion: true },
+    });
+    flushSync();
+    const campo = document.querySelector('textarea')!;
+    let confirmado = false;
+    replay(campo, traza, (paso) => {
+      if (paso.type === 'compositionend') confirmado = true;
+      flushSync();
+      expect(document.querySelector('.ch.current')?.textContent).toBe(confirmado ? 's' : 'á');
+    });
+    await tick();
+    expect(document.querySelector('.ch.correct')?.textContent).toBe('á');
+  });
+
+  it('activado, nunca cancela una entrada de composición', () => {
+    const campo = montarFiltro(true);
+    for (const inputType of ['insertCompositionText', 'insertFromComposition']) {
+      for (const t of [1000, 1010]) {
+        vi.spyOn(performance, 'now').mockReturnValue(t);
+        const ev = new InputEvent('beforeinput', { inputType, data: 'á', bubbles: true, cancelable: true });
+        campo.dispatchEvent(ev);
+        expect(ev.defaultPrevented, inputType).toBe(false);
+      }
+    }
+  });
+});

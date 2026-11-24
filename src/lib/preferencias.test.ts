@@ -176,3 +176,11 @@ describe('longitud del texto y recordatorio de pausa', () => {
     expect(palabrasPorTexto('raro' as never)).toBe(PALABRAS_POR_LONGITUD.normal);
   });
 });
+
+describe('filtro de repetición por temblor', () => {
+  it('viene apagado: a quien no tiene temblor le podría comer una doble letra', () => {
+    expect(normalizar({}).ignorarRepeticion).toBe(false);
+    expect(normalizar({ ignorarRepeticion: 'sí' }).ignorarRepeticion).toBe(false);
+    expect(normalizar({ ignorarRepeticion: true }).ignorarRepeticion).toBe(true);
+  });
+});

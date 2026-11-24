@@ -90,6 +90,12 @@ export interface Preferencias {
    * bloquea: es un aviso que se cierra y ya.
    */
   recordatorioPausa: number;
+  /**
+   * Ignorar la repetición involuntaria de un mismo carácter en muy poco
+   * tiempo (temblor). Viene apagado: a quien no lo necesita le podría comer
+   * una doble letra legítima tecleada muy rápido. Ver `keyboard/temblor.ts`.
+   */
+  ignorarRepeticion: boolean;
 }
 
 /**
@@ -137,6 +143,7 @@ export const POR_DEFECTO: Preferencias = {
   ocultarMetricas: false,
   longitudTexto: 'normal',
   recordatorioPausa: 20,
+  ignorarRepeticion: false,
 };
 
 const CLAVE = 'libretype.preferencias';
@@ -184,6 +191,7 @@ export function normalizar(crudo: unknown): Preferencias {
     recordatorioPausa: (MINUTOS_PAUSA as readonly unknown[]).includes(o.recordatorioPausa)
       ? (o.recordatorioPausa as number)
       : POR_DEFECTO.recordatorioPausa,
+    ignorarRepeticion: o.ignorarRepeticion === true,
   };
 }
 

@@ -133,6 +133,22 @@
 </div>
 
 <div class="field">
+  <span id="temblor-l">Si a veces una tecla se repite sin querer</span>
+  <div class="group" role="group" aria-labelledby="temblor-l">
+    <button aria-pressed={!prefs.ignorarRepeticion} onclick={() => onCambiar({ ignorarRepeticion: false })}>Contar todo</button>
+    <button aria-pressed={prefs.ignorarRepeticion} onclick={() => onCambiar({ ignorarRepeticion: true })}>Ignorar repeticiones muy rápidas</button>
+  </div>
+  <p class="note">
+    Con temblor, el dedo puede rebotar y escribir dos veces la misma letra. Esto
+    ignora la segunda si llega casi a la vez. Para algo más completo, el sistema
+    tiene «teclas de rebote» (o «teclas lentas»): en Windows, en Configuración ›
+    Accesibilidad › Teclado; en macOS, en Ajustes del Sistema › Accesibilidad ›
+    Teclado; en GNOME, en Configuración › Accesibilidad › Escritura; en KDE, en
+    Preferencias del sistema › Accesibilidad › Filtros de teclado.
+  </p>
+</div>
+
+<div class="field">
   <span id="sonido-l">Sonido</span>
   <div class="group" role="group" aria-labelledby="sonido-l">
     <button aria-pressed={!prefs.sonido} onclick={() => onCambiar({ sonido: false })}>Sin sonido</button>

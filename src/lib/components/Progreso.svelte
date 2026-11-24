@@ -561,6 +561,15 @@
     </section>
   {/if}
 
+  {#if (almacen?.recuperadas ?? 0) > 0}
+    <p class="nota aviso recuperadas">
+      {almacen?.recuperadas === 1
+        ? 'Se ha recuperado una sesión que se guardó'
+        : `Se han recuperado ${almacen?.recuperadas} sesiones que se guardaron`}
+      de forma provisional mientras la base de datos de este equipo no estaba disponible.
+    </p>
+  {/if}
+
   {#if esDegradado}
     <p class="nota aviso aviso-error" role="alert">
       No se ha podido abrir la base de datos de este equipo. Mientras tanto, tu

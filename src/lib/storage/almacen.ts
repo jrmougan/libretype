@@ -19,6 +19,11 @@ export interface Almacen {
   readonly tipo: "sqlite" | "local";
   /** Indica si falló la base de datos local en escritorio y se degradó a local. */
   readonly errorAlmacen?: boolean;
+  /**
+   * Sesiones recuperadas al abrir: las que se guardaron en el respaldo mientras
+   * SQLite fallaba y ya están en la base de datos. Ver `traspasarRespaldo`.
+   */
+  readonly recuperadas?: number;
   guardar(s: Sesion): Promise<void>;
   leerTodas(): Promise<Sesion[]>;
   /** Dominio acumulado por tecla, para saber cuánta ayuda visual retirar. */
@@ -261,6 +266,7 @@ function serializarCopia(
 export class AlmacenSqlite implements Almacen {
   readonly tipo = "sqlite" as const;
   readonly errorAlmacen = false;
+  recuperadas = 0;
   #db: DbSql;
   #restaurando = false;
 
@@ -572,6 +578,22 @@ export class AlmacenLocal implements Almacen {
     } catch { /* ignorado */ }
   }
 
+  /** ¿Hay algo guardado aquí? Lo pregunta el traspaso a SQLite. */
+  tieneDatos(): boolean {
+    try {
+      return [CLAVE_LOCAL, CLAVE_TECLAS, CLAVE_LECCIONES].some((c) => localStorage.getItem(c) !== null);
+    } catch {
+      return false;
+    }
+  }
+
+  /** Lo quita todo, lecciones vivas incluidas: solo tras haberlo traspasado. */
+  vaciar(): void {
+    try {
+      for (const c of [CLAVE_LOCAL, CLAVE_TECLAS, CLAVE_LECCIONES]) localStorage.removeItem(c);
+    } catch { /* si no se puede, el próximo traspaso lo vuelve a combinar sin duplicar */ }
+  }
+
   #leerLecciones(): LeccionPropia[] {
     try {
       const crudo = localStorage.getItem(CLAVE_LECCIONES);
@@ -695,6 +717,32 @@ export class AlmacenMemoria implements Almacen {
   }
 }
 
+/**
+ * Pasa a SQLite lo que se guardó en localStorage mientras SQLite falló.
+ *
+ * En el escritorio localStorage solo se usa de respaldo, así que si SQLite abre
+ * y ahí hay algo, es práctica hecha durante un fallo: sin esto se quedaría en un
+ * sitio que la aplicación ya no mira, y a todos los efectos se habría perdido.
+ * Se combina (no duplica aunque se repita) y solo entonces se vacía el respaldo.
+ * Si algo falla, o alguna lección no cabe, el respaldo se queda como está y se
+ * vuelve a intentar en el siguiente arranque. Nunca lanza: no poder traspasar no
+ * puede impedir practicar. Devuelve cuántas sesiones se han recuperado.
+ */
+export async function traspasarRespaldo(
+  destino: Almacen,
+  respaldo: AlmacenLocal = new AlmacenLocal(),
+): Promise<number> {
+  try {
+    if (!respaldo.tieneDatos()) return 0;
+    const r = await destino.importar(await respaldo.exportar(), "combinar");
+    if (r.leccionesSinSitio === 0) respaldo.vaciar();
+    return r.sesionesNuevas ?? 0;
+  } catch (err) {
+    console.warn("[libretype] no se pudo traspasar el respaldo local:", err);
+    return 0;
+  }
+}
+
 export async function abrirAlmacen(): Promise<Almacen> {
   let enEscritorio = false;
   try {
@@ -704,7 +752,9 @@ export async function abrirAlmacen(): Promise<Almacen> {
 
     const { default: Database } = await import("@tauri-apps/plugin-sql");
     const db = await Database.load("sqlite:libretype.db");
-    return new AlmacenSqlite(db as unknown as DbSql);
+    const almacen = new AlmacenSqlite(db as unknown as DbSql);
+    almacen.recuperadas = await traspasarRespaldo(almacen);
+    return almacen;
   } catch (err) {
     console.warn("[libretype] SQLite no disponible, se usa localStorage:", err);
     return new AlmacenLocal(enEscritorio);

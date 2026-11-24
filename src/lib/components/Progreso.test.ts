@@ -794,3 +794,25 @@ describe("Progreso.svelte - combinar una copia con lo que hay", () => {
     expect(await almacen.leerTodas()).toHaveLength(2);
   });
 });
+
+describe("Progreso.svelte - sesiones recuperadas del respaldo", () => {
+  it("dice cuántas sesiones se han recuperado tras un fallo de la base de datos", () => {
+    const almacen = Object.assign(new AlmacenMemoria(), { recuperadas: 3 });
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones: [sesionPrueba], lecciones: LESSONS, tipoAlmacen: "sqlite", almacen, onBorrar: () => {} },
+    });
+    flushSync();
+    expect(document.querySelector(".recuperadas")?.textContent?.replace(/\s+/g, " "))
+      .toContain("Se han recuperado 3 sesiones que se guardaron de forma provisional");
+  });
+
+  it("sin nada recuperado no dice nada", () => {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones: [sesionPrueba], lecciones: LESSONS, tipoAlmacen: "sqlite", almacen: new AlmacenMemoria(), onBorrar: () => {} },
+    });
+    flushSync();
+    expect(document.querySelector(".recuperadas")).toBeNull();
+  });
+});

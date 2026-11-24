@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   contarDominadas, DOMINADA, dominioDe, INTENTOS_MINIMOS, mapaDeDominio,
-  MS_LENTO, MS_RAPIDO, opacidadEtiqueta, registrar,
+  MS_LENTO, MS_RAPIDO, olvidar, opacidadEtiqueta, registrar, VENTANA,
   type EstadoTecla,
 } from './dominio';
 
@@ -99,6 +99,77 @@ describe('registrar intentos', () => {
     let e = registrar(undefined, true, 400);
     e = registrar(e, false, 600);
     expect(e).toEqual({ intentos: 2, aciertos: 1, msTotal: 1000 });
+  });
+
+  it('nunca guarda más de dos ventanas de intentos', () => {
+    let e: EstadoTecla | undefined;
+    for (let i = 0; i < 500; i++) {
+      e = registrar(e, i % 10 !== 0, 400);
+      expect(e.intentos).toBeLessThan(2 * VENTANA);
+      expect(Number.isInteger(e.aciertos)).toBe(true);
+      expect(Number.isInteger(e.msTotal)).toBe(true);
+    }
+    // El 90% de acierto sobrevive al reescalado, no se deforma.
+    expect(e!.aciertos / e!.intentos).toBeGreaterThanOrEqual(0.85);
+    expect(e!.aciertos / e!.intentos).toBeLessThanOrEqual(0.95);
+  });
+
+  it('el reescalado conserva la proporción y la velocidad media', () => {
+    const e = olvidar({ intentos: 480, aciertos: 432, msTotal: 480 * 500 });
+    // 48 fallos de 480 son 2,4 en una ventana de 24: se quedan en 2.
+    expect(e).toEqual({ intentos: VENTANA, aciertos: VENTANA - 2, msTotal: VENTANA * 500 });
+    // Lo que no llega a dos ventanas se queda como estaba.
+    const corto = { intentos: 2 * VENTANA - 1, aciertos: 3, msTotal: 99 };
+    expect(olvidar(corto)).toBe(corto);
+  });
+
+  it('un fallo suelto se acaba olvidando', () => {
+    // Redondear siempre hacia arriba dejaría ese fallo para siempre y la tecla
+    // no llegaría nunca al 100%.
+    let e: EstadoTecla | undefined = registrar(undefined, false, 300);
+    for (let i = 0; i < 4 * VENTANA; i++) e = registrar(e, true, 300);
+    expect(e!.aciertos).toBe(e!.intentos);
+  });
+
+  it('el niño que mejora: los fallos del principio dejan de pesar', () => {
+    // Cuarenta intentos al 70% el primer día; luego ya no falla. Contando toda
+    // la vida haría falta un centenar de intentos para llegar al 90%: con la
+    // ventana, la ayuda se retira mucho antes.
+    let e: EstadoTecla | undefined;
+    for (let i = 0; i < 40; i++) e = registrar(e, i % 10 >= 3, 900);
+    expect(dominioDe(e)).toBe(0);
+    let hasta = 0;
+    while (dominioDe(e) < DOMINADA && hasta < 200) {
+      e = registrar(e, true, MS_RAPIDO);
+      hasta++;
+    }
+    expect(dominioDe(e)).toBeGreaterThanOrEqual(DOMINADA);
+    // Con la cuenta de toda la vida: (28 + n) / (40 + n) >= 0,9 pide n >= 80.
+    expect(hasta).toBeLessThan(80);
+  });
+
+  it('una tecla dominada hace tiempo vuelve a enseñar su letra si se falla', () => {
+    // Quinientos aciertos de hace meses no pueden tapar que hoy no sale.
+    let e: EstadoTecla | undefined = { intentos: 500, aciertos: 500, msTotal: 500 * MS_RAPIDO };
+    expect(dominioDe(e)).toBeGreaterThanOrEqual(DOMINADA);
+    for (let i = 0; i < 6; i++) e = registrar(e, false, 900);
+    expect(dominioDe(e)).toBe(0);
+    expect(opacidadEtiqueta(dominioDe(e))).toBe(1);
+  });
+
+  it('las reglas de siempre siguen valiendo con la ventana', () => {
+    // Por debajo de 8 intentos no se retira nada aunque todos sean aciertos.
+    let e: EstadoTecla | undefined;
+    for (let i = 0; i < INTENTOS_MINIMOS - 1; i++) e = registrar(e, true, MS_RAPIDO);
+    expect(dominioDe(e)).toBe(0);
+    // Y fallando una de cada cinco tampoco, por rápido que sea y en ningún
+    // momento: el reescalado no puede colar un 90% que no existe.
+    e = undefined;
+    for (let i = 0; i < 300; i++) {
+      e = registrar(e, i % 5 !== 0, MS_RAPIDO);
+      expect(dominioDe(e), `intento ${i}`).toBe(0);
+    }
+    expect(dominioDe(e)).toBe(0);
   });
 
   it('un parón largo no falsea la media', () => {

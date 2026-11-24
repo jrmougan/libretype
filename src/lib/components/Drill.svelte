@@ -536,7 +536,10 @@
      de debajo asoma). El suelo de la fila no cambia: esto no le quita nada al
      teclado ni mueve el orden de sacrificio. */
   .compacta .text { padding: var(--space-1) var(--space-3) calc(var(--space-1) + 4px); line-height: 1.35; }
-  .compacta .explica { padding: 0 var(--space-3); }
+  /* Con interlineado propio: el «normal» de Atkinson Hyperlegible es más alto que
+     el de la letra del sistema y, a doble tamaño, el botón pasaba de --target-min
+     y se llevaba 2px del teclado (medido a 1024x640 al 200%). */
+  .compacta .explica { padding: 0 var(--space-3); line-height: 1.2; }
 
   .capture {
     position: absolute;

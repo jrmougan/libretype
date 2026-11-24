@@ -10,6 +10,8 @@
   import SelectConfirmado from './lib/components/SelectConfirmado.svelte';
   import SelectorLeccion from './lib/components/SelectorLeccion.svelte';
   import SelectorTono from './lib/components/SelectorTono.svelte';
+  import TamanoTexto from './lib/components/TamanoTexto.svelte';
+  import { escucharAtajosTamano } from './lib/tamano';
   import { obtenerLayout } from './lib/keyboard/layouts';
   import { catalogo } from './lib/lecciones/catalogo';
   import { ejercicioDe, resolverLeccion, type Seleccion } from './lib/lecciones/ejercicio';
@@ -212,6 +214,13 @@
     window.addEventListener('blur', onWindowBlur);
     return () => window.removeEventListener('blur', onWindowBlur);
   });
+
+  // Ctrl+ / Ctrl− / Ctrl+0 mueven --ui-scale y no el zoom del motor (ver lib/tamano.ts).
+  onMount(() => escucharAtajosTamano(
+    window,
+    () => prefs.escala,
+    (escala) => { prefs = { ...prefs, escala }; },
+  ));
 
   function elegirTono(tono: Tono): void {
     prefs = { ...prefs, tono };
@@ -671,7 +680,13 @@
     {#if !progresoCargado}
       <p class="note" role="status">Cargando progreso…</p>
     {:else if vista === 'tono'}
-      <div class="centrado"><SelectorTono onElegir={elegirTono} /></div>
+      <!-- El tamaño va ya aquí: quien necesita la letra grande no puede tener que
+           leer en pequeño para encontrar dónde se agranda. -->
+      <div class="centrado primera">
+        <TamanoTexto id="tamano-inicio" escala={prefs.escala}
+                     onCambiar={(escala) => (prefs = { ...prefs, escala })} />
+        <SelectorTono onElegir={elegirTono} />
+      </div>
     {:else if vista === 'cero'}
       <!-- Quien ya practica ha venido a repasar: vuelve a lo suyo, sin perder el sitio. -->
       <LeccionCero
@@ -927,6 +942,7 @@
   .escena:has(> .barra-practica) { grid-template-rows: auto minmax(0, 1fr); }
   /* `safe`: si no cabe, centrar dejaría la parte de arriba donde no se puede llegar. */
   .centrado { align-self: safe center; justify-self: center; max-width: 72ch; }
+  .primera { display: grid; gap: var(--space-6); }
 
   /* --- Panel superpuesto ------------------------------------------------- */
   dialog {

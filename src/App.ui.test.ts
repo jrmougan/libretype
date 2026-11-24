@@ -281,7 +281,7 @@ describe('ajustes', () => {
     await abrir({ escala: 1.5 });
     boton('Ajustes').click();
     await tick();
-    expect(document.querySelector('#scale')?.getAttribute('aria-valuetext')).toBe('150%');
+    expect(document.querySelector('#tamano-rango')?.getAttribute('aria-valuetext')).toBe('150%');
     expect(document.querySelector('#panel-dialogo button[aria-pressed="true"]')).not.toBeNull();
   });
 

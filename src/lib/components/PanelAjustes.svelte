@@ -1,5 +1,6 @@
 <script lang="ts">
   /** Contenido del panel de ajustes. Quien lo monta decide qué hacer con cada cambio. */
+  import TamanoTexto from './TamanoTexto.svelte';
   import { LAYOUTS } from '../keyboard/layouts';
   import type { Preferencias } from '../preferencias';
   import type { Actualizador, EstadoActualizacion } from '../actualizacion';
@@ -19,15 +20,10 @@
 
   const TEMAS = [['auto', 'Sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']] as const;
   const CONTRASTES = [['auto', 'Sistema'], ['normal', 'Normal'], ['alto', 'Alto']] as const;
-  const pct = $derived(`${Math.round(prefs.escala * 100)}%`);
 </script>
 
 <div class="field">
-  <label for="scale">Tamaño del texto: {pct}</label>
-  <input id="scale" type="range" min="1" max="2" step="0.1"
-         value={prefs.escala}
-         aria-valuetext={pct}
-         oninput={(e) => onCambiar({ escala: +e.currentTarget.value })} />
+  <TamanoTexto escala={prefs.escala} conDeslizador onCambiar={(escala) => onCambiar({ escala })} />
 </div>
 
 <div class="field">

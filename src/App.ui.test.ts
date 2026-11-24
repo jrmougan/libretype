@@ -99,7 +99,12 @@ describe('lo que dejaba la pantalla rota', () => {
   });
 
   it('el ancho de los paneles crece con la letra', () => {
-    expect(appSvelte).toMatch(/\.panel\s*\{[^}]*width:\s*min\(calc\(36rem \* var\(--ui-scale\)\), 100%\)/);
+    // La caja centrada es quien mide ahora; el <dialog> ocupa la ventana y pinta el velo.
+    const anchos = [...appSvelte.matchAll(/\.panel-caja[.\w-]*\s*\{[^}]*?width:\s*([^;]+);/g)].map((m) => m[1]);
+    expect(anchos).toHaveLength(3);
+    for (const ancho of anchos) {
+      expect(ancho).toMatch(/^min\(calc\(\d+rem \* var\(--ui-scale\)\), 100%\)$/);
+    }
   });
 });
 

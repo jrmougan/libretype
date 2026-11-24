@@ -176,8 +176,6 @@
    * «esto se pulsa» también para quien no distingue bien los degradados. */
   --shadow-boton: 0 3px 0 var(--accent-deep);
   --shadow-panel: 0 24px 60px rgba(0, 0, 0, 0.28);
-  /* La del panel lateral cae hacia la izquierda porque entra por la derecha. */
-  --shadow-lateral: -12px 0 40px rgba(0, 0, 0, 0.22);
 
   /* --- Color: claro ---------------------------------------------------------
    * Papel cálido y acento terracota. Lo medido está en accesibilidad.test.ts:
@@ -376,7 +374,6 @@
     --scrim: Canvas;
     --shadow-boton: none;
     --shadow-panel: none;
-    --shadow-lateral: none;
   }
   .key { forced-color-adjust: none; border: 2px solid CanvasText; }
 }

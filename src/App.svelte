@@ -843,7 +843,7 @@
 -->
 <div class="app" class:compacta>
   <header class="barra">
-    <h1>LibreType</h1>
+    <h1 class="logo">Libre<span class="logo-type">Type</span></h1>
 
     <!-- Antes de elegir el tono, o de saber quién practica, no hay nada que elegir
          aquí: se vería vacío. -->
@@ -864,19 +864,22 @@
       <div class="controles-intento">
         <button
           type="button"
-          class="btn-intento"
+          class="btn-barra btn-intento"
           onclick={reiniciarLeccion}
           aria-label="Reiniciar esta lección"
         >
-          Reiniciar
+          <!-- El icono acompaña al texto, no lo sustituye: «↺» a secas no lo
+               entiende todo el mundo. -->
+          <span class="ico ico-reiniciar" aria-hidden="true"></span>Reiniciar
         </button>
         <button
           type="button"
-          class="btn-intento"
+          class="btn-barra btn-intento"
+          class:activo={pausado}
           onclick={alternarPausa}
           aria-label={pausado ? 'Reanudar lección' : 'Pausar lección'}
         >
-          {pausado ? 'Reanudar' : 'Pausar'}
+          <span class="ico {pausado ? 'ico-seguir' : 'ico-pausa'}" aria-hidden="true"></span>{pausado ? 'Reanudar' : 'Pausar'}
         </button>
       </div>
 
@@ -919,6 +922,7 @@
         </div>
       {/if}
       <button
+        class="btn-barra contorno"
         aria-expanded={panel === 'progreso'}
         aria-controls="panel-dialogo"
         aria-haspopup="dialog"
@@ -928,6 +932,7 @@
         Progreso
       </button>
       <button
+        class="btn-barra contorno"
         aria-expanded={panel === 'ajustes'}
         aria-controls="panel-dialogo"
         aria-haspopup="dialog"
@@ -1054,16 +1059,18 @@
   />
 
   {#if panel}
+    <!-- El <dialog> ocupa la ventana y pinta el velo; la caja va centrada
+         encima. Así el velo no depende de que ::backdrop herede los tokens. -->
     <dialog
       id="panel-dialogo"
       class="panel"
-      class:ancho={panel === 'progreso'}
       bind:this={dialogoPanel}
       use:abrirDialogo
       aria-label={panel === 'ajustes' ? 'Ajustes' : panel === 'lecciones' ? 'Tus lecciones' : 'Progreso'}
       oncancel={(e) => { e.preventDefault(); cerrarPanel(); }}
       onclose={alCerrarseDialogo}
     >
+      <div class="panel-caja" class:caja-ajustes={panel === 'ajustes'} class:caja-lecciones={panel === 'lecciones'}>
       <div class="panel-cab">
         <!-- Con más de un perfil, el título dice de quién es lo que se enseña. -->
         <h2 tabindex="-1">{panel === 'ajustes' ? 'Ajustes' : panel === 'lecciones' ? 'Tus lecciones' : voz.progreso}{#if panel !== 'ajustes' && perfiles.length > 1 && aliasActivo}{' · '}{aliasActivo}{/if}</h2>
@@ -1128,6 +1135,7 @@
           <Informe alias={aliasActivo || 'este equipo'} {sesiones} {teclas} />
         {/if}
       </div>
+      </div>
     </dialog>
   {/if}
 </div>
@@ -1159,23 +1167,65 @@
     border-bottom: 1px solid var(--border);
     background: var(--surface);
   }
-  h1 {
+  .logo {
     margin: 0;
-    font-size: var(--text-lg);
+    font-size: var(--text-cifra);
+    font-weight: 700;
+    letter-spacing: -0.01em;
     white-space: nowrap;
   }
+  /* Solo el color separa «Type», pero no comunica nada: es la marca. */
+  .logo-type { color: var(--accent-ink); }
 
-  .metricas { display: flex; gap: var(--space-4); margin: 0; }
+  /* Las métricas van en bloque, sobre fondo hundido. La barra no puede ganar
+     altura con ello: aprietan el interlineado y caben en --target-min. */
+  .metricas {
+    display: flex;
+    gap: var(--space-4);
+    margin: 0;
+    padding: calc(var(--space-1) / 2) var(--space-3);
+    background: var(--surface-sunken);
+    border-radius: var(--radius);
+  }
   /* Ancho reservado: que las cifras crezcan no puede mover el resto de la barra. */
   .metricas div { display: flex; flex-direction: column; min-width: 5ch; }
-  .metricas dt { font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.2; }
+  .metricas dt { font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.1; }
   .metricas dd {
-    margin: 0; font-size: var(--text-lg); line-height: 1.1;
+    margin: 0; font-size: var(--text-cifra); font-weight: 700; line-height: 1;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
-  .metricas small { font-size: var(--text-xs); color: var(--fg-muted); }
+  .metricas small { font-size: var(--text-xs); font-weight: 500; color: var(--fg-muted); }
 
-  .controles-intento { display: flex; gap: var(--space-2); }
+  .controles-intento { display: flex; gap: var(--space-1); }
+  .btn-intento {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding-inline: var(--space-3);
+    white-space: nowrap;
+  }
+  /* Iconos dibujados con CSS y no con caracteres: así no entran en el nombre
+     accesible ni en el textContent del botón. */
+  .ico { display: inline-block; flex: none; width: 1em; height: 1em; }
+  .ico-reiniciar::before {
+    content: '↺';
+    content: '↺' / '';
+    display: block;
+    font-size: 1.25em;
+    line-height: 0.8;
+    font-weight: 700;
+  }
+  .ico-pausa {
+    width: 0.8em;
+    border-left: 0.28em solid currentColor;
+    border-right: 0.28em solid currentColor;
+  }
+  .ico-seguir {
+    width: 0.8em;
+    background: currentColor;
+    clip-path: polygon(10% 0, 100% 50%, 10% 100%);
+  }
 
   .acciones { display: flex; gap: var(--space-2); margin-left: auto; align-items: center; }
 
@@ -1183,7 +1233,14 @@
      aparece cuando hay algo que hacer. Ocupa sitio en una barra que ya va
      justa, así que el texto es corto y el detalle va en el <small>. */
   .actualizacion { display: flex; align-items: center; }
-  .actualizacion button { white-space: nowrap; }
+  /* El principal (base.css), a la medida de la barra: sin el alto de más ni el
+     canto, que aquí se lo quitarían al teclado. */
+  .actualizacion button {
+    white-space: nowrap;
+    min-height: var(--target-min);
+    padding-inline: var(--space-3);
+    box-shadow: none;
+  }
   /* El color no es lo que lo distingue: el texto ya dice qué hace. */
   .actualizacion small { font-size: var(--text-xs); opacity: 0.9; }
   .act-texto {
@@ -1196,7 +1253,7 @@
   /* Sin la marca, la barra cabe en una fila a 1024 y deja sitio al aviso: la
      ventana ya dice cómo se llama la aplicación. Sigue en el árbol. */
   @media (max-width: 1100px) {
-    h1, .actualizacion small {
+    .logo, .actualizacion small {
       position: absolute; width: 1px; height: 1px;
       overflow: hidden; clip-path: inset(50%);
     }
@@ -1205,7 +1262,7 @@
   /* Letra grande: dos filas de barra como mucho. Fuera lo que se repite (la marca,
      las etiquetas de unas métricas que ya llevan su unidad, el relleno de los
      botones), porque cada píxel de aquí se lo quita al teclado. */
-  .compacta h1, .compacta .metricas dt {
+  .compacta .logo, .compacta .metricas dt {
     position: absolute; width: 1px; height: 1px;
     overflow: hidden; clip-path: inset(50%);
   }
@@ -1223,8 +1280,9 @@
     overflow: hidden; clip-path: inset(50%);
   }
   .compacta .barra-practica button { padding: 0 var(--space-3); white-space: nowrap; }
-  .compacta .metricas { gap: var(--space-3); }
-  .compacta .metricas dd { font-size: var(--text-base); }
+  .compacta .metricas { gap: var(--space-3); padding-block: 0; }
+  .compacta .metricas dd { font-size: var(--text-base); line-height: 1.3; }
+  .compacta .btn-intento { gap: var(--space-1); }
   .compacta .actualizacion small {
     position: absolute; width: 1px; height: 1px;
     overflow: hidden; clip-path: inset(50%);
@@ -1250,7 +1308,11 @@
   .centrado { align-self: safe center; justify-self: center; max-width: 72ch; }
   .primera { display: grid; gap: var(--space-6); }
 
-  /* --- Panel superpuesto ------------------------------------------------- */
+  /* --- Panel superpuesto -------------------------------------------------
+   * El <dialog> ocupa la ventana y pinta el velo (--scrim), y la caja va
+   * centrada encima, igual que el diálogo de resultado. El velo va en el propio
+   * diálogo y no en ::backdrop porque este no hereda los tokens en todos los
+   * WebKit que soportamos. */
   dialog {
     color: var(--fg);
     max-width: none;
@@ -1259,38 +1321,53 @@
     padding: 0;
     border: 0;
   }
-  dialog::backdrop {
-    background: color-mix(in srgb, var(--bg) 78%, transparent);
+  dialog::backdrop { background: transparent; }
+  .panel {
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    display: grid; place-items: center;
+    background: var(--scrim);
+    padding: var(--space-4);
   }
 
   /* El ancho va en función de `--ui-scale`, como la letra: fijo, al 200% cabían
      dos palabras por línea y el panel de progreso medía casi 8000px de alto. */
-  .panel {
-    position: fixed; top: 0; right: 0; bottom: 0; left: auto;
-    height: 100%;
-    width: min(calc(36rem * var(--ui-scale)), 100%);
+  .panel-caja {
+    width: min(calc(60rem * var(--ui-scale)), 100%);
+    max-height: 100%;
+    min-height: 0;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
     background: var(--surface);
-    border-left: 1px solid var(--border);
-    box-shadow: var(--shadow-lateral);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-panel);
   }
-  /* Las tablas de progreso caben enteras sin desplazarse de lado al 100%. */
-  .panel.ancho { width: min(calc(46rem * var(--ui-scale)), 100%); }
+  /* Ajustes va en dos columnas al 100% (una con la letra grande). */
+  .panel-caja.caja-ajustes { width: min(calc(65rem * var(--ui-scale)), 100%); }
+  .panel-caja.caja-lecciones { width: min(calc(44rem * var(--ui-scale)), 100%); }
   .panel-cab {
     display: flex; align-items: center; justify-content: space-between;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-4) var(--space-6);
     border-bottom: 1px solid var(--border);
   }
-  .panel-cab h2 { margin: 0; font-size: var(--text-lg); }
+  .panel-cab h2 { margin: 0; font-size: calc(1.5rem * var(--ui-scale)); line-height: 1.2; min-width: 0; overflow-wrap: anywhere; }
   /* El panel sí se desplaza por dentro: es lo que evita que lo haga la página. */
   .panel-cuerpo {
+    min-height: 0;
     overflow-y: auto;
-    padding: var(--space-4);
+    padding: var(--space-4) var(--space-6) var(--space-6);
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-6);
     align-content: start;
+  }
+  .compacta .panel { padding: var(--space-2); }
+  .compacta .panel-cab { padding: var(--space-2) var(--space-4); }
+  .compacta .panel-cuerpo { padding: var(--space-3) var(--space-4) var(--space-4); }
+  @media (forced-colors: active) {
+    .panel-caja { border-color: CanvasText; }
   }
 
   .note { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }

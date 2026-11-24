@@ -77,6 +77,9 @@ export const PASOS: Paso[] = [
       'Al principio irás despacio y querrás mirar el teclado. Es normal: le pasa a todo el mundo.',
       'Mirar es justo lo que frena el aprendizaje: mientras los ojos buscan la tecla, los dedos no memorizan dónde está. Se avanza más yendo despacio sin mirar que rápido mirando.',
       'Si te pierdes, busca los relieves de la F y la J con los índices y vuelve a empezar. Para eso están.',
+      // Horizonte realista, sin cifras: una cifra sería una meta que se puede incumplir.
+      'Aprender a escribir sin mirar lleva unas semanas, un rato cada día. Más vale poco y a menudo que mucho de golpe.',
+      'Habrá un tramo en el que parezca que no avanzas. Le pasa a todo el mundo y forma parte del aprendizaje: si sigues practicando, se pasa.',
       'Ya puedes ponerte a practicar. Esta pantalla sigue en el selector de lección, en «Antes de empezar», por si quieres repasarla.',
     ],
     guia: REPOSO,

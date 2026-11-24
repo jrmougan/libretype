@@ -61,6 +61,9 @@
     movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar,
   }: Props = $props();
 
+  /** Para enlazar el campo con su descripción aunque haya más de un Drill montado. */
+  const uid = $props.id();
+
   const sinAnimaciones = $derived(movimiento === 'reducido' || animaciones === 'reducidas');
 
   let field = $state<HTMLTextAreaElement | null>(null);
@@ -359,7 +362,10 @@
 
   <!-- La etiqueta devuelve el foco al pulsar el texto sin interceptar teclas.
        El campo real conserva la composición del método de entrada del sistema. -->
-  <label class="text" bind:this={cajaTexto} aria-label={`Texto de la lección: ${target}`}>
+  <!-- El nombre del campo es corto y el texto va como descripción: con la lección
+       entera en el nombre, el lector la repetía cada vez que el foco volvía aquí.
+       La descripción se anuncia después y se puede saltar. -->
+  <label class="text" bind:this={cajaTexto}>
     <textarea
       bind:this={field}
       class="capture"
@@ -367,7 +373,8 @@
       autocapitalize="off"
       spellcheck="false"
       disabled={!activo || pausado}
-      aria-label={`Escribe el texto de la lección: ${target}`}
+      aria-label={titulo ? `Campo de práctica: ${titulo}` : 'Campo de práctica'}
+      aria-describedby="{uid}-texto"
       onpaste={(e) => e.preventDefault()}
       onbeforeinput={(e) => {
         if ((e as InputEvent).inputType === 'insertFromPaste') {
@@ -395,6 +402,7 @@
   <!-- Para lector de pantalla: el bucle de práctica es visual y motor, pero la
        pista sí tiene que ser audible, y el progreso legible. -->
   <p class="sr-only" aria-live="polite">{hint}</p>
+  <span id="{uid}-texto" class="sr-only">Texto: {target}</span>
 
   <p class="hint" aria-hidden="true">
     {#if nextStep}

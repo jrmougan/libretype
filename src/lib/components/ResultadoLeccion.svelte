@@ -58,9 +58,10 @@
   use:abrir
   aria-labelledby="resultado-titulo"
   aria-describedby="resultado-desc"
-  aria-live="polite"
   oncancel={(e) => { e.preventDefault(); onRepetir(); }}
 >
+  <!-- Una sola región viva en todo el diálogo: anidar otra (en el <dialog> o en
+       el aviso de guardado) hacía que el lector anunciase lo mismo dos veces. -->
   <div class="resultado" class:record class:celebra aria-live="polite">
     <h2 id="resultado-titulo">
       {#if record}★ {voz.record}{:else}{voz.terminada}{/if}
@@ -71,7 +72,7 @@
     </div>
     {#if nota}<p class="note">{nota}</p>{/if}
     {#if errorGuardado}
-      <p class="note" role="status">No se ha podido guardar el resultado. Este intento solo contará hasta que cierres la aplicación.</p>
+      <p class="note">No se ha podido guardar el resultado. Este intento solo contará hasta que cierres la aplicación.</p>
     {/if}
     <div class="botones">
       {#if repetirPrimero}

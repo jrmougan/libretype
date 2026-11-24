@@ -120,7 +120,9 @@ describe('captura y paneles', () => {
     expect(dialogo.open).toBe(true);
     expect(dialogo.getAttribute('aria-labelledby')).toBe('resultado-titulo');
     expect(dialogo.getAttribute('aria-describedby')).toBe('resultado-desc');
-    expect(dialogo.getAttribute('aria-live')).toBe('polite');
+    // Una sola región viva: anidadas, el lector anunciaba lo mismo dos veces.
+    expect(dialogo.hasAttribute('aria-live')).toBe(false);
+    expect(dialogo.querySelectorAll('[aria-live], [role="status"], [role="alert"]')).toHaveLength(1);
     expect(dialogo.querySelector('#resultado-desc')).not.toBeNull();
     expect(dialogo.querySelector('.resultado')?.getAttribute('aria-live')).toBe('polite');
     expect(campo().disabled).toBe(true);

@@ -231,6 +231,10 @@ input[type="radio"] {
   .btn-barra[aria-expanded="true"],
   .btn-barra[aria-pressed="true"],
   .btn-barra.activo {
+    /* Su fondo es --fg y su texto --bg: con los tokens en CanvasText y Canvas, el
+       texto quedaría sobre su propia placa de Canvas y no se vería. */
+    background: Canvas;
+    color: CanvasText;
     border-color: Highlight;
     outline: 2px solid Highlight;
   }

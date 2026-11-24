@@ -214,6 +214,7 @@
            no hace falta: la tecla entera ya es de ese color. -->
       {#if (k.base || k.label) && st !== 'next'}
         <rect
+          class="dedo"
           x={k.x + 5} y={k.y + H - 7} width={k.w - 10} height="4" rx="2"
           fill={dedo} opacity={st === 'pressed' ? 0.95 : 0.7}
         />
@@ -311,4 +312,33 @@
      crecer la letra principal se le echa encima. Se sube en proporción a lo que
      ha crecido la fuente; a escala 1 es translateY(0). */
   .sup { transform: translateY(calc(-20px * (var(--factor-tecla) - 1))); }
+
+  /* Alto contraste del sistema. Fondos y bordes ya llegan en Canvas y CanvasText
+     (final de tokens.css); Highlight se pone aquí y no en :root porque en el HTML
+     dejaría sin texto los botones (ver allí). Todos los dedos van a Highlight: con
+     la paleta del sistema no hay nueve colores que distinguir, y lo que importa es
+     que la siguiente destaque, con su anillo y su triángulo. El dedo sigue dicho
+     en texto en la pista. Además:
+     - se apagan las barras de dedo, que en Highlight harían de cada tecla una
+       candidata a «la siguiente»;
+     - la pulsación fallida, sin su fondo de error, se confundiría con una tecla
+       en reposo: lleva el borde grueso y discontinuo. */
+  @media (forced-colors: active) {
+    .keyboard {
+      --accent: Highlight;
+      --accent-fg: HighlightText;
+      --on-finger: HighlightText;
+      --finger-l-pinky: Highlight;
+      --finger-l-ring: Highlight;
+      --finger-l-middle: Highlight;
+      --finger-l-index: Highlight;
+      --finger-r-index: Highlight;
+      --finger-r-middle: Highlight;
+      --finger-r-ring: Highlight;
+      --finger-r-pinky: Highlight;
+      --finger-thumb: Highlight;
+    }
+    .dedo { display: none; }
+    .key.wrong .cap { stroke-width: 4; stroke-dasharray: 5 3; }
+  }
 </style>

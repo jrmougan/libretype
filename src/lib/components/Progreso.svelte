@@ -907,6 +907,10 @@
   @media (forced-colors: active) {
     .global div, .tecla-card { border: 1px solid CanvasText; }
     .insignia { forced-color-adjust: none; border-color: CanvasText; background: Canvas; color: CanvasText; }
+    /* La superada sale de los tokens (CanvasText con la marca en Canvas); la
+       disponible conservaba el acento del tema: va en Highlight, como la tecla
+       siguiente. Sin placa, por el forced-color-adjust de arriba. */
+    .insignia.abierta { background: Highlight; border-color: Highlight; color: HighlightText; }
     tr.actual > * { background: Canvas; }
     .aqui { border: 1px solid CanvasText; }
   }

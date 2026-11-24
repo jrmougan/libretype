@@ -160,6 +160,10 @@ de altura a mitad de lección. Medido con Chromium y WebKit: la práctica cabe s
 desplazarse a 1280x800 y 1024x640, también al 200%. Con la barra extra de práctica
 continua o texto propio, a 1024x640 al 200% sobran unos 50px y actúa el paso 4.
 
+Las pantallas de entrada (tono y «¿Quién practica?») también tienen modo compacto: el
+título del tamaño va al lado de sus botones y los nombres en tres columnas. Caben a
+1280x800 al 200%; a 1024x640 al 200%, o con OpenDyslexic, se desplazan.
+
 Los paneles miden en función de `--ui-scale`, como la letra; fijos, al 200% cabían
 dos palabras por línea.
 
@@ -650,6 +654,11 @@ Reglas que aplican a cualquier UI nueva:
 - El alto contraste propio (`data-contrast="alto"`, o `prefers-contrast: more` con la
   preferencia en «Sistema») va al final de `tokens.css` para ganarle al tono de juego.
   Sus paletas se miden en `accesibilidad.test.ts` leyéndolas del propio fichero.
+- `forced-colors` (el alto contraste de Windows) va al final de `tokens.css` y en
+  `:root` solo pone Canvas y CanvasText: el navegador respeta los colores del sistema
+  que pone el autor y pinta una placa de Canvas detrás del texto, así que un fondo
+  Highlight en el HTML deja el texto invisible. Highlight va dentro del SVG (teclado,
+  gráfica) o con `forced-color-adjust: none`. Hay test.
 - OpenDyslexic va incluida (`src/assets/fonts/`, OFL). El teclado en pantalla se
   queda en la monoespaciada (`--font-key`): su geometría está medida con ella.
 - vitest sustituye el CSS por una cadena vacía: un error de sintaxis en `tokens.css`

@@ -364,20 +364,6 @@
   }
 }
 
-/* Alto contraste del sistema. forced-colors lo aplica Windows por su cuenta;
- * aquí solo nos aseguramos de que los bordes no desaparezcan. */
-@media (forced-colors: active) {
-  :root {
-    --border: CanvasText;
-    --border-strong: CanvasText;
-    --accent-deep: CanvasText;
-    --scrim: Canvas;
-    --shadow-boton: none;
-    --shadow-panel: none;
-  }
-  .key { forced-color-adjust: none; border: 2px solid CanvasText; }
-}
-
 /* Movimiento reducido: se respeta la preferencia del sistema, y además el
  * usuario puede forzarlo desde los ajustes de la app con data-motion. */
 @media (prefers-reduced-motion: reduce) {
@@ -721,4 +707,48 @@ body {
 :root[data-contrast="alto"] :focus-visible { outline-width: 4px; }
 @media (prefers-contrast: more) {
   :root:not([data-contrast]) :focus-visible { outline-width: 4px; }
+}
+
+/* --- Alto contraste del sistema ---------------------------------------------
+ * `forced-colors` lo aplica Windows por su cuenta al HTML, pero no a todo:
+ * el teclado y la gráfica son SVG y pintan con `fill`/`stroke` que salen de estos
+ * tokens, igual que lo que lleva `forced-color-adjust: none`. Sin este mapeo el
+ * teclado conservaba los colores del tema sobre el fondo del sistema.
+ *
+ * Aquí solo van Canvas y CanvasText, y no es por prudencia: el navegador respeta
+ * los colores del sistema que pone el autor y pinta detrás de cada texto una placa
+ * de Canvas. Un fondo Highlight con texto HighlightText (un `.primario`) quedaba
+ * con el texto invisible sobre su placa. Los fondos van a Canvas y las tintas a
+ * CanvasText; Highlight se asigna dentro del teclado y de la gráfica, que son SVG
+ * y no llevan placa. Por eso tampoco hay `--fg` como fondo sin su regla propia
+ * (`.btn-barra` activo, en base.css).
+ *
+ * Va al final del fichero y con `:root` repetido a propósito: tiene que ganarle al
+ * tema oscuro y a las paletas de alto contraste propio, que llegan a tres
+ * selectores de especificidad. */
+@media (forced-colors: active) {
+  :root:root:root {
+    --bg: Canvas;
+    --surface: Canvas;
+    --surface-sunken: Canvas;
+    --accent-soft: Canvas;
+    --ok-bg: Canvas;
+    --error-bg: Canvas;
+    --pending-bg: Canvas;
+    --celebracion-soft: Canvas;
+    --muestra-juego-bg: Canvas;
+    --scrim: Canvas;
+    --border: CanvasText;
+    --border-strong: CanvasText;
+    --fg: CanvasText;
+    --fg-muted: CanvasText;
+    --accent-deep: CanvasText;
+    --accent-ink: CanvasText;
+    --ok: CanvasText;
+    --error: CanvasText;
+    --pending: CanvasText;
+    --celebracion-deep: CanvasText;
+    --shadow-boton: none;
+    --shadow-panel: none;
+  }
 }

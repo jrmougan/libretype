@@ -533,3 +533,46 @@ describe("tokens.css y base.css se pueden compilar", () => {
     }
   });
 });
+
+describe("Alto contraste del sistema (forced-colors)", () => {
+  const sinComentarios = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const bloqueForzado = (css: string) => {
+    const i = css.lastIndexOf("@media (forced-colors: active)");
+    expect(i).toBeGreaterThan(-1);
+    return css.slice(i);
+  };
+
+  it("mapea a colores del sistema los tokens con los que pinta el SVG", () => {
+    const bloque = bloqueForzado(sinComentarios(tokensCss));
+    for (const token of ["--surface", "--surface-sunken", "--border-strong", "--fg", "--fg-muted", "--error", "--error-bg", "--scrim"]) {
+      expect(bloque, token).toMatch(new RegExp(`${token}:\\s*Canvas(Text)?;`));
+    }
+  });
+
+  it("en :root solo usa Canvas y CanvasText: un fondo Highlight dejaría el texto sin ver", () => {
+    // El navegador respeta los colores del sistema que pone el autor y pinta una
+    // placa de Canvas detrás del texto: un .primario en Highlight con texto
+    // HighlightText quedaba con el texto invisible.
+    const bloque = bloqueForzado(sinComentarios(tokensCss));
+    const valores = [...bloque.matchAll(/--[\w-]+:\s*([^;]+);/g)].map((m) => m[1].trim());
+    expect(valores.length).toBeGreaterThan(10);
+    for (const v of valores) expect(["Canvas", "CanvasText", "none"]).toContain(v);
+  });
+
+  it("va al final de tokens.css y gana al tema oscuro y al alto contraste propio", () => {
+    const css = sinComentarios(tokensCss);
+    expect(css.lastIndexOf("@media (forced-colors: active)")).toBeGreaterThan(css.lastIndexOf('[data-contrast="alto"]'));
+    expect(bloqueForzado(css)).toMatch(/:root:root:root\s*\{/);
+  });
+
+  it("el teclado pone Highlight a la tecla siguiente y apaga las barras de dedo", () => {
+    const css = sinComentarios(keyboardSvelte);
+    const bloque = css.slice(css.indexOf("@media (forced-colors: active)"));
+    expect(bloque).toMatch(/\.keyboard\s*\{[^}]*--on-finger:\s*HighlightText/);
+    for (const dedo of ["l-pinky", "l-ring", "l-middle", "l-index", "thumb", "r-index", "r-middle", "r-ring", "r-pinky"]) {
+      expect(bloque, dedo).toMatch(new RegExp(`--finger-${dedo}:\\s*Highlight;`));
+    }
+    expect(bloque).toMatch(/\.dedo\s*\{\s*display:\s*none/);
+    expect(keyboardSvelte).toMatch(/class="dedo"/);
+  });
+});

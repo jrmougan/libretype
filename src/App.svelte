@@ -1310,6 +1310,7 @@
   /* `safe`: si no cabe, centrar dejaría la parte de arriba donde no se puede llegar. */
   .centrado { align-self: safe center; justify-self: center; max-width: 72ch; }
   .primera { display: grid; gap: var(--space-6); }
+  .compacta .primera { gap: var(--space-3); }
 
   /* --- Panel superpuesto -------------------------------------------------
    * El <dialog> ocupa la ventana y pinta el velo (--scrim), y la caja va

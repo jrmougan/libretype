@@ -24,7 +24,7 @@
   const igual = (a: number, b: number) => Math.abs(a - b) < 0.001;
 </script>
 
-<div class="tamano">
+<div class="tamano" class:entrada={!conDeslizador}>
   <span id="{id}-l" class="titulo">Tamaño del texto: <span class="valor">{pct(escala)}</span></span>
   <div class="group botones" role="group" aria-labelledby="{id}-l">
     {#each ESCALAS_FIJAS as valor (valor)}
@@ -86,4 +86,15 @@
   .cifra { font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
   .fino { display: grid; gap: var(--space-1); font-size: var(--text-sm); justify-self: stretch; }
   .nota { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
+
+  /* En las pantallas de entrada con la letra grande, el título va a la izquierda
+     de los botones y no encima: es una fila menos en una pantalla que tiene que
+     caber entera para que se llegue a elegir sin desplazarse. */
+  :global(.app.compacta) .entrada {
+    grid-template-columns: auto auto;
+    justify-content: start;
+    align-items: center;
+    column-gap: var(--space-4);
+  }
+  :global(.app.compacta) .entrada .nota { grid-column: 1 / -1; }
 </style>

@@ -98,8 +98,16 @@
   h2 { margin: 0; font-size: var(--text-2xl); line-height: 1.2; }
   .intro { margin: 0; font-size: var(--text-md); color: var(--fg-muted); }
   /* Con la letra grande la tarjeta no puede gastar media pantalla en aire. */
-  :global(.app.compacta) .quien { padding: var(--space-4); gap: var(--space-3); }
+  :global(.app.compacta) .quien { padding: var(--space-3) var(--space-4); gap: var(--space-2); }
   :global(.app.compacta) .quien h2 { font-size: var(--text-xl); }
+  /* Y los nombres, en tres columnas y no en dos: cada fila de tarjetas cuesta más
+     de lo que se gana con su anchura. El objetivo sigue por encima del mínimo. */
+  :global(.app.compacta) .perfiles {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(10rem * var(--ui-scale))), 1fr));
+    gap: var(--space-2);
+  }
+  :global(.app.compacta) .perfil { min-height: calc(var(--target-min) * 1.25); padding: var(--space-2) var(--space-3); }
+  :global(.app.compacta) .nota { padding-top: var(--space-2); }
 
   .perfiles {
     list-style: none;

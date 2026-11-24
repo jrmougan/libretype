@@ -172,7 +172,7 @@ describe("Progreso.svelte - Exportación e importación (Issue #28)", () => {
     await tick();
     await new Promise((r) => setTimeout(r, 20));
 
-    expect(onImportar).toHaveBeenCalledWith(contenidoValido);
+    expect(onImportar).toHaveBeenCalledWith(contenidoValido, "sustituir");
     const mensaje = document.querySelector("[role='status']");
     expect(mensaje?.textContent).toContain("Copia de seguridad importada con éxito");
   });
@@ -247,7 +247,7 @@ describe("Progreso.svelte - Exportación e importación (Issue #28)", () => {
     await tick();
     await new Promise((r) => setTimeout(r, 20));
 
-    expect(onImportar).toHaveBeenCalledWith(contenido);
+    expect(onImportar).toHaveBeenCalledWith(contenido, "sustituir");
     expect(document.querySelector("[role='status']")?.textContent).toContain("con éxito");
   });
 });
@@ -736,5 +736,61 @@ describe("Progreso.svelte - comparado con uno mismo", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("Progreso.svelte - combinar una copia con lo que hay", () => {
+  async function hastaConfirmar(props: Record<string, unknown>): Promise<string> {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones: [sesionPrueba], lecciones: LESSONS, tipoAlmacen: "sqlite", onBorrar: () => {}, ...props },
+    });
+    flushSync();
+    const contenido = JSON.stringify({
+      version: 1, sesiones: [{ ...sesionPrueba, terminadaEn: "2026-09-02T12:00:00.000Z" }], teclas: {},
+    });
+    const input = document.querySelector("input[type='file']") as HTMLInputElement;
+    Object.defineProperty(input, "files", { value: [new File([contenido], "c.json")] });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    await vi.waitFor(() => expect(document.querySelector(".confirmacion")).not.toBeNull());
+    return contenido;
+  }
+  const botonDe = (texto: string) => [...document.querySelectorAll<HTMLButtonElement>(".confirmacion button")]
+    .find((b) => b.textContent?.trim() === texto)!;
+
+  it("ofrece sustituir o combinar, y explica la diferencia sin tecnicismos", async () => {
+    await hastaConfirmar({ onImportar: vi.fn() });
+    expect(document.querySelector(".confirmacion")?.textContent).toContain("juntar los dos");
+    expect(botonDe("Sí, importar")).toBeDefined();
+    expect(botonDe("Combinar con lo que hay")).toBeDefined();
+    // El foco sigue yendo a la salida segura.
+    await tick();
+    expect(document.activeElement).toBe(botonDe("Cancelar"));
+  });
+
+  it("combinar llama con ese modo y dice cuántas sesiones ha añadido", async () => {
+    const onImportar = vi.fn().mockResolvedValue({ leccionesSinSitio: 0, sesionesNuevas: 3 });
+    const contenido = await hastaConfirmar({ onImportar });
+    botonDe("Combinar con lo que hay").click();
+    await vi.waitFor(() => expect(document.querySelector("[role='status']")?.textContent).toContain("Copia combinada"));
+    expect(onImportar).toHaveBeenCalledWith(contenido, "combinar");
+    expect(document.querySelector("[role='status']")?.textContent).toContain("Se han añadido 3 sesiones.");
+  });
+
+  it("combinar una copia que no trae nada nuevo lo dice tal cual", async () => {
+    const onImportar = vi.fn().mockResolvedValue({ leccionesSinSitio: 0, sesionesNuevas: 0 });
+    await hastaConfirmar({ onImportar });
+    botonDe("Combinar con lo que hay").click();
+    await vi.waitFor(() => expect(document.querySelector("[role='status']")?.textContent)
+      .toContain("No traía ninguna sesión que no estuviera ya."));
+  });
+
+  it("sin manejador propio combina directamente en el almacén, sin duplicar", async () => {
+    const almacen = new AlmacenMemoria();
+    await almacen.guardar(sesionPrueba);
+    await hastaConfirmar({ almacen });
+    botonDe("Combinar con lo que hay").click();
+    await vi.waitFor(() => expect(document.querySelector("[role='status']")?.textContent).toContain("Se ha añadido una sesión."));
+    expect(await almacen.leerTodas()).toHaveLength(2);
   });
 });

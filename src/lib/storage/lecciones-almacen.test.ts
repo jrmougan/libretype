@@ -1,16 +1,12 @@
 /**
  * Las lecciones personalizadas en los tres almacenes, y el de SQLite contra un
- * SQLite de verdad con las migraciones reales de `lib.rs`: un doble no notaría una
- * columna mal escrita ni un parámetro de más.
+ * SQLite de verdad con las migraciones reales de `lib.rs` (`sqlite-de-prueba.ts`).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { crearLeccion, type LeccionPropia } from '../lecciones/personalizadas';
 import { AlmacenLocal, AlmacenMemoria, AlmacenSqlite, parsearCopiaSeguridad, type Almacen, type DbSql } from './almacen';
 import type { Sesion } from './progreso';
-
-const LIB_RS = Object.values(import.meta.glob('/src-tauri/src/lib.rs', {
-  eager: true, query: '?raw', import: 'default',
-}))[0] as string;
+import { migraciones, sqliteReal } from './sqlite-de-prueba';
 
 const AHORA = '2026-11-04T10:00:00.000Z';
 const LUEGO = '2026-11-05T10:00:00.000Z';
@@ -19,25 +15,6 @@ const sesion: Sesion = {
 };
 const leccion = (id = 'propia:a', titulo = 'Mi lección'): LeccionPropia =>
   crearLeccion({ titulo, descripcion: 'Qué se practica', texto: 'una frase para practicar' }, AHORA, id);
-
-/** Las migraciones reales, en orden, sacadas del fuente de Rust. */
-function migraciones(): string[] {
-  return [...LIB_RS.matchAll(/sql: "([\s\S]*?)",\s*kind: MigrationKind::Up/g)].map((m) => m[1]);
-}
-
-/** `node:sqlite` por una variable: fuera del ámbito de tipos del frontend. */
-async function sqliteReal(): Promise<DbSql> {
-  const modulo = 'node:sqlite';
-  const { DatabaseSync } = await import(/* @vite-ignore */ modulo);
-  const db = new DatabaseSync(':memory:');
-  for (const sql of migraciones()) db.exec(sql);
-  // sqlx enlaza `$1` por su número; `node:sqlite` solo lo hace con `?1`.
-  const numerados = (sql: string) => sql.replace(/\$(\d+)/g, '?$1');
-  return {
-    async execute(sql: string, valores: unknown[] = []) { return db.prepare(numerados(sql)).run(...valores); },
-    async select<T>(sql: string, valores: unknown[] = []) { return db.prepare(numerados(sql)).all(...valores) as T; },
-  };
-}
 
 beforeEach(() => localStorage.clear());
 

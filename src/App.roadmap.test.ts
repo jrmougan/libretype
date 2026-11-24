@@ -393,7 +393,10 @@ describe('teclas recién dominadas', () => {
   });
 
   it('muchas de golpe se cuentan en vez de enumerarse', async () => {
-    await abrir();
+    // El texto revisado de la primera lección, que no cambia: la a, la l, la s, la d
+    // y el espacio salen de sobra para dominarse en un solo intento limpio.
+    await abrir({}, [{ ...SESION, leccion: 'practica-continua' }]);
+    expect(textoMostrado()).toBe(catalogo.primera.text);
     await teclear(textoMostrado());
     expect(logro()).toMatch(/^Ya escribes sin mirar \d+ teclas nuevas\.$/);
   });
@@ -402,5 +405,30 @@ describe('teclas recién dominadas', () => {
     await abrir();
     await teclear('x'.repeat(textoMostrado().length));
     expect(logro()).toBeUndefined();
+  });
+});
+
+describe('importar combinando', () => {
+  it('junta la copia de otro equipo con lo que hay, y repetirlo no duplica', async () => {
+    await abrir();
+    boton('Progreso').click();
+    await tick();
+    const copia = JSON.stringify({
+      version: 1,
+      sesiones: [SESION, { ...SESION, leccion: catalogo.lecciones[1].id, terminadaEn: '2026-11-02T10:00:00.000Z' }],
+      teclas: {},
+    });
+    const guardadas = (): unknown[] => JSON.parse(localStorage.getItem('libretype.sesiones')!);
+
+    for (const esperado of ['Se ha añadido una sesión.', 'No traía ninguna sesión que no estuviera ya.']) {
+      const input = document.querySelector<HTMLInputElement>('#panel-dialogo input[type="file"]')!;
+      Object.defineProperty(input, 'files', { configurable: true, value: [new File([copia], 'c.json')] });
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      await vi.waitFor(() => expect(boton('Combinar con lo que hay')).toBeDefined());
+      boton('Combinar con lo que hay').click();
+      await vi.waitFor(() => expect(document.querySelector('#panel-dialogo [role="status"].aviso-exito')?.textContent)
+        .toContain(esperado));
+      expect(guardadas()).toHaveLength(2);
+    }
   });
 });

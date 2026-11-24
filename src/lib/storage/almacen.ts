@@ -38,16 +38,70 @@ export interface Almacen {
   /** Exporta el progreso completo a una cadena JSON. */
   exportar(): Promise<string>;
   /**
-   * Sustituye sesiones y teclas por las de una copia de seguridad en JSON. Las
-   * lecciones no se sustituyen: se aplica la versión más reciente de cada una.
+   * Trae una copia de seguridad en JSON. Por defecto **sustituye** sesiones y teclas
+   * por las de la copia; con `combinar` las **junta** con lo que hay, sin duplicar
+   * (ver `sesionesQueFaltan` y `combinarTeclas`). Las lecciones no se sustituyen en
+   * ningún modo: se aplica la versión más reciente de cada una.
    */
-  importar(json: string): Promise<ResultadoRestauracion>;
+  importar(json: string, modo?: ModoImportacion): Promise<ResultadoRestauracion>;
 }
+
+/**
+ * `sustituir` es restaurar una copia; `combinar`, juntar la de otro equipo con lo
+ * que hay en este. Combinar es idempotente: repetirlo con la misma copia no cambia
+ * nada, y por eso sirve también para traspasar el respaldo local a SQLite.
+ */
+export type ModoImportacion = "sustituir" | "combinar";
 
 export interface ResultadoRestauracion {
   /** Lecciones de la copia que no han cabido en el límite. */
   leccionesSinSitio: number;
+  /** Al combinar: cuántas sesiones de la copia no estaban ya. */
+  sesionesNuevas?: number;
 }
+
+/** Dos sesiones son la misma si coinciden en todo: la fecha lleva milisegundos. */
+const claveSesion = (s: Sesion): string =>
+  [s.terminadaEn, s.leccion, s.ppm, s.pctAcierto, s.aciertos, s.escritos, s.ms].join("\u0000");
+
+/**
+ * Las sesiones de una copia que no están ya entre las actuales, sin repetidas entre
+ * sí. Es lo que hace que combinar dos veces la misma copia no duplique el historial.
+ */
+export function sesionesQueFaltan(actuales: readonly Sesion[], copia: readonly Sesion[]): Sesion[] {
+  const vistas = new Set(actuales.map(claveSesion));
+  const faltan: Sesion[] = [];
+  for (const s of copia) {
+    const clave = claveSesion(s);
+    if (vistas.has(clave)) continue;
+    vistas.add(clave);
+    faltan.push(s);
+  }
+  return faltan;
+}
+
+/**
+ * De cada tecla se queda el estado con más intentos, en vez de sumarlos. Sumar no
+ * es posible sin saber qué sesión produjo cada intento: importar dos veces la misma
+ * copia duplicaría intentos y aciertos y falsearía el dominio, y restaurar una copia
+ * antigua del mismo alumno es el caso típico. Si las dos historias eran disjuntas se
+ * infravalora el dominio, que es el lado seguro: una letra visible de más no
+ * perjudica a nadie.
+ */
+export function combinarTeclas(
+  actuales: ReadonlyMap<string, EstadoTecla>,
+  copia: ReadonlyMap<string, EstadoTecla>,
+): Map<string, EstadoTecla> {
+  const m = new Map(actuales);
+  for (const [code, e] of copia) {
+    const previo = m.get(code);
+    if (!previo || e.intentos > previo.intentos) m.set(code, e);
+  }
+  return m;
+}
+
+const porFecha = (a: Sesion, b: Sesion): number =>
+  (a.terminadaEn < b.terminadaEn ? -1 : a.terminadaEn > b.terminadaEn ? 1 : 0);
 
 export interface CopiaSeguridad {
   version: number;
@@ -320,7 +374,7 @@ export class AlmacenSqlite implements Almacen {
   }
 
 
-  async importar(json: string): Promise<ResultadoRestauracion> {
+  async importar(json: string, modo: ModoImportacion = "sustituir"): Promise<ResultadoRestauracion> {
     const copia = parsearCopiaSeguridad(json);
     // Dos restauraciones intercaladas dejarían más filas de las que trae la copia.
     if (this.#restaurando) {
@@ -328,11 +382,58 @@ export class AlmacenSqlite implements Almacen {
     }
     this.#restaurando = true;
     try {
+      if (modo === "combinar") {
+        const sesionesNuevas = await this.#combinarProgreso(copia.sesiones, copia.teclas);
+        return { ...(await this.#fundirLecciones(copia.lecciones)), sesionesNuevas };
+      }
       await this.#sustituirProgreso(copia.sesiones, copia.teclas);
       return await this.#fundirLecciones(copia.lecciones);
     } finally {
       this.#restaurando = false;
     }
+  }
+
+  /**
+   * Junta la copia con lo que hay. Dos sentencias, cada una atómica, y ninguna
+   * borra nada: si la segunda falla, repetir la operación la completa sin duplicar,
+   * porque las sesiones que ya entraron se reconocen y las teclas solo cambian a un
+   * estado con más intentos.
+   */
+  async #combinarProgreso(sesiones: Sesion[], teclas: ReadonlyMap<string, EstadoTecla>): Promise<number> {
+    const nuevas = sesionesQueFaltan(await this.leerTodas(), sesiones);
+    try {
+      if (nuevas.length > 0) {
+        await this.#db.execute(
+          `INSERT INTO sesiones
+             (leccion, ppm, pct_acierto, aciertos, escritos, ms, terminada_en)
+           SELECT json_extract(value, '$.leccion'), json_extract(value, '$.ppm'),
+                  json_extract(value, '$.pctAcierto'), json_extract(value, '$.aciertos'),
+                  json_extract(value, '$.escritos'), json_extract(value, '$.ms'),
+                  json_extract(value, '$.terminadaEn')
+             FROM json_each($1)`,
+          [JSON.stringify(nuevas)],
+        );
+      }
+      await this.#db.execute(
+        `INSERT INTO teclas (code, intentos, aciertos, ms_total)
+         SELECT json_extract(value, '$.code'), json_extract(value, '$.intentos'),
+                json_extract(value, '$.aciertos'), json_extract(value, '$.msTotal')
+           FROM json_each($1) WHERE true
+         ON CONFLICT(code) DO UPDATE SET
+           intentos = excluded.intentos,
+           aciertos = excluded.aciertos,
+           ms_total = excluded.ms_total
+         WHERE excluded.intentos > teclas.intentos`,
+        [JSON.stringify([...teclas].map(([code, e]) => ({ code, ...e })))],
+      );
+    } catch (err) {
+      console.warn("[libretype] no se pudo combinar la copia:", err);
+      throw new Error(
+        "No se ha podido combinar la copia entera. Lo que tenías sigue ahí, y puedes "
+          + "probar otra vez sin miedo: lo que ya entró no se repite.",
+      );
+    }
+    return nuevas.length;
   }
 
   /**
@@ -504,8 +605,13 @@ export class AlmacenLocal implements Almacen {
   }
 
 
-  async importar(json: string): Promise<ResultadoRestauracion> {
-    const { sesiones, teclas, lecciones } = parsearCopiaSeguridad(json);
+  async importar(json: string, modo: ModoImportacion = "sustituir"): Promise<ResultadoRestauracion> {
+    const copia = parsearCopiaSeguridad(json);
+    const { lecciones } = copia;
+    const combinar = modo === "combinar";
+    const faltan = combinar ? sesionesQueFaltan(this.#leer(), copia.sesiones) : [];
+    const sesiones = combinar ? [...this.#leer(), ...faltan].sort(porFecha) : copia.sesiones;
+    const teclas = combinar ? combinarTeclas(await this.leerTeclas(), copia.teclas) : copia.teclas;
     const actuales = this.#leerLecciones();
     const { aEscribir, sinSitio } = aplicarDeCopia(actuales, lecciones);
     const ids = new Set(aEscribir.map((l) => l.id));
@@ -528,7 +634,9 @@ export class AlmacenLocal implements Almacen {
       }
       throw new Error("Esta copia no cabe en el espacio de este equipo. No se ha cambiado nada de lo que tenías.");
     }
-    return { leccionesSinSitio: sinSitio.length };
+    return combinar
+      ? { leccionesSinSitio: sinSitio.length, sesionesNuevas: faltan.length }
+      : { leccionesSinSitio: sinSitio.length };
   }
 }
 
@@ -571,15 +679,19 @@ export class AlmacenMemoria implements Almacen {
   }
 
 
-  async importar(json: string): Promise<ResultadoRestauracion> {
+  async importar(json: string, modo: ModoImportacion = "sustituir"): Promise<ResultadoRestauracion> {
     const { sesiones, teclas, lecciones } = parsearCopiaSeguridad(json);
-    this.#sesiones = [...sesiones];
-    this.#teclas = new Map(teclas);
+    const combinar = modo === "combinar";
+    const faltan = combinar ? sesionesQueFaltan(this.#sesiones, sesiones) : [];
+    this.#sesiones = combinar ? [...this.#sesiones, ...faltan].sort(porFecha) : [...sesiones];
+    this.#teclas = combinar ? combinarTeclas(this.#teclas, teclas) : new Map(teclas);
     const { aEscribir, sinSitio } = aplicarDeCopia(await this.leerLecciones(), lecciones);
     for (const l of aEscribir) {
       this.#lecciones.set(l.id, l);
     }
-    return { leccionesSinSitio: sinSitio.length };
+    return combinar
+      ? { leccionesSinSitio: sinSitio.length, sesionesNuevas: faltan.length }
+      : { leccionesSinSitio: sinSitio.length };
   }
 }
 

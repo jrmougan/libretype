@@ -30,7 +30,9 @@
   import {
     contarDominadas, mapaDeDominio, registrar, type EstadoTecla,
   } from './lib/keyboard/dominio';
-  import { abrirAlmacen, cargarDatos, type Almacen, type ResultadoRestauracion } from './lib/storage/almacen';
+  import {
+    abrirAlmacen, cargarDatos, type Almacen, type ModoImportacion, type ResultadoRestauracion,
+  } from './lib/storage/almacen';
   import { leccionesOxidadas } from './lib/storage/repaso';
   import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
   import { leccionesSuperadas, OBJETIVO_PENDIENTE } from './lib/storage/objetivos';
@@ -364,13 +366,13 @@
    * sustituye todo el progreso no puede terminar sin ningún aviso. Lo de debajo se
    * pone al día sin llevarse el foco, que sigue en el panel.
    */
-  async function importarProgreso(json: string): Promise<ResultadoRestauracion | void> {
+  async function importarProgreso(json: string, modo: ModoImportacion = 'sustituir'): Promise<ResultadoRestauracion | void> {
     if (!almacen) return;
     importando = true;
     try {
       let resultado: ResultadoRestauracion;
       try {
-        resultado = await almacen.importar(json);
+        resultado = await almacen.importar(json, modo);
       } catch (err) {
         // Las lecciones pueden haber quedado a medias: que se vea lo que hay en disco.
         await releerDelAlmacen();

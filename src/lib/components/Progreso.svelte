@@ -16,7 +16,7 @@
   import { esIdPropio, ID_FLUIDEZ, ID_PRACTICA_CONTINUA, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_TEXTO_PROPIO } from "../lecciones/ids";
   import { LIMITES, type LeccionPropia } from "../lecciones/personalizadas";
   import type { Lesson } from "../lecciones/tipos";
-  import type { Almacen, ResultadoRestauracion } from "../storage/almacen";
+  import type { Almacen, ModoImportacion, ResultadoRestauracion } from "../storage/almacen";
   import type { EstadoTecla } from "../keyboard/dominio";
   import {
     generarEjercicioRefuerzo, obtenerTeclasOrdenadas, type EjercicioRefuerzo,
@@ -37,7 +37,7 @@
     cursoActual?: string;
     onBorrar: () => void;
     onExportar?: () => Promise<string> | string;
-    onImportar?: (json: string) => Promise<ResultadoRestauracion | void> | ResultadoRestauracion | void;
+    onImportar?: (json: string, modo: ModoImportacion) => Promise<ResultadoRestauracion | void> | ResultadoRestauracion | void;
     onPracticarRefuerzo?: (ejercicio: EjercicioRefuerzo) => void;
     onGestionarLecciones?: () => void;
     /** Salida del estado vacío: cerrar esto y ponerse a practicar. */
@@ -196,23 +196,29 @@
    */
   let importando = $state(false);
 
-  async function procesarImportacion(contenido: string): Promise<void> {
+  async function procesarImportacion(contenido: string, modo: ModoImportacion = "sustituir"): Promise<void> {
     if (importando) return;
     importando = true;
     mensajeEstado = { tipo: "curso", texto: "Importando la copia de seguridad…" };
     try {
       let resultado: ResultadoRestauracion | void;
       if (onImportar) {
-        resultado = await onImportar(contenido);
+        resultado = await onImportar(contenido, modo);
       } else if (almacen) {
-        resultado = await almacen.importar(contenido);
+        resultado = await almacen.importar(contenido, modo);
       } else {
         throw new Error("El progreso aún no está disponible. Prueba de nuevo en un momento.");
       }
       const fuera = resultado?.leccionesSinSitio ?? 0;
+      const nuevas = resultado?.sesionesNuevas;
       mensajeEstado = {
         tipo: "exito",
-        texto: "Copia de seguridad importada con éxito."
+        texto: (modo === "combinar"
+          ? "Copia combinada con lo que tenías."
+            + (nuevas === undefined ? ""
+              : nuevas === 0 ? " No traía ninguna sesión que no estuviera ya."
+              : nuevas === 1 ? " Se ha añadido una sesión." : ` Se han añadido ${nuevas} sesiones.`)
+          : "Copia de seguridad importada con éxito.")
           + (fuera > 0
             ? ` ${fuera === 1 ? "Una lección no ha cabido" : `${fuera} lecciones no han cabido`}, porque el límite son ${LIMITES.lecciones}. Si borras alguna y la importas otra vez, entrarán.`
             : ""),
@@ -264,9 +270,9 @@
     }
   }
 
-  function confirmarImportar(): void {
+  function confirmarImportar(modo: ModoImportacion = "sustituir"): void {
     if (archivoPendiente) {
-      void procesarImportacion(archivoPendiente);
+      void procesarImportacion(archivoPendiente, modo);
     }
   }
 
@@ -601,8 +607,13 @@
 
     {#if confirmandoImportar}
       <div class="confirmacion" role="alert">
-        <span>Al importar la copia se sustituirá el progreso actual. ¿Quieres continuar?</span>
-        <button type="button" disabled={importando} onclick={confirmarImportar}>Sí, importar</button>
+        <span>
+          Al importar la copia se sustituirá el progreso actual. ¿Quieres continuar?
+          Si la copia es de otro equipo y quieres juntar los dos, elige «Combinar»:
+          no se pierde nada de lo que hay ni se repite lo que ya estaba.
+        </span>
+        <button type="button" disabled={importando} onclick={() => confirmarImportar("sustituir")}>Sí, importar</button>
+        <button type="button" disabled={importando} onclick={() => confirmarImportar("combinar")}>Combinar con lo que hay</button>
         <button type="button" class="cancelar" disabled={importando} onclick={cancelarImportar}>Cancelar</button>
       </div>
     {/if}

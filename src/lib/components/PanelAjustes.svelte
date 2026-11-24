@@ -18,6 +18,7 @@
   let { prefs, onCambiar, layoutId, aprendidas, gestorDelSistema, actualizador, estadoAct }: Props = $props();
 
   const TEMAS = [['auto', 'Sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']] as const;
+  const CONTRASTES = [['auto', 'Sistema'], ['normal', 'Normal'], ['alto', 'Alto']] as const;
   const pct = $derived(`${Math.round(prefs.escala * 100)}%`);
 </script>
 
@@ -36,6 +37,19 @@
       <button aria-pressed={prefs.tema === v} onclick={() => onCambiar({ tema: v })}>{l}</button>
     {/each}
   </div>
+</div>
+
+<div class="field">
+  <span id="contraste-l">Contraste</span>
+  <div class="group" role="group" aria-labelledby="contraste-l">
+    {#each CONTRASTES as [v, l] (v)}
+      <button aria-pressed={prefs.contraste === v} onclick={() => onCambiar({ contraste: v })}>{l}</button>
+    {/each}
+  </div>
+  <p class="note">
+    «Alto» pone negro sobre blanco (o al revés con el tema oscuro) y bordes
+    marcados. En «Sistema» se activa solo si tu equipo pide más contraste.
+  </p>
 </div>
 
 <div class="field">

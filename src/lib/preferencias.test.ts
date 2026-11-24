@@ -99,15 +99,26 @@ describe('aplicar al documento', () => {
 
   it('vuelca cada preferencia a su atributo', () => {
     aplicar({
+      ...POR_DEFECTO,
       escala: 1.8, tema: 'oscuro', movimiento: 'reducido',
       fuente: 'dislexia', tono: 'juego', ayudaTeclado: 'siempre',
-      buscarActualizaciones: true, layout: 'es-iso',
+      buscarActualizaciones: true, layout: 'es-iso', contraste: 'alto',
     }, raiz);
     expect(raiz.getAttribute('data-theme')).toBe('dark');
     expect(raiz.getAttribute('data-motion')).toBe('reducido');
     expect(raiz.getAttribute('data-font')).toBe('dyslexic');
     expect(raiz.getAttribute('data-tono')).toBe('juego');
+    expect(raiz.getAttribute('data-contrast')).toBe('alto');
     expect(raiz.style.getPropertyValue('--ui-scale')).toBe('1.8');
+  });
+
+  it('el contraste en «Sistema» no pone atributo, y «Normal» lo apaga a propósito', () => {
+    aplicar({ ...POR_DEFECTO, contraste: 'alto' }, raiz);
+    aplicar(POR_DEFECTO, raiz);
+    expect(raiz.hasAttribute('data-contrast')).toBe(false);
+    aplicar({ ...POR_DEFECTO, contraste: 'normal' }, raiz);
+    expect(raiz.getAttribute('data-contrast')).toBe('normal');
+    expect(normalizar({ contraste: 'muchísimo' }).contraste).toBe('auto');
   });
 
   it('aplica movimiento reducido si se indica mediante animaciones reducidas', () => {

@@ -60,6 +60,13 @@ export interface Preferencias {
   ultimaLeccion?: string;
   /** Identificador de la distribución seleccionada (p. ej. 'es-iso'). */
   layout: string;
+  /**
+   * Alto contraste propio. En Linux y macOS no existe `forced-colors`, así que
+   * si la app no lo trae, quien lo necesita no lo tiene. 'auto' sigue a
+   * `prefers-contrast: more` del sistema; 'normal' lo apaga aunque el sistema
+   * lo pida, por si alguien lo tiene activado para otras aplicaciones.
+   */
+  contraste: 'auto' | 'normal' | 'alto';
 }
 
 export const POR_DEFECTO: Preferencias = {
@@ -72,6 +79,7 @@ export const POR_DEFECTO: Preferencias = {
   buscarActualizaciones: true,
   ultimaLeccion: catalogo.primera.id,
   layout: 'es-iso',
+  contraste: 'auto',
 };
 
 const CLAVE = 'libretype.preferencias';
@@ -109,6 +117,7 @@ export function normalizar(crudo: unknown): Preferencias {
         : POR_DEFECTO.buscarActualizaciones,
     ultimaLeccion: leccionValida ? (o.ultimaLeccion as string) : catalogo.primera.id,
     layout: typeof o.layout === 'string' && o.layout.trim() ? o.layout.trim() : POR_DEFECTO.layout,
+    contraste: unaDe(o.contraste, ['auto', 'normal', 'alto'] as const, POR_DEFECTO.contraste),
   };
 }
 
@@ -139,4 +148,6 @@ export function aplicar(p: Preferencias, raiz: HTMLElement): void {
   atributo('data-motion', reducido ? 'reducido' : null);
   atributo('data-font', p.fuente === 'dislexia' ? 'dyslexic' : null);
   atributo('data-tono', p.tono);
+  // Sin atributo manda `prefers-contrast` del sistema (ver tokens.css).
+  atributo('data-contrast', p.contraste === 'auto' ? null : p.contraste);
 }

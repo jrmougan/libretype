@@ -39,3 +39,6 @@ __pycache__/
 # Spike binaries
 spike-deadkeys/driver
 spike-deadkeys/wkhost
+
+# Ficheros de trabajo de agentes de código: son de cada equipo
+.qwen/

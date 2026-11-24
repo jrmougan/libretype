@@ -37,4 +37,16 @@ describe('guardarFichero', () => {
     await expect(guardarFichero('l.json', '{}')).resolves.toEqual({ ruta: null });
     clic.mockRestore();
   });
+
+  it('una página HTML se descarga como HTML, no como JSON', async () => {
+    let tipo = '';
+    URL.createObjectURL = vi.fn((b: Blob) => { tipo = b.type; return 'blob:x'; });
+    URL.revokeObjectURL = vi.fn();
+    const clic = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    await guardarFichero('informe.html', '<!doctype html>', async () => null);
+    expect(tipo).toBe('text/html;charset=utf-8');
+    await guardarFichero('l.json', '{}', async () => null);
+    expect(tipo).toBe('application/json;charset=utf-8');
+    clic.mockRestore();
+  });
 });

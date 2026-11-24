@@ -8,7 +8,7 @@ Construido sobre **Tauri v2**, **Svelte 5** y **Rust**, LibreType combina la lig
 
 ## Características principales
 
-- **Español primero**: El temario de aprendizaje no sigue el orden tradicional en inglés (reposo, superior, inferior), sino uno derivado de frecuencias reales sobre un corpus de 50.000 palabras en español (`investigacion/frecuencias.py`). El **13 %** de las palabras en español contienen tildes, diéresis o eñe, y la tecla `´` se pulsa con más frecuencia que la `p`. Por ello, las tildes se enseñan temprano (lección 5 de 14) utilizando palabras reales.
+- **Español primero**: El temario de aprendizaje no sigue el orden tradicional en inglés (reposo, superior, inferior), sino uno derivado de frecuencias reales sobre un corpus de 50.000 palabras en español (`investigacion/frecuencias.py`). El **13 %** de las palabras en español contienen tildes, diéresis o eñe, y la tecla `´` se pulsa con más frecuencia que la `p`. Por ello, las tildes se enseñan temprano (lección 5 de 16) utilizando palabras reales.
 - **Todo cabe en la ventana, sin scroll**: Para aprender mecanografía sin mirarse las manos, el alumno debe ver en un solo golpe de vista el texto objetivo, la pista del dedo y el teclado en pantalla. La ventana tiene un tamaño mínimo garantizado de 800×600 y una jerarquía de adaptación que evita que el teclado se vuelva ilegible.
 - **Retirada progresiva de ayudas visuales**: El teclado en pantalla actúa como apoyo inicial. A medida que el alumno demuestra dominio sobre una tecla (precisión ≥ 90 % y al menos 8 intentos), su letra se desvanece y se sustituye por un punto discreto para romper el hábito de buscar la tecla en la pantalla.
 - **Tono y preferencias respetuosas**: Evita la *design disqualification* (la sensación de exclusión al enfrentarse a interfaces infantiles o condescendientes). Permite alternar entre tono sobrio y tono lúdico por preferencia explícita (sin preguntar jamás la edad).
@@ -203,6 +203,14 @@ Requiere `libwebkit2gtk-4.1-0`, así que funciona en Ubuntu 22.04+ y Debian 12+,
 En AppImage, macOS y Windows, LibreType mira al arrancar si hay una versión nueva y lo avisa en la barra de arriba. Nunca instala ni reinicia por su cuenta: las dos cosas son un clic, porque reiniciar a mitad de una lección tiraría el intento por la borda.
 
 Es la única petición de red que hace la aplicación —un fichero JSON público en GitHub— y se puede desactivar en Ajustes. Instalada por apt o dnf, ni siquiera eso: manda el gestor de paquetes y la aplicación no consulta nada.
+
+### Aulas, bibliotecas y centros de mayores
+
+Varias personas pueden compartir un equipo con un perfil cada una (un alias,
+sin contraseña). Quien administra los equipos puede apagar las actualizaciones
+y fijar el perfil con el que se abre con un fichero de política del sistema, e
+instalar en Windows sin red (el instalador lleva WebView2 completo). Está en
+[`docs/instalacion-gestionada.md`](docs/instalacion-gestionada.md).
 
 ### Puesta en marcha (solo para quien publique)
 

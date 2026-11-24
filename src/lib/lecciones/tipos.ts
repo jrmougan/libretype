@@ -11,7 +11,18 @@ export interface Lesson {
   nuevas: string;
   /** Porcentaje de palabras del idioma escribibles al terminarla. */
   cobertura: number;
+  /**
+   * Texto revisado a mano. Es el del primer intento y el de referencia de los
+   * tests; a partir del segundo, `generador.ts` saca uno nuevo cada vez.
+   */
   text: string;
+  /**
+   * Frases completas con las que componer los intentos siguientes, para las
+   * lecciones en las que las palabras sueltas no sirven (mayúsculas, signos,
+   * cifras). Solo usan teclas ya enseñadas; `garantias.ts` lo comprueba. Sin
+   * ellas, una lección que ya no estrena letras conserva siempre su texto.
+   */
+  frases?: readonly string[];
 }
 
 /**
@@ -29,6 +40,13 @@ export interface Curso {
   vocabulario?: readonly string[];
   /** Palabras extra para el refuerzo de teclas, aparte de las de las lecciones. */
   palabrasRefuerzo?: readonly string[];
+  /**
+   * Las palabras más frecuentes del idioma, de más a menos, para las tandas de
+   * fluidez. Sin ellas, la fluidez usa el vocabulario acumulado.
+   */
+  frecuentes?: readonly string[];
+  /** Pares de letras que más se encadenan; cada uno se practica con palabras de `frecuentes`. */
+  bigramas?: readonly string[];
   /**
    * Última lección en la que se estrenan letras. Hasta ella la cobertura debe
    * subir y no se estrenan más de cinco teclas de golpe. Sin este campo, esas

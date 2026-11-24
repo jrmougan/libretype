@@ -434,22 +434,26 @@
   .lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
   .lista li {
     display: grid; gap: var(--space-2);
-    padding: var(--space-3);
+    padding: var(--space-3) var(--space-4);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-card);
+    background: var(--surface);
   }
-  h3 { margin: 0; font-size: var(--text-base); overflow-wrap: anywhere; }
+  /* En cada tarjeta, «Practicar» es la acción principal, pero a la medida de sus
+     compañeras: el alto de más es para la acción de la pantalla. */
+  .lista .primario { min-height: var(--target-min); padding-inline: var(--space-4); }
+  h3 { margin: 0; font-size: var(--text-lg); overflow-wrap: anywhere; }
   .campo { display: grid; gap: var(--space-1); }
-  .campo label { font-weight: 600; }
+  .campo label { font-weight: 700; }
   .campo label small { font-weight: 400; color: var(--fg-muted); }
   input:not([type='file']), textarea { width: 100%; }
   textarea { font-family: var(--font-drill); resize: vertical; }
   .error { margin: 0; font-size: var(--text-sm); color: var(--error); overflow-wrap: anywhere; }
   .aviso {
     display: grid; gap: var(--space-1);
-    padding: var(--space-3);
+    padding: var(--space-3) var(--space-4);
     border: 1px solid var(--ok);
-    border-radius: var(--radius);
+    border-radius: var(--radius-card);
     background: var(--ok-bg);
     color: var(--fg);
     overflow-wrap: anywhere;

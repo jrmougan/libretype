@@ -9,11 +9,15 @@
     FILA_DISPONIBLE, leccionesSuperadas, OBJETIVO_PANEL,
   } from "../storage/objetivos";
   import { catalogo } from "../lecciones/catalogo";
+  import { ES_ISO, type Layout } from "../keyboard/layouts";
+  import { comparacionPropia, fraseResumen, serieGrafica, teclasSinMirar } from "../storage/comparacion";
+  import { aliasParaFichero } from "../storage/informe";
+  import GraficaEvolucion from "./GraficaEvolucion.svelte";
   import { guardarFichero } from "../ficheros";
-  import { esIdPropio, ID_PRACTICA_CONTINUA, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_TEXTO_PROPIO } from "../lecciones/ids";
+  import { esIdPropio, ID_FLUIDEZ, ID_PRACTICA_CONTINUA, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_TEXTO_PROPIO } from "../lecciones/ids";
   import { LIMITES, type LeccionPropia } from "../lecciones/personalizadas";
   import type { Lesson } from "../lecciones/tipos";
-  import type { Almacen, ResultadoRestauracion } from "../storage/almacen";
+  import type { Almacen, ModoImportacion, ResultadoRestauracion } from "../storage/almacen";
   import type { EstadoTecla } from "../keyboard/dominio";
   import {
     generarEjercicioRefuerzo, obtenerTeclasOrdenadas, type EjercicioRefuerzo,
@@ -34,11 +38,19 @@
     cursoActual?: string;
     onBorrar: () => void;
     onExportar?: () => Promise<string> | string;
-    onImportar?: (json: string) => Promise<ResultadoRestauracion | void> | ResultadoRestauracion | void;
+    onImportar?: (json: string, modo: ModoImportacion) => Promise<ResultadoRestauracion | void> | ResultadoRestauracion | void;
     onPracticarRefuerzo?: (ejercicio: EjercicioRefuerzo) => void;
     onGestionarLecciones?: () => void;
     /** Salida del estado vacío: cerrar esto y ponerse a practicar. */
     onIrAPracticar?: () => void;
+    /** Para saber qué teclas pide lo ya abierto; ES-ISO si no se dice. */
+    layout?: Layout;
+    /** Alias del perfil, si hay varios: va en el nombre de la copia para no confundirlas. */
+    alias?: string;
+    /** La lección del temario en curso, para marcar su fila; null si no hay. */
+    leccionActual?: string | null;
+    /** Tono con celebración: la tarjeta de constancia lleva su color. */
+    celebra?: boolean;
   }
 
   let {
@@ -56,7 +68,14 @@
     onPracticarRefuerzo,
     onGestionarLecciones,
     onIrAPracticar,
+    layout = ES_ISO,
+    alias = '',
+    leccionActual = null,
+    celebra = false,
   }: Props = $props();
+
+  /** `guardar_en_descargas` solo admite letras sin tilde, cifras y guiones. */
+  const aliasEnFichero = $derived(aliasParaFichero(alias));
 
   const esDegradado = $derived(errorAlmacen || Boolean(almacen?.errorAlmacen));
   const porLeccion = $derived(resumirLecciones(sesiones));
@@ -68,6 +87,13 @@
   const listaTeclas = $derived(teclas ? obtenerTeclasOrdenadas(teclas) : []);
   const teclasFlojas = $derived(listaTeclas.filter((t) => t.esFloja));
   const idsActuales = $derived(new Set(lecciones.map((l) => l.id)));
+  /** Sobre lo abierto en el curso que se sigue: lo que aún no se ha enseñado no cuenta en contra. */
+  const sinMirar = $derived(teclasSinMirar(
+    teclas ?? new Map(), catalogo.ultimaDisponible(superadas, cursoActual).id, layout,
+  ));
+  /** Contra medias y contra los comienzos, nunca contra la última sesión. */
+  const comparacion = $derived(comparacionPropia(sesiones));
+  const serie = $derived(serieGrafica(evolucion.dias));
 
   /**
    * Los modos de práctica también salen aquí abajo, pero no son lecciones retiradas.
@@ -76,6 +102,7 @@
    */
   const MODOS_PRACTICA: ReadonlyMap<string, string> = new Map([
     [ID_PRACTICA_CONTINUA, "Práctica continua"],
+    [ID_FLUIDEZ, "Fluidez"],
     [ID_TEXTO_PROPIO, "Texto propio"],
     [ID_REFUERZO, "Refuerzo de teclas"],
     [ID_REFUERZO_SUELTO, "Refuerzo con texto repetido"],
@@ -161,7 +188,8 @@
       if (!json) return;
 
       const fechaHoy = new Date().toISOString().slice(0, 10);
-      const { ruta } = await guardarFichero(`libretype-progreso-${fechaHoy}.json`, json);
+      const quien = aliasEnFichero ? `${aliasEnFichero}-` : '';
+      const { ruta } = await guardarFichero(`libretype-progreso-${quien}${fechaHoy}.json`, json);
       mensajeEstado = {
         tipo: "exito",
         texto: ruta
@@ -182,23 +210,29 @@
    */
   let importando = $state(false);
 
-  async function procesarImportacion(contenido: string): Promise<void> {
+  async function procesarImportacion(contenido: string, modo: ModoImportacion = "sustituir"): Promise<void> {
     if (importando) return;
     importando = true;
     mensajeEstado = { tipo: "curso", texto: "Importando la copia de seguridad…" };
     try {
       let resultado: ResultadoRestauracion | void;
       if (onImportar) {
-        resultado = await onImportar(contenido);
+        resultado = await onImportar(contenido, modo);
       } else if (almacen) {
-        resultado = await almacen.importar(contenido);
+        resultado = await almacen.importar(contenido, modo);
       } else {
         throw new Error("El progreso aún no está disponible. Prueba de nuevo en un momento.");
       }
       const fuera = resultado?.leccionesSinSitio ?? 0;
+      const nuevas = resultado?.sesionesNuevas;
       mensajeEstado = {
         tipo: "exito",
-        texto: "Copia de seguridad importada con éxito."
+        texto: (modo === "combinar"
+          ? "Copia combinada con lo que tenías."
+            + (nuevas === undefined ? ""
+              : nuevas === 0 ? " No traía ninguna sesión que no estuviera ya."
+              : nuevas === 1 ? " Se ha añadido una sesión." : ` Se han añadido ${nuevas} sesiones.`)
+          : "Copia de seguridad importada con éxito.")
           + (fuera > 0
             ? ` ${fuera === 1 ? "Una lección no ha cabido" : `${fuera} lecciones no han cabido`}, porque el límite son ${LIMITES.lecciones}. Si borras alguna y la importas otra vez, entrarán.`
             : ""),
@@ -250,9 +284,9 @@
     }
   }
 
-  function confirmarImportar(): void {
+  function confirmarImportar(modo: ModoImportacion = "sustituir"): void {
     if (archivoPendiente) {
-      void procesarImportacion(archivoPendiente);
+      void procesarImportacion(archivoPendiente, modo);
     }
   }
 
@@ -276,7 +310,9 @@
 
 <!-- El título lo pone el panel: dos seguidos y una caja dentro de otra eran ruido. -->
 <section class="progreso" aria-label="Tu progreso" bind:this={raiz}>
-  <p class="nota">{superadas.size} de {lecciones.length} lecciones superadas. {OBJETIVO_PANEL}</p>
+  <!-- Subtítulo del panel: el umbral se explica una vez, aquí, y siempre con la
+       frase de objetivos.ts. -->
+  <p class="nota subtitulo">{superadas.size} de {lecciones.length} lecciones superadas. {OBJETIVO_PANEL}</p>
 
   {#if global.sesiones === 0}
     <p class="vacio">
@@ -287,14 +323,32 @@
       <button class="primario empezar" onclick={onIrAPracticar}>Ir a practicar</button>
     {/if}
   {:else}
+    <!-- Lo primero, en una frase: seis cifras sueltas no dicen si vas bien. -->
+    <p class="resumen">{fraseResumen({
+      superadas: superadas.size, lecciones: lecciones.length, sinMirar,
+      diasEstaSemana: evolucion.diasEstaSemana,
+    })}</p>
+
+    <!-- Tarjetas de cifra. La constancia de la semana lleva el color de la
+         celebración cuando el tono lo pide; la cifra y su texto dicen lo mismo sin él. -->
     <dl class="global">
+      <div><dt>Teclas que ya escribes sin mirar</dt><dd>{sinMirar.dominadas} <small>de {sinMirar.total}</small></dd></div>
       <div><dt>Lecciones practicadas</dt><dd>{tocadasActuales} <small>de {lecciones.length}</small></dd></div>
       <div><dt>Sesiones</dt><dd>{global.sesiones}</dd></div>
+      <div class:constancia={celebra}><dt>Esta semana</dt><dd>{evolucion.diasEstaSemana} <small>{evolucion.diasEstaSemana === 1 ? 'día' : 'días'}</small></dd></div>
       <div><dt>Días practicados</dt><dd>{evolucion.diasPracticados}</dd></div>
-      <div><dt>Racha</dt><dd>{evolucion.rachaActual} <small>{evolucion.rachaActual === 1 ? 'día' : 'días'}</small></dd></div>
       <div><dt>Tiempo total</dt><dd>{formatearDuracion(global.msTotales)}</dd></div>
       <div><dt>Mejor marca</dt><dd>{global.mejorPpm} <small>ppm</small></dd></div>
     </dl>
+
+    {#if comparacion.length > 0}
+      <section class="seccion-bloque" aria-labelledby="titulo-comparacion">
+        <h3 id="titulo-comparacion">Frente a tus comienzos</h3>
+        <ul class="comparacion">
+          {#each comparacion as frase (frase)}<li>{frase}</li>{/each}
+        </ul>
+      </section>
+    {/if}
 
     <!-- Al 200% las seis columnas no caben en el panel. Que se desplace la
          tabla dentro de su caja, no que se recorten la marca y la fecha. -->
@@ -318,12 +372,15 @@
         {#each lecciones as l (l.id)}
           {@const r = porLeccion.get(l.id)}
           {@const d = dificultad.get(l.id)}
-          <tr class:sin-hacer={!r}>
-            <th scope="row">{l.title}<small>{!catalogo.estaDesbloqueada(l.id, superadas) ? 'Bloqueada · supera las anteriores' : superadas.has(l.id) ? 'Superada' : FILA_DISPONIBLE}</small></th>
+          {@const estado = !catalogo.estaDesbloqueada(l.id, superadas) ? 'cerrada' : superadas.has(l.id) ? 'superada' : 'abierta'}
+          <tr class:sin-hacer={!r} class:actual={leccionActual === l.id}>
+            <!-- La insignia acompaña a la etiqueta escrita: no es lo único que dice
+                 el estado. Y la fila en curso lo dice con texto, no solo con el fondo. -->
+            <th scope="row"><span class="fila-tit"><span class="insignia {estado}" aria-hidden="true">{estado === 'superada' ? '✓' : estado === 'abierta' ? '›' : ''}</span><span class="nombre">{l.title}{#if leccionActual === l.id}{' '}<span class="aqui">Estás aquí</span>{/if}</span></span><small class="con-insignia">{estado === 'cerrada' ? 'Bloqueada · supera las anteriores' : estado === 'superada' ? 'Superada' : FILA_DISPONIBLE}</small></th>
             <td>{r ? r.intentos : "—"}</td>
             <td>
               {#if d}
-                {d.intentosHastaSuperar}{#if !d.superada} <span class="nota">sin superar</span>{/if}
+                {d.intentosHastaSuperar}{#if !d.superada}{' '}<span class="nota">sin superar</span>{/if}
               {:else}—{/if}
             </td>
             <td>
@@ -437,6 +494,9 @@
     {#if evolucion.dias.length > 0}
       <section class="seccion-bloque" aria-labelledby="titulo-evolucion">
         <h3 id="titulo-evolucion">Evolución por días</h3>
+        <!-- La gráfica dice la tendencia de un vistazo; la tabla de debajo es su
+             alternativa textual y el detalle para quien lo quiera. -->
+        <GraficaEvolucion dias={serie} />
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <div class="tabla" role="region" aria-label="Evolución por días" tabindex="0">
           <table>
@@ -511,7 +571,7 @@
       <div class="rejilla-teclas" role="list" aria-label="Lista de teclas practicadas ordenadas por dificultad">
         {#each listaTeclas as t (t.code)}
           <div class="tecla-card" class:tecla-floja={t.esFloja} role="listitem">
-            <span class="tecla-char">{t.char === " " ? "Espacio" : t.char.toUpperCase()}</span>
+            <span class="tecla-char" class:larga={t.char === " "}>{t.char === " " ? "Espacio" : t.char.toUpperCase()}</span>
             <span class="tecla-pct">{t.precision}%</span>
             {#if t.esFloja}
               <span class="badge-floja">reforzar</span>
@@ -520,6 +580,15 @@
         {/each}
       </div>
     </section>
+  {/if}
+
+  {#if (almacen?.recuperadas ?? 0) > 0}
+    <p class="nota aviso recuperadas">
+      {almacen?.recuperadas === 1
+        ? 'Se ha recuperado una sesión que se guardó'
+        : `Se han recuperado ${almacen?.recuperadas} sesiones que se guardaron`}
+      de forma provisional mientras la base de datos de este equipo no estaba disponible.
+    </p>
   {/if}
 
   {#if esDegradado}
@@ -568,8 +637,13 @@
 
     {#if confirmandoImportar}
       <div class="confirmacion" role="alert">
-        <span>Al importar la copia se sustituirá el progreso actual. ¿Quieres continuar?</span>
-        <button type="button" disabled={importando} onclick={confirmarImportar}>Sí, importar</button>
+        <span>
+          Al importar la copia se sustituirá el progreso actual. ¿Quieres continuar?
+          Si la copia es de otro equipo y quieres juntar los dos, elige «Combinar»:
+          no se pierde nada de lo que hay ni se repite lo que ya estaba.
+        </span>
+        <button type="button" disabled={importando} onclick={() => confirmarImportar("sustituir")}>Sí, importar</button>
+        <button type="button" disabled={importando} onclick={() => confirmarImportar("combinar")}>Combinar con lo que hay</button>
         <button type="button" class="cancelar" disabled={importando} onclick={cancelarImportar}>Cancelar</button>
       </div>
     {/if}
@@ -600,6 +674,7 @@
 </section>
 
 <style>
+  /* El panel ya es la tarjeta: aquí dentro no hay otra caja alrededor. */
   .progreso {
     display: grid;
     gap: var(--space-4);
@@ -607,16 +682,47 @@
     min-width: 0;
     grid-template-columns: minmax(0, 1fr);
   }
+  .nota.subtitulo { font-size: var(--text-base); }
   .empezar { justify-self: start; }
   .vacio { margin: 0; color: var(--fg-muted); }
 
-  .global { display: flex; flex-wrap: wrap; gap: var(--space-6); margin: 0; }
-  .global div { display: flex; flex-direction: column; }
-  .global dt { font-size: var(--text-sm); color: var(--fg-muted); }
-  .global dd { margin: 0; font-size: var(--text-xl); font-variant-numeric: tabular-nums; }
-  .global small { font-size: var(--text-sm); color: var(--fg-muted); }
+  .resumen { margin: 0; font-size: var(--text-lg); line-height: 1.4; overflow-wrap: anywhere; }
+  .comparacion { margin: 0; padding-left: var(--space-4); display: grid; gap: var(--space-1); }
 
-  .tabla { overflow-x: auto; }
+  /* Tarjetas de cifra: hundidas, con la cifra grande y su unidad al lado. */
+  .global {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(9.5rem * var(--ui-scale))), 1fr));
+    gap: var(--space-3);
+    margin: 0;
+  }
+  .global div {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-sunken);
+    border-radius: var(--radius);
+  }
+  .global div.constancia { background: var(--celebracion-soft); }
+  .global dt { font-size: var(--text-sm); color: var(--fg-muted); }
+  .global .constancia dt { color: var(--fg); }
+  .global dd {
+    margin: 0;
+    font-size: var(--text-xl);
+    font-weight: 700;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .global small { font-size: var(--text-sm); font-weight: 400; color: var(--fg-muted); }
+  .global .constancia small { color: var(--fg); }
+
+  .tabla {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
   /* Se puede enfocar para desplazarla con las flechas, y eso tiene que verse. */
   .tabla:focus-visible { outline-offset: -3px; }
   table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
@@ -626,12 +732,18 @@
     padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--border);
   }
+  tbody tr:last-child > * { border-bottom: 0; }
   /* Las cifras no se parten: «22 ppm · 96%» en dos líneas cuesta más de leer. */
   td { white-space: nowrap; }
   /* Con la letra grande no caben ni así; mejor partidas que desplazar de lado. */
   :global(.compacta) td { white-space: normal; }
   :global(.compacta) th, :global(.compacta) td { padding: var(--space-1) var(--space-2); }
-  thead th { font-size: var(--text-sm); color: var(--fg-muted); font-weight: 600; }
+  thead th {
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+    font-weight: 700;
+    background: var(--surface-sunken);
+  }
   tbody th { font-weight: 500; }
   /* Las lecciones sin hacer se distinguen también por el guion de cada celda,
      no solo por el atenuado. */
@@ -646,6 +758,42 @@
     font-size: var(--text-sm);
     font-weight: 400;
     color: var(--fg-muted);
+  }
+  /* Alineada con el nombre, no con la insignia. */
+  tbody th small.con-insignia { padding-left: calc(1.75 * var(--text-xs) + var(--space-2)); }
+  .fila-tit { display: flex; align-items: center; gap: var(--space-2); }
+  .nombre { min-width: 0; }
+
+  /* Insignia redonda del estado de la lección: ✓ superada, › abierta y vacía
+     con borde si sigue cerrada. Siempre con la etiqueta escrita debajo. */
+  .insignia {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 50%;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    line-height: 1;
+    border: 2px solid var(--border-strong);
+  }
+  .insignia.superada { background: var(--ok); border-color: var(--ok); color: var(--surface); }
+  .insignia.abierta { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+  .insignia.cerrada { background: transparent; }
+
+  /* La fila en curso se marca con fondo y con el texto «Estás aquí». */
+  tr.actual > * { background: var(--accent-soft); color: var(--fg); }
+  tr.actual small, tr.actual .nota { color: var(--fg); }
+  .aqui {
+    display: inline-block;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-chip);
+    background: var(--accent);
+    color: var(--accent-fg);
+    white-space: nowrap;
   }
 
   .nota { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
@@ -671,6 +819,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border);
   }
   .copia {
     display: flex;
@@ -693,13 +843,14 @@
 
   .seccion-bloque {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-3);
     margin-top: var(--space-2);
+    align-content: start;
   }
   /* Vacía compensa el `gap`; con `display: none` dejaría de anunciar. */
-  .estado-refuerzo:empty { margin-bottom: calc(-1 * var(--space-2)); }
+  .estado-refuerzo:empty { margin-bottom: calc(-1 * var(--space-3)); }
   .seccion-bloque h3 {
-    font-size: var(--text-base);
+    font-size: var(--text-lg);
     margin: 0;
   }
   .cab-bloque {
@@ -709,6 +860,8 @@
     gap: var(--space-2);
     flex-wrap: wrap;
   }
+  /* El principal de base.css, sin el alto de más: aquí acompaña a un título. */
+  .btn-refuerzo { min-height: var(--target-min); padding-inline: var(--space-4); }
   .rejilla-teclas {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(calc(5rem * var(--ui-scale)), 1fr));
@@ -720,27 +873,45 @@
     align-items: center;
     justify-content: center;
     min-height: var(--target-min);
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-2);
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     font-variant-numeric: tabular-nums;
   }
   .tecla-char {
-    font-weight: 600;
-    font-size: var(--text-base);
+    font-family: var(--font-key);
+    font-weight: 700;
+    font-size: var(--text-cifra);
+    line-height: 1.2;
   }
+  /* «Espacio» no es una letra: a tamaño de tecla no cabría en la tarjeta. */
+  .tecla-char.larga { font-size: var(--text-sm); line-height: 1.9; }
   .tecla-pct {
     font-size: var(--text-xs);
     color: var(--fg-muted);
   }
+  /* Floja: borde doble y grueso, fondo, cifra en negrita y la palabra
+     «reforzar». El color es lo último que la distingue, no lo único. Va en
+     --pending y no en rojo: pide práctica, no señala un fallo. */
   .tecla-card.tecla-floja {
     border: 3px double var(--pending);
     background: var(--pending-bg);
   }
+  .tecla-floja .tecla-pct { color: var(--fg); font-weight: 700; }
   .badge-floja {
     font-size: var(--text-xs);
     color: var(--pending);
-    font-weight: bold;
+    font-weight: 700;
+  }
+  @media (forced-colors: active) {
+    .global div, .tecla-card { border: 1px solid CanvasText; }
+    .insignia { forced-color-adjust: none; border-color: CanvasText; background: Canvas; color: CanvasText; }
+    /* La superada sale de los tokens (CanvasText con la marca en Canvas); la
+       disponible conservaba el acento del tema: va en Highlight, como la tecla
+       siguiente. Sin placa, por el forced-color-adjust de arriba. */
+    .insignia.abierta { background: Highlight; border-color: Highlight; color: HighlightText; }
+    tr.actual > * { background: Canvas; }
+    .aqui { border: 1px solid CanvasText; }
   }
 </style>

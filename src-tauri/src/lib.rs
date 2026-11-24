@@ -58,32 +58,149 @@ fn migraciones() -> Vec<Migration> {
         ",
             kind: MigrationKind::Up,
         },
+        // Perfiles: un equipo de aula lo comparten varios alumnos. Todo lo que
+        // ya había pasa al perfil 1, «Principal», también las lecciones propias,
+        // que son de cada perfil. Va en una transacción (sqlx envuelve cada
+        // migración en una), así que o se aplica entera o no se aplica.
+        // `teclas` y `lecciones_propias` se rehacen porque su clave pasa a
+        // incluir el perfil, y en SQLite eso no se puede cambiar con un ALTER.
+        // La columna `perfil` de `sesiones` no lleva REFERENCES: con las claves
+        // foráneas activas, SQLite no deja añadir una con valor por defecto.
+        Migration {
+            version: 4,
+            description: "perfiles locales",
+            sql: "
+            CREATE TABLE IF NOT EXISTS perfiles (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                alias      TEXT    NOT NULL,
+                creado_en  TEXT    NOT NULL
+            );
+            INSERT INTO perfiles (id, alias, creado_en)
+                VALUES (1, 'Principal', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            ALTER TABLE sesiones ADD COLUMN perfil INTEGER NOT NULL DEFAULT 1;
+            CREATE INDEX IF NOT EXISTS idx_sesiones_perfil
+                ON sesiones (perfil, leccion);
+            CREATE TABLE teclas_por_perfil (
+                perfil    INTEGER NOT NULL,
+                code      TEXT    NOT NULL,
+                intentos  INTEGER NOT NULL,
+                aciertos  INTEGER NOT NULL,
+                ms_total  INTEGER NOT NULL,
+                PRIMARY KEY (perfil, code)
+            );
+            INSERT INTO teclas_por_perfil (perfil, code, intentos, aciertos, ms_total)
+                SELECT 1, code, intentos, aciertos, ms_total FROM teclas;
+            DROP TABLE teclas;
+            ALTER TABLE teclas_por_perfil RENAME TO teclas;
+            CREATE TABLE lecciones_por_perfil (
+                perfil          INTEGER NOT NULL,
+                id              TEXT NOT NULL,
+                titulo          TEXT NOT NULL,
+                descripcion     TEXT NOT NULL DEFAULT '',
+                texto           TEXT NOT NULL,
+                creada_en       TEXT NOT NULL,
+                actualizada_en  TEXT NOT NULL,
+                borrada_en      TEXT,
+                PRIMARY KEY (perfil, id)
+            );
+            INSERT INTO lecciones_por_perfil
+                (perfil, id, titulo, descripcion, texto, creada_en, actualizada_en, borrada_en)
+                SELECT 1, id, titulo, descripcion, texto, creada_en, actualizada_en, borrada_en
+                  FROM lecciones_propias;
+            DROP TABLE lecciones_propias;
+            ALTER TABLE lecciones_por_perfil RENAME TO lecciones_propias;
+        ",
+            kind: MigrationKind::Up,
+        },
     ]
+}
+
+/// El fichero que abre tauri-plugin-sql, dentro de `app_config_dir()`.
+const BASE_DE_DATOS: &str = "libretype.db";
+/// Junto a la base de datos: la versión del esquema que ya tiene copia hecha.
+const MARCA_ESQUEMA: &str = "libretype.db.esquema";
+
+/// La versión más alta del esquema que conoce este binario (van en orden).
+fn version_esquema() -> i64 {
+    migraciones().last().map_or(0, |m| m.version)
+}
+
+/// Copia la base de datos antes de que una migración nueva la toque.
+///
+/// Las migraciones las aplica tauri-plugin-sql al cargar la base de datos
+/// desde la interfaz, que es después de `setup`. Aquí no se puede preguntar a
+/// SQLite qué versión tiene sin abrirla, así que se lleva la cuenta en un
+/// fichero al lado: si este binario trae un esquema más nuevo que el último
+/// copiado, se copia `libretype.db` (y su `-wal`/`-shm`, si los hay) a
+/// `libretype-antes-de-esquema-N.db`. Una copia que ya existe no se pisa: si
+/// escribir la marca falla, el siguiente arranque no puede sustituir la copia
+/// buena por una ya migrada.
+///
+/// Devuelve la ruta de la copia, si se hizo.
+fn copiar_antes_de_migrar(dir: &Path, version: i64) -> io::Result<Option<PathBuf>> {
+    let marca = dir.join(MARCA_ESQUEMA);
+    let copiada: i64 = std::fs::read_to_string(&marca)
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0);
+    if copiada >= version {
+        return Ok(None);
+    }
+
+    let db = dir.join(BASE_DE_DATOS);
+    let mut copia = None;
+    if db.is_file() {
+        let destino = dir.join(format!("libretype-antes-de-esquema-{version}.db"));
+        if !destino.exists() {
+            std::fs::copy(&db, &destino)?;
+            for sufijo in ["-wal", "-shm"] {
+                let origen = dir.join(format!("{BASE_DE_DATOS}{sufijo}"));
+                if origen.is_file() {
+                    let nombre = format!("libretype-antes-de-esquema-{version}.db{sufijo}");
+                    std::fs::copy(&origen, dir.join(nombre))?;
+                }
+            }
+        }
+        copia = Some(destino);
+    }
+    std::fs::create_dir_all(dir)?;
+    std::fs::write(&marca, version.to_string())?;
+    Ok(copia)
 }
 
 /// Tope de lo que se puede escribir de una vez. Una copia de seguridad enorme
 /// sigue siendo unos pocos megas; más que esto no sale de esta aplicación.
 const MAX_BYTES_FICHERO: usize = 64 * 1024 * 1024;
 
+/// Lo único que sabe escribir este comando: copias y lecciones en JSON, y el
+/// informe del docente como página HTML para abrirla en un navegador.
+const EXTENSIONES: [&str; 2] = [".json", ".html"];
+
+/// La extensión admitida con la que acaba el nombre, si acaba en alguna.
+fn extension_de(nombre: &str) -> Option<&'static str> {
+    EXTENSIONES.into_iter().find(|e| nombre.ends_with(e))
+}
+
 /// El nombre lo pone la interfaz, pero por aquí no puede pasar una ruta: solo un
-/// nombre plano `.json`. Con esto el comando no sabe escribir fuera de la carpeta
-/// que se le da, ni crear otra cosa que un JSON.
+/// nombre plano `.json` o `.html`. Con esto el comando no sabe escribir fuera de
+/// la carpeta que se le da, ni crear otra cosa que esos dos tipos de fichero.
 fn nombre_valido(nombre: &str) -> bool {
     let plano = nombre
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
-    plano && nombre.len() <= 128 && !nombre.starts_with('.') && nombre.ends_with(".json")
+    plano && nombre.len() <= 128 && !nombre.starts_with('.') && extension_de(nombre).is_some()
 }
 
 /// Crea el fichero sin pisar ninguno: si ya existe, prueba con `-1`, `-2`...
 /// `create_new` lo hace atómico, sin el hueco entre comprobar y escribir.
 fn escribir_sin_pisar(carpeta: &Path, nombre: &str, contenido: &str) -> io::Result<PathBuf> {
-    let base = nombre.trim_end_matches(".json");
+    let extension = extension_de(nombre).unwrap_or("");
+    let base = nombre.strip_suffix(extension).unwrap_or(nombre);
     for intento in 0..1000 {
         let candidato = if intento == 0 {
             carpeta.join(nombre)
         } else {
-            carpeta.join(format!("{base}-{intento}.json"))
+            carpeta.join(format!("{base}-{intento}{extension}"))
         };
         match OpenOptions::new()
             .write(true)
@@ -104,7 +221,8 @@ fn escribir_sin_pisar(carpeta: &Path, nombre: &str, contenido: &str) -> io::Resu
     ))
 }
 
-/// Guarda un JSON en la carpeta de descargas y devuelve la ruta para enseñarla.
+/// Guarda un fichero de texto (JSON o HTML) en la carpeta de descargas y devuelve
+/// la ruta para enseñarla.
 ///
 /// Existe porque `<a download>` no es fiable dentro de un WebView: WebKitGTK y
 /// WKWebView no tienen gestor de descargas propio. La alternativa eran dos
@@ -132,6 +250,54 @@ fn guardar_en_descargas(
         .and_then(|_| escribir_sin_pisar(&carpeta, &nombre, &contenido))
         .map(|ruta| ruta.to_string_lossy().into_owned())
         .map_err(|e| format!("No se ha podido guardar el fichero: {e}"))
+}
+
+/// Dónde deja el administrador la política del equipo. Ver
+/// `docs/instalacion-gestionada.md`.
+#[cfg(target_os = "windows")]
+fn ruta_politica() -> PathBuf {
+    std::env::var_os("ProgramData")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\ProgramData"))
+        .join("LibreType")
+        .join("politica.json")
+}
+
+#[cfg(target_os = "macos")]
+fn ruta_politica() -> PathBuf {
+    PathBuf::from("/Library/Application Support/LibreType/politica.json")
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+fn ruta_politica() -> PathBuf {
+    PathBuf::from("/etc/libretype/politica.json")
+}
+
+/// Una política es un JSON de un par de campos: más que esto no es una política.
+const MAX_BYTES_POLITICA: u64 = 64 * 1024;
+
+/// Lee la política de una ruta: "" si no hay fichero, y un texto que no es JSON
+/// si existe pero no se puede leer o es desmesurado, para que la interfaz lo
+/// trate como ilegible (apaga las actualizaciones) y no como ausente.
+fn leer_politica(ruta: &Path) -> String {
+    match std::fs::metadata(ruta) {
+        Err(e) if e.kind() == ErrorKind::NotFound => String::new(),
+        Ok(m) if m.is_file() && m.len() <= MAX_BYTES_POLITICA => {
+            std::fs::read_to_string(ruta).unwrap_or_else(|_| "ilegible".into())
+        }
+        _ => "ilegible".into(),
+    }
+}
+
+/// El contenido de la política del sistema, o "" si no hay.
+///
+/// Solo lee: interpretar el JSON se hace en `src/lib/politica.ts`, que se
+/// puede probar sin compilar Rust. La ruta es fija y fuera del alcance del
+/// usuario normal a propósito: una variable de entorno la podría cambiar
+/// cualquiera, y entonces no sería una política.
+#[tauri::command]
+fn politica_del_sistema() -> String {
+    leer_politica(&ruta_politica())
 }
 
 /// Cómo se empaquetó este binario: "deb", "rpm", "appimage", "msi", "nsis",
@@ -166,7 +332,8 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             tipo_de_paquete,
-            guardar_en_descargas
+            guardar_en_descargas,
+            politica_del_sistema
         ])
         .plugin(
             tauri_plugin_sql::Builder::default()
@@ -192,6 +359,17 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Antes de que la interfaz cargue la base de datos y se apliquen
+            // las migraciones. Que falle la copia no impide practicar.
+            match app.path().app_config_dir() {
+                Ok(dir) => match copiar_antes_de_migrar(&dir, version_esquema()) {
+                    Ok(Some(copia)) => log::info!("copia previa a la migración en {copia:?}"),
+                    Ok(None) => {}
+                    Err(e) => log::warn!("no se pudo copiar la base de datos: {e}"),
+                },
+                Err(e) => log::warn!("sin directorio de configuración para la copia: {e}"),
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -205,7 +383,7 @@ mod tests {
     #[test]
     fn migraciones_tienen_versiones_validas_y_sql_no_vacio() {
         let migs = migraciones();
-        assert_eq!(migs.len(), 3, "debe haber 3 migraciones");
+        assert_eq!(migs.len(), 4, "debe haber 4 migraciones");
 
         // Versión 1: sesiones de práctica
         assert_eq!(migs[0].version, 1);
@@ -223,6 +401,13 @@ mod tests {
             .contains("CREATE TABLE IF NOT EXISTS lecciones_propias"));
         assert!(migs[2].sql.contains("borrada_en"));
 
+        // Versión 4: perfiles, con las lecciones propias dentro de cada uno
+        assert_eq!(migs[3].version, 4);
+        assert!(migs[3].sql.contains("CREATE TABLE IF NOT EXISTS perfiles"));
+        assert!(migs[3].sql.contains("PRIMARY KEY (perfil, code)"));
+        assert!(migs[3].sql.contains("PRIMARY KEY (perfil, id)"));
+        assert_eq!(version_esquema(), migs.len() as i64);
+
         // Invariantes generales
         for (idx, m) in migs.iter().enumerate() {
             assert_eq!(m.version as usize, idx + 1);
@@ -231,9 +416,92 @@ mod tests {
         }
     }
 
+    /// Un directorio temporal propio de cada test, para que no se pisen.
+    fn dir_de_prueba(nombre: &str) -> PathBuf {
+        let nombre = format!("libretype-test-{}-{nombre}", std::process::id());
+        let dir = std::env::temp_dir().join(nombre);
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
     #[test]
-    fn nombre_valido_solo_admite_un_json_plano() {
+    fn copia_la_base_de_datos_antes_de_un_esquema_nuevo_y_solo_una_vez() {
+        let dir = dir_de_prueba("copia");
+        let db = dir.join(BASE_DE_DATOS);
+        std::fs::write(&db, b"version 2").unwrap();
+        let wal_original = dir.join("libretype.db-wal");
+        std::fs::write(&wal_original, b"wal").unwrap();
+
+        let hecha = copiar_antes_de_migrar(&dir, 3).unwrap();
+        let copia = hecha.expect("debe copiar");
+        assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
+        let wal = dir.join("libretype-antes-de-esquema-3.db-wal");
+        assert_eq!(std::fs::read(wal).unwrap(), b"wal");
+
+        // Ya migrada: el siguiente arranque no vuelve a copiar.
+        std::fs::write(&db, b"version 3").unwrap();
+        assert!(copiar_antes_de_migrar(&dir, 3).unwrap().is_none());
+        assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
+
+        // Si la marca se perdió, la copia buena tampoco se pisa.
+        std::fs::remove_file(dir.join(MARCA_ESQUEMA)).unwrap();
+        copiar_antes_de_migrar(&dir, 3).unwrap();
+        assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
+
+        // Un esquema posterior sí hace su propia copia, con lo que haya entonces.
+        let siguiente = copiar_antes_de_migrar(&dir, 4)
+            .unwrap()
+            .expect("debe copiar");
+        assert!(siguiente.ends_with("libretype-antes-de-esquema-4.db"));
+        assert_eq!(std::fs::read(&siguiente).unwrap(), b"version 3");
+        assert_eq!(std::fs::read(&copia).unwrap(), b"version 2");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn en_una_instalacion_nueva_no_hay_nada_que_copiar() {
+        let dir = dir_de_prueba("nueva");
+        assert!(copiar_antes_de_migrar(&dir, 3).unwrap().is_none());
+        let marca = std::fs::read_to_string(dir.join(MARCA_ESQUEMA)).unwrap();
+        assert_eq!(marca, "3");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn la_politica_ausente_es_vacia_y_la_ilegible_no() {
+        let dir = dir_de_prueba("politica");
+        let ruta = dir.join("politica.json");
+
+        // Sin fichero no hay política: todo sigue como siempre.
+        assert_eq!(leer_politica(&ruta), "");
+
+        std::fs::write(&ruta, r#"{ "actualizaciones": false }"#).unwrap();
+        assert_eq!(leer_politica(&ruta), r#"{ "actualizaciones": false }"#);
+
+        // Bytes que no son UTF-8, o un directorio en su lugar: existe pero no se
+        // entiende, y eso no puede confundirse con que no haya política.
+        std::fs::write(&ruta, [0xff, 0xfe, 0x00]).unwrap();
+        assert_eq!(leer_politica(&ruta), "ilegible");
+        std::fs::remove_file(&ruta).unwrap();
+        std::fs::create_dir(&ruta).unwrap();
+        assert_eq!(leer_politica(&ruta), "ilegible");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn la_ruta_de_la_politica_es_fija_y_del_sistema() {
+        let ruta = ruta_politica();
+        assert!(ruta.is_absolute());
+        assert!(ruta.ends_with("politica.json"));
+    }
+
+    #[test]
+    fn nombre_valido_solo_admite_un_json_o_un_html_plano() {
         assert!(nombre_valido("libretype-lecciones-2026-11-04.json"));
+        assert!(nombre_valido("informe-ana-2026-11-04.html"));
         for malo in [
             "../fuera.json",
             "a/b.json",
@@ -242,6 +510,9 @@ mod tests {
             ".oculto.json",
             "script.sh",
             "lecciones.json.exe",
+            "informe.htm",
+            "informe.html.sh",
+            "pagina.HTML",
             "",
             "ñu.json",
         ] {
@@ -261,6 +532,13 @@ mod tests {
         assert_ne!(primero, segundo);
         assert!(segundo.ends_with("copia-1.json"));
         assert_eq!(std::fs::read_to_string(&primero).unwrap(), "uno");
+        assert_eq!(std::fs::read_to_string(&segundo).unwrap(), "dos");
+
+        // Con cada extensión por su lado: un informe no pisa ni se numera con las copias.
+        let pagina = escribir_sin_pisar(&carpeta, "copia.html", "tres").unwrap();
+        let otra = escribir_sin_pisar(&carpeta, "copia.html", "cuatro").unwrap();
+        assert!(pagina.ends_with("copia.html"));
+        assert!(otra.ends_with("copia-1.html"));
         assert_eq!(std::fs::read_to_string(&segundo).unwrap(), "dos");
 
         std::fs::remove_dir_all(&carpeta).unwrap();

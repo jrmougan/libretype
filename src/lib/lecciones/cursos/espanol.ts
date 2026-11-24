@@ -149,6 +149,17 @@ const LECCIONES: Lesson[] = [
       'viaja a Jaén y a Oviedo Nuria conoce Kenia Una prima de Quito llama a Úrsula ' +
       'Óscar y Yolanda cenan en casa Ñoquis con salsa para Ángel e Íñigo Él y ' +
       'Xavier saludan a Wendy en Zaragoza',
+    frases: [
+      'El sol brilla en Madrid y Ana pasea por el Retiro', 'Carlos y Elena viajan a Toledo',
+      'Mañana sale el tren hacia Sevilla', 'Pedro visita a Laura en Valencia',
+      'Beatriz y Diego viven en Bilbao', 'Fernando e Irene estudian en Granada',
+      'Hugo viaja a Jaén y a Oviedo', 'Nuria conoce Kenia', 'Una prima de Quito llama a Úrsula',
+      'Óscar y Yolanda cenan en casa', 'Ñoquis con salsa para Ángel e Íñigo',
+      'Él y Xavier saludan a Wendy en Zaragoza', 'Ana vive en Madrid', 'Mañana voy a Sevilla',
+      'Hoy cena Pedro en casa', 'El tren sale de Toledo', 'Laura estudia en Valencia',
+      'Mi hermano vive en Zaragoza', 'Ya llega el verano', 'Quiero ir a Granada',
+      'Juan come con Lucía', 'Óscar visita Málaga', 'Úrsula trabaja en Cádiz', 'Iván juega en Oviedo',
+    ],
   },
   {
     id: 'puntuacion',
@@ -162,6 +173,14 @@ const LECCIONES: Lesson[] = [
       'Hola, ¿cómo estás? ¡Qué alegría verte! Sí, todo va bien por aquí. ' +
       '¿Vienes hoy al cine? ¡Claro que sí, me apunto! Uno, dos, tres. ' +
       '¿Dónde vamos? ¡Espera, ya voy!',
+    frases: [
+      'Hola, ¿cómo estás?', '¡Qué alegría verte!', 'Sí, todo va bien por aquí.',
+      '¿Vienes hoy al cine?', '¡Claro que sí, me apunto!', 'Uno, dos, tres.',
+      '¿Dónde vamos?', '¡Espera, ya voy!', 'Buenos días, ¿qué tal?',
+      'Mañana llueve, coge el paraguas.', '¡Qué bien, ya es viernes!',
+      '¿Tienes un momento?', 'Gracias, eres muy amable.', 'Luego te llamo, ¿vale?',
+      '¡Feliz cumpleaños, Marta!', 'No pasa nada, otra vez será.',
+    ],
   },
   {
     id: 'numeros',
@@ -176,6 +195,16 @@ const LECCIONES: Lesson[] = [
       'Un año tiene 365 días y un día tiene 24 horas. En el pueblo viven 1280 ' +
       'personas y hay 3 colegios. Compró 7 libros por 49 euros y 8 libretas por ' +
       '10 euros. El tren sale a las 6 y llega a las 9.',
+    // Tampoco aquí hay años.
+    frases: [
+      'Tengo 3 hermanos.', 'Vivo en el piso 4.', 'Son las 2 y cuarto.', 'Somos 5 en casa.',
+      'Compré 12 huevos.', 'La clase es a las 11.', 'Enero tiene 31 días.', 'Nací el 15 de mayo.',
+      'Llegó el 24 de abril.', 'Cuesta 45 euros.', 'Lee la página 132.', 'Quedan 3 días.',
+      '¿Vienes a las 4?', '¡Faltan 2 minutos!', 'Un año tiene 365 días.', 'El día tiene 24 horas.',
+      'Mi número es el 678.', 'Compró 7 libros por 49 euros.', 'Somos 8 en la mesa.',
+      'Son las 9 y media.', 'El tren sale a las 10.', 'Tengo 60 años.', 'Hay 100 sillas.',
+      'Corre 6 kilómetros.', '¿Quedamos a las 7?', '¡Ya son las 8!',
+    ],
   },
   // Consolidación: textos seguidos con todo lo anterior. Cada una estrena los
   // signos que aún faltaban, para que escribir un texto real no deje a nadie sin
@@ -205,6 +234,59 @@ const LECCIONES: Lesson[] = [
       'temprano". Mi abuelo prefiere otro refrán: "a quien madruga, Dios le ayuda". ' +
       'Yo me quedo con este: "más vale tarde que nunca". Y si hoy no sale, mañana ' +
       'será otro día.',
+  },
+  /*
+   * Lo que faltaba para escribir una fecha, un teléfono, un precio o un correo.
+   *
+   * Van al final a propósito, y no junto a «Números»: el desbloqueo recorre el
+   * curso en orden, así que una lección nueva en medio volvería a cerrarle a
+   * quien ya las superó todas las que vienen detrás. Por lo mismo «Números» no
+   * se parte en dos: quien la superó escribió las diez cifras, y quitarle
+   * cinco sería retirar algo ya acreditado. `numeros-2` es una segunda vuelta
+   * a la fila de arriba con los dos signos que acompañan a las cifras.
+   */
+  {
+    id: 'numeros-2',
+    title: 'Fechas y teléfonos',
+    focus:
+      'Otra vuelta a la fila de números, ahora en fechas, horas y teléfonos. ' +
+      'Estrenas el guion, que está junto a la Mayús derecha, y la barra: Mayús con el 7.',
+    nuevas: '-/',
+    cobertura: 100,
+    // Fechas sin año, como en «Números».
+    text:
+      'Nació el 3/10 y su hermana el 25/12. El teléfono del centro es 912-345-678. ' +
+      'La biblioteca abre de 9 a 14, de lunes a viernes; por la tarde, de 17-20. ' +
+      'El tren Madrid-Toledo sale a las 10:30. Apunta la fecha: 6/4.',
+    frases: [
+      'Nació el 3/10.', 'La cita es el 14/02.', 'El teléfono es 912-345-678.',
+      'El tren Madrid-Toledo sale a las 10:30.', 'Abre de 9 a 14, de lunes a viernes.',
+      'El horario de tarde es 17-20.', 'Mi número de socio es el 12-345.',
+      'La reunión es el 25/11 a las 18:00.', 'Usa y/o según el caso.',
+      'Lee las páginas 40-45.', 'Quedamos el 6/4, ¿te viene bien?', 'El partido acabó 3-2.',
+      'Vuelo Sevilla-Bilbao, puerta 7.', 'Del 1/7 al 15/8 cerramos por vacaciones.',
+    ],
+  },
+  {
+    id: 'simbolos',
+    title: 'Correo, precios y porcentajes',
+    focus:
+      'La arroba sale con AltGr y el 2; el euro, con AltGr y el 5; el tanto por ' +
+      'ciento, con Mayús y el 5. Con esto ya puedes escribir una dirección de correo.',
+    nuevas: '@€%',
+    cobertura: 100,
+    text:
+      'Mi correo es ana.ruiz@ejemplo.es y el de Luis es luis@ejemplo.org. El menú ' +
+      'cuesta 12 € y hoy tiene un 20% de descuento. Un café cuesta 1,50 €. El 30% ' +
+      'de la clase fue a la excursión, que costaba 8 € por persona.',
+    frases: [
+      'Mi correo es ana.ruiz@ejemplo.es.', 'Escríbeme a luis@ejemplo.org.',
+      'El menú cuesta 12 €.', 'Hay un 20% de descuento.', 'Un café cuesta 1,50 €.',
+      'El 30% de la clase vino.', 'El IVA es del 21%.', 'Son 25 € por persona.',
+      'Mi correo nuevo es marta@ejemplo.org.', 'La entrada cuesta 6 €, con un 50% de descuento.',
+      'Envía la foto a info@ejemplo.es.', 'Ahorra un 10% cada mes.',
+      '¿Cuánto es el 15% de 200 €?', 'El billete sube un 3%.',
+    ],
   },
 ];
 
@@ -238,6 +320,31 @@ export const PALABRAS_BASE: readonly string[] = [
   'taxi', 'kilo', 'reloj', 'hoja', 'hijo', 'ayer', 'agua', 'sol', 'aire',
 ];
 
+/**
+ * Las palabras más frecuentes del español escrito, de más a menos. Las primeras
+ * cien cubren cerca de la mitad de lo que se escribe; aquí van las que sostienen
+ * las frases (artículos, preposiciones, verbos auxiliares). Para la fluidez.
+ */
+export const PALABRAS_FRECUENTES: readonly string[] = [
+  'de', 'la', 'que', 'el', 'en', 'y', 'a', 'los', 'se', 'del',
+  'las', 'un', 'por', 'con', 'no', 'una', 'su', 'para', 'es', 'al',
+  'lo', 'como', 'más', 'o', 'pero', 'sus', 'le', 'ha', 'me', 'si',
+  'sin', 'sobre', 'este', 'ya', 'entre', 'cuando', 'todo', 'esta', 'ser', 'son',
+  'dos', 'también', 'fue', 'había', 'era', 'muy', 'años', 'hasta', 'desde', 'está',
+  'mi', 'porque', 'qué', 'solo', 'han', 'yo', 'hay', 'vez', 'puede', 'todos',
+  'así', 'nos', 'ni', 'parte', 'tiene', 'él', 'uno', 'donde', 'bien', 'tiempo',
+  'mismo', 'ese', 'ahora', 'cada', 'e', 'vida', 'otro', 'después', 'te', 'otros',
+  'aunque', 'esa', 'eso', 'hace', 'otra', 'gobierno', 'tan', 'durante', 'siempre', 'día',
+  'tanto', 'ella', 'tres', 'sí', 'dijo', 'sido', 'gran', 'país', 'según', 'menos',
+];
+
+/** Pares de letras que más se encadenan en español. */
+export const BIGRAMAS_FRECUENTES: readonly string[] = [
+  'de', 'es', 'en', 'el', 'la', 'os', 'ue', 'ar', 'er', 'ra',
+  're', 'qu', 'an', 'as', 'on', 'co', 'ta', 'do', 'se', 'te',
+  'al', 'or', 'nt', 'st', 'ad', 'ci', 'to', 'ca', 'ie', 'io',
+];
+
 export const CURSO_ESPANOL: Curso = {
   id: 'espanol',
   titulo: 'Temario de español',
@@ -245,6 +352,8 @@ export const CURSO_ESPANOL: Curso = {
   lecciones: LECCIONES,
   vocabulario: BANCO_VOCABULARIO,
   palabrasRefuerzo: PALABRAS_BASE,
+  frecuentes: PALABRAS_FRECUENTES,
+  bigramas: BIGRAMAS_FRECUENTES,
   // Hasta aquí llega el alfabeto; después solo se añaden mayúsculas y signos.
   finAlfabeto: 'raras',
 };

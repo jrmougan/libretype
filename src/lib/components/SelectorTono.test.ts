@@ -53,6 +53,14 @@ describe('SelectorTono.svelte (Issue #36)', () => {
     const chips = Array.from(botones).map((b) => b.querySelector('.chip')?.textContent?.trim());
     expect(chips).toEqual(['¡Has llegado al final!', 'Lección terminada.']);
 
+    // Las franjas de arriba son decoración: el nombre ya dice qué es cada una.
+    const franjas = document.querySelectorAll('.franja');
+    expect(franjas).toHaveLength(2);
+    for (const f of franjas) {
+      expect(f.getAttribute('aria-hidden')).toBe('true');
+      expect(f.textContent).toBe('');
+    }
+
     // Las muestras visuales están ocultas para el lector de pantalla para no duplicar información
     const muestras = document.querySelectorAll('.muestra');
     expect(muestras).toHaveLength(2);

@@ -1,16 +1,12 @@
 /**
  * Las lecciones personalizadas en los tres almacenes, y el de SQLite contra un
- * SQLite de verdad con las migraciones reales de `lib.rs`: un doble no notaría una
- * columna mal escrita ni un parámetro de más.
+ * SQLite de verdad con las migraciones reales de `lib.rs` (`sqlite-de-prueba.ts`).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { crearLeccion, type LeccionPropia } from '../lecciones/personalizadas';
 import { AlmacenLocal, AlmacenMemoria, AlmacenSqlite, parsearCopiaSeguridad, type Almacen, type DbSql } from './almacen';
 import type { Sesion } from './progreso';
-
-const LIB_RS = Object.values(import.meta.glob('/src-tauri/src/lib.rs', {
-  eager: true, query: '?raw', import: 'default',
-}))[0] as string;
+import { migraciones, sqliteReal } from './sqlite-de-prueba';
 
 const AHORA = '2026-11-04T10:00:00.000Z';
 const LUEGO = '2026-11-05T10:00:00.000Z';
@@ -19,25 +15,6 @@ const sesion: Sesion = {
 };
 const leccion = (id = 'propia:a', titulo = 'Mi lección'): LeccionPropia =>
   crearLeccion({ titulo, descripcion: 'Qué se practica', texto: 'una frase para practicar' }, AHORA, id);
-
-/** Las migraciones reales, en orden, sacadas del fuente de Rust. */
-function migraciones(): string[] {
-  return [...LIB_RS.matchAll(/sql: "([\s\S]*?)",\s*kind: MigrationKind::Up/g)].map((m) => m[1]);
-}
-
-/** `node:sqlite` por una variable: fuera del ámbito de tipos del frontend. */
-async function sqliteReal(): Promise<DbSql> {
-  const modulo = 'node:sqlite';
-  const { DatabaseSync } = await import(/* @vite-ignore */ modulo);
-  const db = new DatabaseSync(':memory:');
-  for (const sql of migraciones()) db.exec(sql);
-  // sqlx enlaza `$1` por su número; `node:sqlite` solo lo hace con `?1`.
-  const numerados = (sql: string) => sql.replace(/\$(\d+)/g, '?$1');
-  return {
-    async execute(sql: string, valores: unknown[] = []) { return db.prepare(numerados(sql)).run(...valores); },
-    async select<T>(sql: string, valores: unknown[] = []) { return db.prepare(numerados(sql)).all(...valores) as T; },
-  };
-}
 
 beforeEach(() => localStorage.clear());
 
@@ -133,13 +110,13 @@ describe('datos corruptos', () => {
     const a = new AlmacenSqlite(db);
     await a.guardarLeccion(leccion());
     await db.execute(
-      `INSERT INTO lecciones_propias (id, titulo, descripcion, texto, creada_en, actualizada_en)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO lecciones_propias (id, titulo, descripcion, texto, creada_en, actualizada_en, perfil)
+       VALUES ($1, $2, $3, $4, $5, $6, 1)`,
       ['reposo', 'no', '', 'x', 'ayer', 'ayer'],
     );
     await db.execute(
-      `INSERT INTO lecciones_propias (id, titulo, descripcion, texto, creada_en, actualizada_en)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO lecciones_propias (id, titulo, descripcion, texto, creada_en, actualizada_en, perfil)
+       VALUES ($1, $2, $3, $4, $5, $6, 1)`,
       ['propia:rota', '', '', '', 'ayer', 'ayer'],
     );
     expect((await a.leerLecciones()).map((l) => l.id)).toEqual(['propia:a']);
@@ -177,12 +154,14 @@ describe('si no cabe, se dice', () => {
 describe('la migración', () => {
   it('es la tercera, nueva, y no editó las dos anteriores', () => {
     const sql = migraciones();
-    expect(sql).toHaveLength(3);
+    expect(sql.length).toBeGreaterThanOrEqual(3);
     expect(sql[0]).toContain('sesiones');
     expect(sql[1]).toContain('teclas');
     expect(sql[2]).toContain('lecciones_propias');
     expect(sql[0]).not.toContain('lecciones_propias');
     expect(sql[1]).not.toContain('lecciones_propias');
+    // Los perfiles llegaron después, en su propia migración: ninguna de estas tres los conoce.
+    for (const anterior of sql.slice(0, 3)) expect(anterior).not.toMatch(/perfil/);
   });
 });
 

@@ -250,3 +250,23 @@ export function generarEjercicioRefuerzo(
     suelto,
   };
 }
+
+/**
+ * Un refuerzo para unas teclas concretas: las que más costaron en el intento que
+ * acaba de terminar. Es el mismo ejercicio que el de las teclas flojas, con el
+ * mismo límite (solo vocabulario ya visto), pero elegidas por lo de ahora y no
+ * por la media de semanas del dominio. `null` si ninguna se puede practicar.
+ */
+export function generarRefuerzoDeTeclas(
+  teclas: readonly { code: string; fallos: number }[],
+  superadas: ReadonlySet<string> = new Set(),
+  layout: Layout = ES_ISO,
+  cursoId?: string,
+  catalogo: Catalogo = catalogoApp,
+): EjercicioRefuerzo | null {
+  // Sin aciertos: todas cuentan como flojas, y con más fallos van primero.
+  const estados = new Map<string, EstadoTecla>(
+    teclas.filter((t) => t.fallos > 0).map((t) => [t.code, { intentos: t.fallos, aciertos: 0, msTotal: 0 }]),
+  );
+  return estados.size > 0 ? generarEjercicioRefuerzo(estados, superadas, layout, cursoId, catalogo) : null;
+}

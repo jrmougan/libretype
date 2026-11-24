@@ -82,8 +82,10 @@ describe("AlmacenSqlite", () => {
     await almacen.borrarTodo();
 
     const sqles = consultas.map((c) => c.sql);
-    expect(sqles).toContain("DELETE FROM sesiones");
-    expect(sqles).toContain("DELETE FROM teclas");
+    // Solo lo del perfil activo: borrar el progreso de uno no toca el de los demás.
+    expect(sqles).toContain("DELETE FROM sesiones WHERE perfil = $1");
+    expect(sqles).toContain("DELETE FROM teclas WHERE perfil = $1");
+    expect(consultas.filter((c) => c.sql.startsWith("DELETE")).every((c) => c.params?.[0] === 1)).toBe(true);
     expect(sqles).toContain("VACUUM");
   });
 

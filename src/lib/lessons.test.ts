@@ -181,6 +181,28 @@ describe('temario ampliado: mayúsculas, puntuación y números (Issue #20)', ()
     }
   });
 
+  it('fechas, teléfonos, precios y correo: los signos que faltaban tienen lección', () => {
+    const porSigno: Record<string, string> = { '-': 'numeros-2', '/': 'numeros-2', '@': 'simbolos', '€': 'simbolos', '%': 'simbolos' };
+    for (const [signo, id] of Object.entries(porSigno)) {
+      const l = LESSONS.find((x) => x.id === id)!;
+      expect(l.nuevas, id).toContain(signo);
+      expect(l.text, id).toContain(signo);
+      expect(l.frases!.some((f) => f.includes(signo)), `${id}: ${signo}`).toBe(true);
+      expect(index.has(signo)).toBe(true);
+    }
+  });
+
+  it('las lecciones nuevas van al final: no vuelven a cerrar las que ya estaban superadas', () => {
+    // El desbloqueo recorre el curso en orden. Este es el orden con el que se
+    // publicó; lo nuevo solo puede ir detrás.
+    const publicadas = [
+      'reposo', 'vocales-1', 'nasales', 'vocales-2', 'tildes', 'oclusivas', 'consonantes',
+      'dificiles', 'raras', 'mayusculas', 'puntuacion', 'numeros', 'un-dia', 'refranes',
+    ];
+    expect(LESSONS.slice(0, publicadas.length).map((l) => l.id)).toEqual(publicadas);
+    expect(nivelDesbloqueado(publicadas)).toBe(publicadas.length);
+  });
+
   it('la lección de números practica los diez dígitos', () => {
     const l = LESSONS.find((x) => x.id === 'numeros')!;
     expect(l).toBeDefined();

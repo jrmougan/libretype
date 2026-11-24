@@ -172,7 +172,7 @@ describe("Progreso.svelte - Exportación e importación (Issue #28)", () => {
     await tick();
     await new Promise((r) => setTimeout(r, 20));
 
-    expect(onImportar).toHaveBeenCalledWith(contenidoValido);
+    expect(onImportar).toHaveBeenCalledWith(contenidoValido, "sustituir");
     const mensaje = document.querySelector("[role='status']");
     expect(mensaje?.textContent).toContain("Copia de seguridad importada con éxito");
   });
@@ -247,7 +247,7 @@ describe("Progreso.svelte - Exportación e importación (Issue #28)", () => {
     await tick();
     await new Promise((r) => setTimeout(r, 20));
 
-    expect(onImportar).toHaveBeenCalledWith(contenido);
+    expect(onImportar).toHaveBeenCalledWith(contenido, "sustituir");
     expect(document.querySelector("[role='status']")?.textContent).toContain("con éxito");
   });
 });
@@ -341,6 +341,11 @@ describe("Progreso.svelte - Evolución temporal (Issue #26) y Teclas flojas (Iss
     );
     expect(dtDias).not.toBeNull();
     expect(dtDias?.nextElementSibling?.textContent).toContain("1");
+
+    // La racha que volvía a 0 se cambió por constancia semanal: nada que perder.
+    const rotulos = [...document.querySelectorAll("dl.global dt")].map((dt) => dt.textContent);
+    expect(rotulos).toContain("Esta semana");
+    expect(rotulos.join(" ")).not.toMatch(/racha/i);
 
     const tituloEvolucion = document.querySelector("#titulo-evolucion");
     expect(tituloEvolucion).not.toBeNull();
@@ -670,5 +675,198 @@ describe("Progreso: los modos de práctica no son lecciones retiradas", () => {
     input.dispatchEvent(new Event("change", { bubbles: true }));
     await vi.waitFor(() => expect(document.querySelector("[role='alert']")?.textContent).toContain("demasiado grande"));
     expect(onImportar).not.toHaveBeenCalled();
+  });
+});
+
+describe("Progreso.svelte - comparado con uno mismo", () => {
+  const dominada = { intentos: 20, aciertos: 20, msTotal: 20 * 250 };
+  const dia = (fecha: string, extra: Partial<Sesion> = {}): Sesion =>
+    ({ ...sesionPrueba, terminadaEn: `${fecha}T12:00:00.000Z`, ...extra });
+
+  function montar(sesiones: Sesion[], teclas = new Map<string, typeof dominada>()): void {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones, lecciones: LESSONS, tipoAlmacen: "sqlite", teclas, onBorrar: () => {} },
+    });
+    flushSync();
+  }
+
+  it("abre con una frase que resume lo conseguido y dice cuántas teclas salen ya sin mirar", () => {
+    montar([sesionPrueba], new Map([["KeyA", dominada], ["KeyS", dominada]]));
+    const resumen = document.querySelector(".resumen")?.textContent ?? "";
+    expect(resumen).toContain(`Has superado 1 de ${LESSONS.length} lecciones`);
+    // Con «reposo» superada está abierta la segunda: asdfjklñ más la e y la o.
+    expect(resumen).toContain("ya escribes 2 de 10 teclas sin mirar");
+    const dt = [...document.querySelectorAll("dl.global dt")].find((x) => x.textContent === "Teclas que ya escribes sin mirar");
+    expect(dt?.nextElementSibling?.textContent?.replace(/\s+/g, " ").trim()).toBe("2 de 10");
+  });
+
+  it("la gráfica es una imagen con nombre y descripción, y conserva la tabla como alternativa", () => {
+    montar([dia("2026-09-01", { ppm: 10 }), dia("2026-09-02", { ppm: 20 }), dia("2026-09-03", { ppm: 30 })]);
+    const svg = document.querySelector(".grafica svg")!;
+    expect(svg.getAttribute("role")).toBe("img");
+    const [idTitulo, idDesc] = svg.getAttribute("aria-labelledby")!.split(" ");
+    expect(document.getElementById(idTitulo)?.textContent).toBe("Palabras por minuto, media de cada día");
+    const desc = document.getElementById(idDesc)?.textContent ?? "";
+    expect(desc).toContain("3 días con práctica");
+    expect(desc).toContain("El primero, 10 palabras por minuto de media; el último, 30");
+    expect(svg.querySelectorAll("rect.barra")).toHaveLength(3);
+    // Sin metas ni líneas de objetivo: una sola línea, la base.
+    expect(svg.querySelectorAll("line")).toHaveLength(1);
+    expect(document.querySelector("#titulo-evolucion")?.closest("section")?.querySelector("table")).not.toBeNull();
+  });
+
+  it("un día solo con una lección propia no dibuja una barra a cero", () => {
+    montar([dia("2026-09-01", { ppm: 10 }), dia("2026-09-02", { leccion: "propia:abc", ppm: 99 })]);
+    expect(document.querySelectorAll(".grafica rect.barra")).toHaveLength(1);
+  });
+
+  it("compara con los comienzos solo cuando hay historia, y sin la última sesión como vara", () => {
+    montar([sesionPrueba]);
+    expect(document.querySelector("#titulo-comparacion")).toBeNull();
+  });
+
+  it("con historia suficiente dice lo que ha mejorado frente a los comienzos", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-21T18:00:00Z"));
+    try {
+      montar([dia("2026-09-01", { pctAcierto: 86, ppm: 6 }), dia("2026-09-21", { pctAcierto: 97, ppm: 16 })]);
+      const bloque = document.querySelector("#titulo-comparacion")?.closest("section");
+      expect(bloque?.textContent).toContain("Tu precisión media ha pasado del 86% de tus primeros días al 97% de esta semana.");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("Progreso.svelte - combinar una copia con lo que hay", () => {
+  async function hastaConfirmar(props: Record<string, unknown>): Promise<string> {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones: [sesionPrueba], lecciones: LESSONS, tipoAlmacen: "sqlite", onBorrar: () => {}, ...props },
+    });
+    flushSync();
+    const contenido = JSON.stringify({
+      version: 1, sesiones: [{ ...sesionPrueba, terminadaEn: "2026-09-02T12:00:00.000Z" }], teclas: {},
+    });
+    const input = document.querySelector("input[type='file']") as HTMLInputElement;
+    Object.defineProperty(input, "files", { value: [new File([contenido], "c.json")] });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    await vi.waitFor(() => expect(document.querySelector(".confirmacion")).not.toBeNull());
+    return contenido;
+  }
+  const botonDe = (texto: string) => [...document.querySelectorAll<HTMLButtonElement>(".confirmacion button")]
+    .find((b) => b.textContent?.trim() === texto)!;
+
+  it("ofrece sustituir o combinar, y explica la diferencia sin tecnicismos", async () => {
+    await hastaConfirmar({ onImportar: vi.fn() });
+    expect(document.querySelector(".confirmacion")?.textContent).toContain("juntar los dos");
+    expect(botonDe("Sí, importar")).toBeDefined();
+    expect(botonDe("Combinar con lo que hay")).toBeDefined();
+    // El foco sigue yendo a la salida segura.
+    await tick();
+    expect(document.activeElement).toBe(botonDe("Cancelar"));
+  });
+
+  it("combinar llama con ese modo y dice cuántas sesiones ha añadido", async () => {
+    const onImportar = vi.fn().mockResolvedValue({ leccionesSinSitio: 0, sesionesNuevas: 3 });
+    const contenido = await hastaConfirmar({ onImportar });
+    botonDe("Combinar con lo que hay").click();
+    await vi.waitFor(() => expect(document.querySelector("[role='status']")?.textContent).toContain("Copia combinada"));
+    expect(onImportar).toHaveBeenCalledWith(contenido, "combinar");
+    expect(document.querySelector("[role='status']")?.textContent).toContain("Se han añadido 3 sesiones.");
+  });
+
+  it("combinar una copia que no trae nada nuevo lo dice tal cual", async () => {
+    const onImportar = vi.fn().mockResolvedValue({ leccionesSinSitio: 0, sesionesNuevas: 0 });
+    await hastaConfirmar({ onImportar });
+    botonDe("Combinar con lo que hay").click();
+    await vi.waitFor(() => expect(document.querySelector("[role='status']")?.textContent)
+      .toContain("No traía ninguna sesión que no estuviera ya."));
+  });
+
+  it("sin manejador propio combina directamente en el almacén, sin duplicar", async () => {
+    const almacen = new AlmacenMemoria();
+    await almacen.guardar(sesionPrueba);
+    await hastaConfirmar({ almacen });
+    botonDe("Combinar con lo que hay").click();
+    await vi.waitFor(() => expect(document.querySelector("[role='status']")?.textContent).toContain("Se ha añadido una sesión."));
+    expect(await almacen.leerTodas()).toHaveLength(2);
+  });
+});
+
+describe("Progreso.svelte - sesiones recuperadas del respaldo", () => {
+  it("dice cuántas sesiones se han recuperado tras un fallo de la base de datos", () => {
+    const almacen = Object.assign(new AlmacenMemoria(), { recuperadas: 3 });
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones: [sesionPrueba], lecciones: LESSONS, tipoAlmacen: "sqlite", almacen, onBorrar: () => {} },
+    });
+    flushSync();
+    expect(document.querySelector(".recuperadas")?.textContent?.replace(/\s+/g, " "))
+      .toContain("Se han recuperado 3 sesiones que se guardaron de forma provisional");
+  });
+
+  it("sin nada recuperado no dice nada", () => {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones: [sesionPrueba], lecciones: LESSONS, tipoAlmacen: "sqlite", almacen: new AlmacenMemoria(), onBorrar: () => {} },
+    });
+    flushSync();
+    expect(document.querySelector(".recuperadas")).toBeNull();
+  });
+});
+
+describe("Progreso.svelte - dirección visual 1a", () => {
+  function montar(props: Record<string, unknown> = {}) {
+    componente = mount(Progreso, {
+      target: document.body,
+      props: { sesiones: [sesionPrueba], lecciones: LESSONS, tipoAlmacen: "sqlite", onBorrar: () => {}, ...props },
+    });
+    flushSync();
+  }
+
+  const filaDe = (titulo: string) => [...document.querySelectorAll("tbody tr")]
+    .find((tr) => tr.querySelector("th")?.textContent?.includes(titulo))!;
+
+  it("la insignia de cada fila acompaña a su etiqueta escrita", () => {
+    montar();
+    const reposo = filaDe(LESSONS[0].title).querySelector(".insignia")!;
+    expect(reposo.getAttribute("aria-hidden")).toBe("true");
+    expect(reposo.textContent).toBe("✓");
+    expect(filaDe(LESSONS[0].title).querySelector("small")?.textContent).toBe("Superada");
+    expect(filaDe(LESSONS[1].title).querySelector(".insignia")?.textContent).toBe("›");
+    expect(filaDe(LESSONS[1].title).querySelector("small")?.textContent).toBe(FILA_DISPONIBLE);
+    expect(filaDe(LESSONS[2].title).querySelector(".insignia")?.textContent).toBe("");
+    expect(filaDe(LESSONS[2].title).querySelector("small")?.textContent).toContain("Bloqueada");
+  });
+
+  it("marca la lección en curso con texto además del fondo", () => {
+    montar({ leccionActual: LESSONS[1].id });
+    expect(filaDe(LESSONS[1].title).classList.contains("actual")).toBe(true);
+    expect(filaDe(LESSONS[1].title).querySelector("th")?.textContent).toContain("Estás aquí");
+    expect(document.querySelectorAll("tr.actual")).toHaveLength(1);
+  });
+
+  it("sin lección en curso (práctica libre, lección propia) no marca ninguna fila", () => {
+    montar();
+    expect(document.querySelectorAll("tr.actual")).toHaveLength(0);
+    expect(document.querySelector(".progreso")?.textContent).not.toContain("Estás aquí");
+  });
+
+  it("la tarjeta de constancia solo lleva el color de celebración con ese tono", async () => {
+    montar();
+    expect(document.querySelector(".global .constancia")).toBeNull();
+    await unmount(componente!);
+    document.body.replaceChildren();
+    montar({ celebra: true });
+    expect(document.querySelector(".global .constancia dt")?.textContent).toBe("Esta semana");
+  });
+
+  it("las teclas flojas se distinguen con texto y cifra, no solo por color", () => {
+    montar({ teclas: new Map([["KeyA", { intentos: 10, aciertos: 6, msTotal: 8000 }]]) });
+    const floja = document.querySelector(".tecla-card.tecla-floja")!;
+    expect(floja.querySelector(".badge-floja")?.textContent).toBe("reforzar");
+    expect(floja.querySelector(".tecla-pct")?.textContent).toBe("60%");
   });
 });

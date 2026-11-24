@@ -10,9 +10,11 @@
    */
   import { onMount } from 'svelte';
   import Keyboard from './Keyboard.svelte';
+  import PistaDedo from './PistaDedo.svelte';
   import { TypingEngine, computeStats, diffAgainstTarget, UMBRAL_PAUSA_MS, type CharState, type Stats }
     from '../keyboard/engine';
   import { MS_RAPIDO, type MapaDominio } from '../keyboard/dominio';
+  import { crearFiltroTemblor } from '../keyboard/temblor';
   import { buildIndex, FINGER_NAMES, type KeyStep, type Layout }
     from '../keyboard/layouts';
 
@@ -53,13 +55,31 @@
     pausado?: boolean;
     /** Callback para reanudar desde el cartel de pausa. */
     onReanudar?: () => void;
+    /**
+     * Esc desde el propio campo. Se escucha en el `<textarea>` y no en la
+     * ventana: un manejador global de teclas es justo lo que descartaron los
+     * spikes, y además así Esc solo pausa cuando se está escribiendo.
+     */
+    onPausar?: () => void;
+    /**
+     * Ignorar el rebote de una tecla por temblor. Actúa antes de que el
+     * carácter llegue al campo, así que el motor no se entera (ver
+     * `keyboard/temblor.ts`, que explica dónde y por qué ahí).
+     */
+    ignorarRepeticion?: boolean;
   }
 
   let {
     layout, target, activo = true, onDone, onTecla, dominios, onStats,
     titulo = '', explicacion = '', cobertura = '', idioma = '', espacioJusto = false,
-    movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar,
+    movimiento = 'auto', animaciones = 'auto', pausado = false, onReanudar, onPausar,
+    ignorarRepeticion = false,
   }: Props = $props();
+
+  const filtroTemblor = crearFiltroTemblor();
+
+  /** Para enlazar el campo con su descripción aunque haya más de un Drill montado. */
+  const uid = $props.id();
 
   const sinAnimaciones = $derived(movimiento === 'reducido' || animaciones === 'reducidas');
 
@@ -94,6 +114,8 @@
   );
   const stats = $derived(computeStats(typed, target, stampsEfectivos, errores));
   const finished = $derived(typed.length >= target.length);
+  /** Fracción escrita, para la barra de avance del pie de la tarjeta. */
+  const avance = $derived(target.length ? Math.min(1, typed.length / target.length) : 0);
 
   /** Carácter que toca escribir ahora. */
   const nextChar = $derived(typed.length < target.length ? target[typed.length] : null);
@@ -167,19 +189,25 @@
   /**
    * El texto se desplaza dentro de su caja (paso 2 del orden de sacrificio), así
    * que hay que llevar el cursor a la vista: nadie va a soltar el teclado para
-   * mover la rueda a mitad de una lección. Se sitúa su línea arriba del todo para
-   * dejar a la vista lo que viene. Sin animación: lo que importa es que esté ya.
+   * mover la rueda a mitad de una lección. Su línea va **siempre** arriba del todo,
+   * no solo cuando se sale: así lo que queda a la vista por debajo es lo que viene,
+   * y al llegar al final de una línea ya se ve la siguiente. Leer por delante es
+   * como mantiene el ritmo quien ya no reacciona tan rápido. Sin animación: lo que
+   * importa es que esté ya.
+   *
+   * La distancia entre el primer carácter y el cursor no depende de cuánto esté
+   * desplazada la caja, así que sirve de destino tal cual; si todo cabe, no se toca.
    */
   $effect(() => {
     void states;
     const caja = cajaTexto;
     const cursor = caja?.querySelector('.ch.current');
-    if (!caja || !cursor) return;
-    const c = caja.getBoundingClientRect();
-    const r = cursor.getBoundingClientRect();
-    if (r.top < c.top || r.bottom > c.bottom) {
-      caja.scrollTop += r.top - c.top - caja.clientTop;
-    }
+    const primero = caja?.querySelector('.ch');
+    if (!caja || !cursor || !primero) return;
+    if (caja.scrollHeight <= caja.clientHeight + 1) return;
+    const destino = Math.max(0, cursor.getBoundingClientRect().top - primero.getBoundingClientRect().top);
+    // Con margen: un píxel de redondeo no puede mover el texto a cada tecla.
+    if (Math.abs(caja.scrollTop - destino) > 2) caja.scrollTop = destino;
   });
 
   /**
@@ -317,6 +345,7 @@
     avisado = false;
     tiempoDescontado = 0;
     pausadoEn = null;
+    filtroTemblor.olvidar();
   }
 </script>
 
@@ -324,13 +353,13 @@
   <header class="cab">
     <h2>{titulo}</h2>
     {#if cobertura}
-      <span class="cobertura"
+      <span class="chip cobertura"
             aria-label="Al terminarla podrás escribir el {cobertura}% de las palabras que se escriben en {idioma}">
         {cobertura}% del {idioma}
       </span>
     {/if}
     {#if explicacion}
-      <button class="explica" aria-expanded={explicacionAbierta}
+      <button class="enlace explica" aria-expanded={explicacionAbierta}
               onclick={() => (decisionManual = !explicacionAbierta)}>
         {explicacionAbierta ? 'Ocultar' : '¿Qué se practica?'}
       </button>
@@ -359,7 +388,10 @@
 
   <!-- La etiqueta devuelve el foco al pulsar el texto sin interceptar teclas.
        El campo real conserva la composición del método de entrada del sistema. -->
-  <label class="text" bind:this={cajaTexto} aria-label={`Texto de la lección: ${target}`}>
+  <!-- El nombre del campo es corto y el texto va como descripción: con la lección
+       entera en el nombre, el lector la repetía cada vez que el foco volvía aquí.
+       La descripción se anuncia después y se puede saltar. -->
+  <label class="text" bind:this={cajaTexto}>
     <textarea
       bind:this={field}
       class="capture"
@@ -367,10 +399,27 @@
       autocapitalize="off"
       spellcheck="false"
       disabled={!activo || pausado}
-      aria-label={`Escribe el texto de la lección: ${target}`}
+      aria-label={titulo ? `Campo de práctica: ${titulo}` : 'Campo de práctica'}
+      aria-describedby="{uid}-texto"
       onpaste={(e) => e.preventDefault()}
+      onkeydown={(e) => {
+        if (e.key !== 'Escape' || !onPausar) return;
+        // A mitad de un acento, Esc es del método de entrada: cancela la
+        // composición. Robárselo dejaría el ´ colgado en el campo. 229 es el
+        // keyCode que dan algunos motores mientras compone el IME.
+        if (e.isComposing || composing || e.keyCode === 229) return;
+        e.preventDefault();
+        onPausar();
+      }}
       onbeforeinput={(e) => {
-        if ((e as InputEvent).inputType === 'insertFromPaste') {
+        const ev = e as InputEvent;
+        if (ev.inputType === 'insertFromPaste') {
+          e.preventDefault();
+          return;
+        }
+        // Capa aparte del motor: si se cancela aquí, el carácter no llega al
+        // campo y el canal B (que lee el valor) no tiene nada que deshacer.
+        if (ignorarRepeticion && filtroTemblor.debeIgnorar(ev, performance.now())) {
           e.preventDefault();
         }
       }}
@@ -392,18 +441,28 @@
        falta: el campo está justo después de los controles de arriba. -->
   <span class="aviso-foco" aria-hidden="true">Pulsa aquí para seguir escribiendo</span>
 
+  <!-- El mismo dato que el «Avance» de la barra de arriba, a golpe de vista: por
+       eso no se anuncia. Va fuera de la caja que se desplaza, en su misma celda,
+       para no irse con el texto. -->
+  <div class="avance" aria-hidden="true">
+    <span style:transform="scaleX({avance})"></span>
+  </div>
+
   <!-- Para lector de pantalla: el bucle de práctica es visual y motor, pero la
        pista sí tiene que ser audible, y el progreso legible. -->
   <p class="sr-only" aria-live="polite">{hint}</p>
+  <span id="{uid}-texto" class="sr-only">Texto: {target}</span>
 
-  <p class="hint" aria-hidden="true">
-    {#if nextStep}
-      <span class="swatch" style="background: var(--finger-{nextStep.finger})"
-            aria-hidden="true"></span>{hint}
-    {:else}
-      Lección terminada.
-    {/if}
-  </p>
+  <!-- Lo mismo que la región viva de arriba, para la vista. Con la letra grande
+       se pliega la tarjeta de manos para que el teclado conserve su suelo (orden
+       de sacrificio en PistaDedo.svelte). -->
+  <div class="hint" aria-hidden="true">
+    <PistaDedo
+      paso={nextStep}
+      despues={nextStep?.dead && nextChar ? (index.get(nextChar)?.[1] ?? null) : null}
+      compacta={espacioJusto}
+    />
+  </div>
 
   <div class="teclado" aria-hidden="true">
     <Keyboard {layout} {held} next={nextStep} {lastWrong} {dominios} />
@@ -423,9 +482,9 @@
     gap: var(--space-2) var(--space-4);
     padding: var(--space-2);
     z-index: 1;
-    border-radius: var(--radius);
+    border-radius: var(--radius-card);
     font-size: var(--text-lg);
-    font-weight: 500;
+    font-weight: 700;
   }
 
   /* El teclado se lleva el espacio que sobre; todo lo demás ocupa lo justo.
@@ -436,8 +495,10 @@
     grid-template-areas: 'cabecera' 'explicacion' 'texto' 'pista' 'teclado';
     /* Los mínimos también van en las filas: si solo los tienen los hijos,
        la rejilla puede encogerlas hasta que texto y teclado se solapen. */
+    /* El suelo de la fila del texto es una línea entera: el interlineado, el
+       relleno de la tarjeta (más los 4px de la barra de avance) y el borde. */
     grid-template-rows: auto auto
-      minmax(calc(1.7 * var(--text-drill) + 2 * var(--space-3) + 2px), auto)
+      minmax(calc(1.7 * var(--text-drill) + 2 * var(--space-3) + 4px + 2px), auto)
       auto minmax(var(--suelo-teclado), 1fr);
     gap: var(--space-2);
     min-height: 0;
@@ -459,7 +520,7 @@
     grid-template-areas: 'explicacion explicacion' 'texto texto' 'pista cabecera' 'teclado teclado';
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: auto
-      minmax(calc(1.7 * var(--text-drill) + 2 * var(--space-1) + 2px), auto)
+      minmax(calc(1.7 * var(--text-drill) + 2 * var(--space-1) + 4px + 2px), auto)
       auto minmax(var(--suelo-teclado), 1fr);
   }
   .compacta .cab h2 {
@@ -467,9 +528,18 @@
     overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
   .compacta .cobertura { display: none; }
-  .compacta .text { padding: var(--space-1) var(--space-3); }
-  .compacta .hint { font-size: var(--text-base); }
-  .compacta .explica { padding: 0 var(--space-3); }
+  /* Con la letra grande la caja enseña una línea y poco más, y al llegar al final
+     de esa línea no se veía nada de lo que viene: leer por delante es como mantiene
+     el ritmo quien ya no reacciona tan rápido. Con el interlineado más prieto, en el
+     mismo alto de caja caben la línea del cursor y la siguiente en cuanto la ventana
+     da para ello (medido: dos enteras a 1280x800 al 200%; en ventanas más bajas, la
+     de debajo asoma). El suelo de la fila no cambia: esto no le quita nada al
+     teclado ni mueve el orden de sacrificio. */
+  .compacta .text { padding: var(--space-1) var(--space-3) calc(var(--space-1) + 4px); line-height: 1.35; }
+  /* Con interlineado propio: el «normal» de Atkinson Hyperlegible es más alto que
+     el de la letra del sistema y, a doble tamaño, el botón pasaba de --target-min
+     y se llevaba 2px del teclado (medido a 1024x640 al 200%). */
+  .compacta .explica { padding: 0 var(--space-3); line-height: 1.2; }
 
   .capture {
     position: absolute;
@@ -479,20 +549,15 @@
        recibir el foco de verdad para que llegue el texto compuesto. */
   }
 
-  .cab { grid-area: cabecera; display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+  .cab { grid-area: cabecera; display: flex; align-items: center; gap: var(--space-2) var(--space-3); flex-wrap: wrap; }
   /* `anywhere`, no `break-word`: solo el primero reduce el ancho mínimo. Un título sin
      espacios, que la validación admite, ensancharía si no toda la lección. */
-  .cab h2 { margin: 0; font-size: var(--text-lg); min-width: 0; overflow-wrap: anywhere; }
+  .cab h2 { margin: 0; font-size: var(--text-xl); font-weight: 700; line-height: 1.15; min-width: 0; overflow-wrap: anywhere; }
 
-  .cobertura {
-    font-size: var(--text-sm);
-    font-variant-numeric: tabular-nums;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius-pill);
-    padding: 1px var(--space-2);
-    white-space: nowrap;
-  }
+  /* El chip (base.css) en acento suave: es lo que se gana, no un aviso. */
+  .cobertura { font-variant-numeric: tabular-nums; }
+
+  /* Con aspecto de enlace (base.css), pero sigue midiendo lo que un botón. */
   .explica {
     margin-left: auto;
     min-height: var(--target-min);
@@ -501,10 +566,9 @@
     align-items: center;
     justify-content: center;
     padding: var(--space-2) var(--space-3);
-    font-size: var(--text-sm);
   }
 
-  .focus { grid-area: explicacion; margin: 0; color: var(--fg-muted); max-width: 78ch; min-width: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
+  .focus { grid-area: explicacion; margin: 0; color: var(--fg-muted); max-width: 78ch; min-width: 0; font-size: var(--text-base); overflow-wrap: anywhere; }
 
   .text {
     grid-area: texto;
@@ -513,9 +577,11 @@
     font-size: var(--text-drill);
     line-height: 1.7;
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: var(--space-3) var(--space-4);
+    /* Es la caja que se pulsa para escribir: cuenta como contorno de control. */
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-card);
+    /* Abajo, sitio para la barra de avance: nunca tapa la última línea. */
+    padding: var(--space-3) var(--space-4) calc(var(--space-3) + 4px);
     margin: 0;
     word-break: break-word;
     /* Si el texto es largo o la letra muy grande, se desplaza aquí dentro y no
@@ -531,7 +597,7 @@
     display: none;
     align-self: end;
     justify-self: end;
-    margin: var(--space-1);
+    margin: var(--space-1) var(--space-1) calc(var(--space-1) + 4px);
     padding: 0 var(--space-2);
     font-size: var(--text-sm);
     background: var(--accent);
@@ -546,12 +612,34 @@
     outline-offset: 2px;
   }
 
+  /* Barra de avance de 4px pegada al borde inferior de la tarjeta. Comparte
+     celda con el texto y no ocupa sitio. */
+  .avance {
+    grid-area: texto;
+    align-self: end;
+    height: 4px;
+    margin: 0 1px 1px;
+    background: var(--surface-sunken);
+    border-radius: 0 0 var(--radius-card) var(--radius-card);
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .avance span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transform-origin: left;
+    transition: transform var(--motion-base) var(--ease);
+  }
+
   .palabra { display: inline-block; }
+  /* Cuatro estados, y ninguno solo por color: lo pendiente va atenuado y sin
+     subrayar; lo acertado, en tinta plena con subrayado sencillo; el error,
+     con fondo y subrayado doble; el cursor, en bloque. */
   .ch { padding: 1px 0; border-bottom: 3px solid transparent; }
   .ch.pending { color: var(--fg-muted); }
-  .ch.correct { color: var(--ok); border-bottom-color: var(--ok); }
+  .ch.correct { color: var(--fg); border-bottom-color: var(--ok); }
 
-  /* El error no se marca solo con color: fondo, subrayado y borde. */
   .ch.wrong {
     color: var(--error);
     background: var(--error-bg);
@@ -559,11 +647,11 @@
     border-radius: 2px;
   }
 
-  /* El cursor tampoco: caja, fondo y parpadeo suave. */
   .ch.current {
     background: var(--accent);
     color: var(--accent-fg);
-    border-radius: 3px;
+    border-bottom-color: var(--fg);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     animation: blink 1.1s var(--ease) infinite;
   }
 
@@ -583,18 +671,7 @@
     outline: 2px solid var(--fg);
   }
 
-  .hint {
-    grid-area: pista;
-    display: flex; align-items: center; gap: var(--space-2);
-    margin: 0; min-height: 1.6em;
-    font-size: var(--text-lg);
-    color: var(--fg-muted);
-  }
-  .swatch {
-    width: 1em; height: 1em; border-radius: 3px;
-    border: 1px solid var(--border-strong);
-    flex: none;
-  }
+  .hint { grid-area: pista; min-width: 0; }
 
   /* El teclado se adapta a la altura disponible, pero con suelo: por debajo de
      esto las letras dejan de leerse y un teclado ilegible es peor que uno al
@@ -628,8 +705,9 @@
       border-bottom-color: CanvasText;
       text-decoration: line-through;
     }
-    .ch.current { background: Highlight; color: HighlightText; }
+    .ch.current { background: Highlight; color: HighlightText; border-bottom-color: Highlight; }
     .aviso-foco { border: 1px solid CanvasText; }
-    .swatch { forced-color-adjust: none; }
+    .avance { border-top: 1px solid CanvasText; }
+    .avance span { background: Highlight; }
   }
 </style>

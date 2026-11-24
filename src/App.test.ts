@@ -63,7 +63,9 @@ describe('captura y paneles', () => {
     guardar({ ...POR_DEFECTO, tono: 'sobrio', ultimaLeccion: LESSONS[1].id });
     app = mount(App, { target: document.body });
     await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title));
-    campo().value = LESSONS[1].text;
+    // Ya practicada: el texto es uno nuevo, así que se teclea el que se enseña.
+    campo().value = document.getElementById(campo().getAttribute('aria-describedby')!)!
+      .textContent!.replace(/^Texto: /, '');
     campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
     flushSync();
     await tick();
@@ -120,7 +122,9 @@ describe('captura y paneles', () => {
     expect(dialogo.open).toBe(true);
     expect(dialogo.getAttribute('aria-labelledby')).toBe('resultado-titulo');
     expect(dialogo.getAttribute('aria-describedby')).toBe('resultado-desc');
-    expect(dialogo.getAttribute('aria-live')).toBe('polite');
+    // Una sola región viva: anidadas, el lector anunciaba lo mismo dos veces.
+    expect(dialogo.hasAttribute('aria-live')).toBe(false);
+    expect(dialogo.querySelectorAll('[aria-live], [role="status"], [role="alert"]')).toHaveLength(1);
     expect(dialogo.querySelector('#resultado-desc')).not.toBeNull();
     expect(dialogo.querySelector('.resultado')?.getAttribute('aria-live')).toBe('polite');
     expect(campo().disabled).toBe(true);
@@ -197,8 +201,11 @@ describe('captura y paneles', () => {
     expect(document.querySelector('h2')?.textContent).toContain('texto propio');
     const inputTexto = document.querySelector('textarea.input-texto-propio') as HTMLTextAreaElement;
     expect(inputTexto).not.toBeNull();
+    expect(document.querySelector('.contador')?.textContent?.trim()).toBe('0 caracteres');
     inputTexto.value = 'hola mundo';
     inputTexto.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    expect(document.querySelector('.contador')?.textContent?.trim()).toBe('10 caracteres');
 
     boton('Empezar a teclear').click();
     await tick();

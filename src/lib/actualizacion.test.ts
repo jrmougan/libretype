@@ -303,11 +303,12 @@ describe('reiniciar', () => {
 
 describe('detectarEntorno', () => {
   /** Carga el módulo con un `@tauri-apps/api/core` de mentira. */
-  async function conTauri(isTauri: boolean, empaquetado = '') {
+  async function conTauri(isTauri: boolean, empaquetado = '', politica = '') {
     vi.resetModules();
     vi.doMock('@tauri-apps/api/core', () => ({
       isTauri: () => isTauri,
-      invoke: async () => empaquetado,
+      invoke: async (comando: string) =>
+        comando === 'politica_del_sistema' ? politica : empaquetado,
     }));
     const { detectarEntorno } = await import('./actualizacion');
     const entorno = await detectarEntorno();
@@ -328,6 +329,34 @@ describe('detectarEntorno', () => {
     // fichero del que manda apt. Aquí no se ofrece el botón.
     expect(await conTauri(true, 'deb')).toEqual({ tipo: 'gestionado', gestor: 'deb' });
     expect(await conTauri(true, 'rpm')).toEqual({ tipo: 'gestionado', gestor: 'rpm' });
+  });
+
+  it('si la política del equipo las apaga, no hay actualizador aunque sea AppImage', async () => {
+    expect(await conTauri(true, 'appimage', '{ "actualizaciones": false }'))
+      .toEqual({ tipo: 'gestionado', gestor: 'politica' });
+    // Una política que no las menciona no cambia nada.
+    expect((await conTauri(true, 'appimage', '{ "perfilPorDefecto": "Aula" }')).tipo).toBe('propio');
+  });
+
+  it('una política ilegible apaga las actualizaciones: es el error que no sorprende a nadie', async () => {
+    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await conTauri(true, 'msi', '{actualizaciones: false')).toEqual({ tipo: 'gestionado', gestor: 'politica' });
+    aviso.mockRestore();
+  });
+
+  it('un binario anterior sin el comando de política sigue actualizando', async () => {
+    vi.resetModules();
+    vi.doMock('@tauri-apps/api/core', () => ({
+      isTauri: () => true,
+      invoke: async (comando: string) => {
+        if (comando === 'politica_del_sistema') throw new Error('command not found');
+        return 'msi';
+      },
+    }));
+    const { detectarEntorno } = await import('./actualizacion');
+    expect((await detectarEntorno()).tipo).toBe('propio');
+    vi.doUnmock('@tauri-apps/api/core');
+    vi.resetModules();
   });
 
   it('en AppImage, .app, msi y nsis se actualiza sola', async () => {

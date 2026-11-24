@@ -45,6 +45,12 @@ async function elegir(valor: string): Promise<void> {
   await tick();
 }
 
+/** Lo que hay que teclear ahora: a partir del segundo intento el temario genera texto nuevo. */
+const textoMostrado = (): string => {
+  const campo = document.querySelector<HTMLTextAreaElement>('textarea.capture')!;
+  return document.getElementById(campo.getAttribute('aria-describedby')!)!.textContent!.replace(/^Texto: /, '');
+};
+
 async function teclear(texto: string): Promise<void> {
   const campo = document.querySelector<HTMLTextAreaElement>('textarea.capture')!;
   campo.value = texto;
@@ -130,7 +136,7 @@ describe('practicar', () => {
   it('el temario sigue alimentándolo', async () => {
     await abrir([]);
     await elegir(catalogo.primera.id);
-    await teclear(catalogo.primera.text);
+    await teclear(textoMostrado());
     await vi.waitFor(() => expect(teclas().length).toBeGreaterThan(0));
   });
 
@@ -342,14 +348,17 @@ describe('reiniciar', () => {
   }
 
   it('lo abandonado no suma al dominio: da igual reiniciar que no', async () => {
-    await abrir();
+    // Sin intentos previos de esa lección, para que las dos veces toque el mismo
+    // texto (el revisado a mano) y los totales se puedan comparar.
+    const otra = [{ ...SESION, leccion: 'practica-continua' }];
+    await abrir([], undefined, otra);
     const limpio = await completarPrimera();
     await unmount(app!);
     app = null;
     document.body.replaceChildren();
     localStorage.removeItem('libretype.teclas');
 
-    await abrir();
+    await abrir([], undefined, otra);
     // Los intentos van a la tecla del carácter objetivo, no a la `q` pulsada.
     await teclear('qqqq');
     expect(totalIntentos()).toBe(0); // Todavía nada en disco: el dominio se guarda al terminar.

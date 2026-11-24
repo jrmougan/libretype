@@ -7,7 +7,9 @@ import type { Layout } from '../keyboard/layouts';
 import type { EjercicioRefuerzo } from '../refuerzo';
 import { objetivoLeccion } from '../storage/objetivos';
 import { catalogo as catalogoApp, type Catalogo } from './catalogo';
-import { esIdPropio, ID_PRACTICA_CONTINUA, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_TEXTO_PROPIO } from './ids';
+import { tramoDe } from './colocacion';
+import { explicacionFluidez } from './fluidez';
+import { esIdPropio, ID_FLUIDEZ, ID_PRACTICA_CONTINUA, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_TEXTO_PROPIO } from './ids';
 import { activas, problemasDeTexto, type LeccionPropia } from './personalizadas';
 
 export interface Ejercicio {
@@ -25,9 +27,18 @@ export interface Ejercicio {
 }
 
 export type Seleccion =
-  | { tipo: 'leccion'; id: string }
+  /**
+   * `texto` es el del intento cuando no es el revisado a mano (ver `generador.ts`),
+   * e `intento` cambia con él para volver a montar la práctica. Solo valen para el
+   * temario: una lección del alumno es siempre su texto.
+   */
+  | { tipo: 'leccion'; id: string; texto?: string | null; intento?: number }
   | { tipo: 'refuerzo'; ejercicio: EjercicioRefuerzo }
   | { tipo: 'continua'; hasta: string; texto: string; intento: number }
+  /** Una tanda de fluidez. `referencia` es el ritmo de las tandas anteriores, o null. */
+  | { tipo: 'fluidez'; texto: string; intento: number; referencia: number | null }
+  /** Un tramo de la prueba de colocación: palabras de esa lección. `tramo` empieza en 1. */
+  | { tipo: 'colocacion'; id: string; tramo: number }
   | { tipo: 'libre'; texto: string; intento: number };
 
 /** En español el separador decimal es la coma, no el punto. */
@@ -64,6 +75,29 @@ export function ejercicioDe(
         idioma: catalogo.cursoDe(hasta.id)?.idioma ?? '',
       };
     }
+    case 'fluidez':
+      return {
+        clave: `fluidez:${s.intento}`,
+        idSesion: ID_FLUIDEZ,
+        titulo: 'Fluidez',
+        texto: s.texto,
+        explicacion: explicacionFluidez(s.referencia),
+        cobertura: '',
+        idioma: '',
+      };
+    case 'colocacion': {
+      const leccion = catalogo.leccion(s.id) ?? catalogo.primera;
+      return {
+        clave: `colocacion:${leccion.id}`,
+        // Una sesión normal de esa lección: es lo que la abre, sin mecanismo aparte.
+        idSesion: leccion.id,
+        titulo: `Prueba de colocación · ${leccion.title}`,
+        texto: tramoDe(leccion),
+        explicacion: `Tramo ${s.tramo}: palabras de la lección «${leccion.title}». Sin prisa: aquí no cuenta la velocidad.`,
+        cobertura: '',
+        idioma: '',
+      };
+    }
     case 'libre':
       return {
         clave: `libre:${s.intento}`,
@@ -91,11 +125,12 @@ export function ejercicioDe(
         }
       }
       const leccion = catalogo.leccion(s.id) ?? catalogo.primera;
+      const generado = catalogo.tiene(s.id) && s.texto ? s.texto : null;
       return {
-        clave: leccion.id,
+        clave: generado === null ? leccion.id : `${leccion.id}#${s.intento ?? 0}`,
         idSesion: leccion.id,
         titulo: leccion.title,
-        texto: leccion.text,
+        texto: generado ?? leccion.text,
         explicacion: objetivoLeccion(leccion.focus),
         cobertura: formatearPct(leccion.cobertura),
         idioma: catalogo.cursoDe(leccion.id)?.idioma ?? '',

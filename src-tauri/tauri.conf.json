@@ -44,6 +44,11 @@
     "publisher": "Jesús Romeo",
     "category": "Education",
     "license": "MIT",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller"
+      }
+    },
     "linux": {
       "deb": {
         "section": "education",

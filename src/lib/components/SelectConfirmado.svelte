@@ -100,8 +100,9 @@
     font-size: var(--text-sm);
     color: var(--fg);
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius);
+    box-shadow: var(--shadow-panel);
   }
   .pista.visible { display: block; }
 </style>

@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { aplicar, cargar, guardar, normalizar, POR_DEFECTO } from './preferencias';
+import {
+  aplicar, cargar, guardar, normalizar, PALABRAS_POR_LONGITUD, palabrasPorTexto, POR_DEFECTO,
+} from './preferencias';
 
 describe('normalizar', () => {
   it('sin nada guardado devuelve los valores por defecto', () => {
@@ -99,15 +101,26 @@ describe('aplicar al documento', () => {
 
   it('vuelca cada preferencia a su atributo', () => {
     aplicar({
+      ...POR_DEFECTO,
       escala: 1.8, tema: 'oscuro', movimiento: 'reducido',
       fuente: 'dislexia', tono: 'juego', ayudaTeclado: 'siempre',
-      buscarActualizaciones: true, layout: 'es-iso',
+      buscarActualizaciones: true, layout: 'es-iso', contraste: 'alto',
     }, raiz);
     expect(raiz.getAttribute('data-theme')).toBe('dark');
     expect(raiz.getAttribute('data-motion')).toBe('reducido');
     expect(raiz.getAttribute('data-font')).toBe('dyslexic');
     expect(raiz.getAttribute('data-tono')).toBe('juego');
+    expect(raiz.getAttribute('data-contrast')).toBe('alto');
     expect(raiz.style.getPropertyValue('--ui-scale')).toBe('1.8');
+  });
+
+  it('el contraste en «Sistema» no pone atributo, y «Normal» lo apaga a propósito', () => {
+    aplicar({ ...POR_DEFECTO, contraste: 'alto' }, raiz);
+    aplicar(POR_DEFECTO, raiz);
+    expect(raiz.hasAttribute('data-contrast')).toBe(false);
+    aplicar({ ...POR_DEFECTO, contraste: 'normal' }, raiz);
+    expect(raiz.getAttribute('data-contrast')).toBe('normal');
+    expect(normalizar({ contraste: 'muchísimo' }).contraste).toBe('auto');
   });
 
   it('aplica movimiento reducido si se indica mediante animaciones reducidas', () => {
@@ -120,5 +133,62 @@ describe('aplicar al documento', () => {
     aplicar(POR_DEFECTO, raiz);
     expect(raiz.hasAttribute('data-theme')).toBe(false);
     expect(raiz.hasAttribute('data-tono')).toBe(false);
+  });
+});
+
+describe('sonido', () => {
+  it('viene apagado y solo un true explícito lo enciende', () => {
+    expect(POR_DEFECTO.sonido).toBe(false);
+    expect(normalizar({}).sonido).toBe(false);
+    expect(normalizar({ sonido: 'sí' }).sonido).toBe(false);
+    expect(normalizar({ sonido: 1 }).sonido).toBe(false);
+    expect(normalizar({ sonido: true }).sonido).toBe(true);
+  });
+
+  it('el volumen se acota y nunca queda en cero con el sonido encendido', () => {
+    expect(normalizar({ volumen: 5 }).volumen).toBe(1);
+    expect(normalizar({ volumen: 0 }).volumen).toBe(0.1);
+    expect(normalizar({ volumen: 'alto' }).volumen).toBe(POR_DEFECTO.volumen);
+  });
+});
+
+describe('longitud del texto y recordatorio de pausa', () => {
+  it('traen valores por defecto prudentes', () => {
+    const p = normalizar({});
+    expect(p.longitudTexto).toBe('normal');
+    expect(p.recordatorioPausa).toBe(20);
+  });
+
+  it('un valor corrupto cae al de por defecto', () => {
+    const p = normalizar({ longitudTexto: 7, recordatorioPausa: 13 });
+    expect(p.longitudTexto).toBe('normal');
+    expect(p.recordatorioPausa).toBe(20);
+  });
+
+  it('respeta lo elegido, también apagar el recordatorio', () => {
+    expect(normalizar({ longitudTexto: 'corto', recordatorioPausa: 0 }))
+      .toMatchObject({ longitudTexto: 'corto', recordatorioPausa: 0 });
+  });
+
+  it('la longitud del texto se traduce a palabras en un solo sitio', () => {
+    expect(palabrasPorTexto('corto')).toBeLessThan(palabrasPorTexto('normal'));
+    expect(palabrasPorTexto('normal')).toBeLessThan(palabrasPorTexto('largo'));
+    expect(palabrasPorTexto('raro' as never)).toBe(PALABRAS_POR_LONGITUD.normal);
+  });
+});
+
+describe('filtro de repetición por temblor', () => {
+  it('viene apagado: a quien no tiene temblor le podría comer una doble letra', () => {
+    expect(normalizar({}).ignorarRepeticion).toBe(false);
+    expect(normalizar({ ignorarRepeticion: 'sí' }).ignorarRepeticion).toBe(false);
+    expect(normalizar({ ignorarRepeticion: true }).ignorarRepeticion).toBe(true);
+  });
+});
+
+describe('último perfil de este equipo', () => {
+  it('por defecto es el principal, y un valor raro cae a él', () => {
+    expect(normalizar({}).perfil).toBe(1);
+    for (const raro of [0, -3, 2.5, '2', null, Infinity]) expect(normalizar({ perfil: raro }).perfil).toBe(1);
+    expect(normalizar({ perfil: 7 }).perfil).toBe(7);
   });
 });

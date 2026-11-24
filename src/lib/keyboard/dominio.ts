@@ -71,6 +71,61 @@ export function opacidadEtiqueta(dominio: number): number {
   return acotar(1 - ((dominio - 0.5) / (DOMINADA - 0.5)) * 0.35, 0.65, 1);
 }
 
+/**
+ * Cuántos intentos «recientes» pesan en el dominio.
+ *
+ * Contar toda la vida de una tecla tiene dos fallos que se notan pronto. Un
+ * niño que falló mucho la primera semana arrastra esos fallos durante cientos
+ * de intentos aunque hoy ya no falle: la ayuda visual no se le retira nunca. Y
+ * al revés, una tecla dominada hace meses con quinientos aciertos tendría que
+ * fallarse cincuenta veces seguidas para que la letra volviera a aparecer.
+ *
+ * La salida es una media que olvida, **sin tocar el esquema** de la base de
+ * datos (que guarda enteros: intentos, aciertos y milisegundos). Cuando una
+ * tecla llega a dos ventanas de intentos, todo se reescala a una ventana en la
+ * misma proporción. Lo antiguo no se borra de golpe: cada vez pesa la mitad.
+ *
+ * 24 da entre 24 y 48 intentos de memoria: bastante para que el 90% no dependa
+ * de un solo fallo, poco para que lo de hace semanas mande sobre lo de hoy.
+ * Las reglas de siempre siguen intactas: con menos de `INTENTOS_MINIMOS` no se
+ * retira nada y por debajo de `PRECISION_MINIMA` tampoco.
+ */
+export const VENTANA = 24;
+
+/**
+ * Redondeo al par en el empate. Al reescalar los fallos hay que redondear, y
+ * redondear siempre hacia arriba dejaría un fallo eterno (1 → 1 → 1…) que ya
+ * no se podría olvidar; siempre hacia abajo regalaría precisión. Al par no
+ * sesga hacia ningún lado.
+ */
+function redondearAlPar(x: number): number {
+  const abajo = Math.floor(x);
+  const resto = x - abajo;
+  if (resto > 0.5) return abajo + 1;
+  if (resto < 0.5) return abajo;
+  return abajo % 2 === 0 ? abajo : abajo + 1;
+}
+
+/**
+ * Reescala un estado demasiado largo a una ventana, conservando la proporción
+ * de aciertos y la velocidad media. Lo de menos de dos ventanas no se toca.
+ * También sirve para datos de versiones anteriores, que acumulaban sin límite:
+ * el primer intento nuevo los trae a la ventana.
+ */
+export function olvidar(e: EstadoTecla): EstadoTecla {
+  if (e.intentos < 2 * VENTANA) return e;
+  const factor = VENTANA / e.intentos;
+  const fallos = Math.min(
+    VENTANA,
+    Math.max(0, redondearAlPar((e.intentos - e.aciertos) * factor)),
+  );
+  return {
+    intentos: VENTANA,
+    aciertos: VENTANA - fallos,
+    msTotal: Math.round(e.msTotal * factor),
+  };
+}
+
 /** Registra un intento sobre una tecla. */
 export function registrar(
   previo: EstadoTecla | undefined,
@@ -78,12 +133,12 @@ export function registrar(
   ms: number,
 ): EstadoTecla {
   const base = previo ?? { intentos: 0, aciertos: 0, msTotal: 0 };
-  return {
+  return olvidar({
     intentos: base.intentos + 1,
     aciertos: base.aciertos + (acierto ? 1 : 0),
     // Un parón largo (se fue a por café) falsearía la media hacia arriba.
     msTotal: base.msTotal + Math.min(ms, MS_LENTO * 3),
-  };
+  });
 }
 
 export type MapaDominio = ReadonlyMap<string, number>;

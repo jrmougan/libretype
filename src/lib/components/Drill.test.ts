@@ -39,25 +39,53 @@ describe('la cifra de cobertura', () => {
 describe('texto largo dentro de su caja', () => {
   const rect = (top: number, bottom: number) => ({ top, bottom }) as DOMRect;
 
-  it('lleva el cursor a la vista al salirse de la caja', async () => {
-    // Sin esto, en cuanto el texto pasaba de lo que cabe en la caja, el cursor
-    // seguía avanzando por debajo sin que se viera.
-    componente = mount(Drill, {
-      target: document.body,
-      props: { layout: ES_ISO, target: 'uno dos', titulo: 'Largo' },
-    });
+  /** jsdom no maqueta: se le dice dónde está cada carácter y cuánto ocupa la caja. */
+  function conMaqueta(texto: string, lineaDe: (i: number) => number, altoCaja: number, altoTexto: number) {
+    componente = mount(Drill, { target: document.body, props: { layout: ES_ISO, target: texto, titulo: 'Largo' } });
     flushSync();
     const campo = document.querySelector('textarea')!;
     const caja = document.querySelector<HTMLElement>('.text')!;
+    Object.defineProperty(caja, 'clientHeight', { configurable: true, value: altoCaja });
+    Object.defineProperty(caja, 'scrollHeight', { configurable: true, value: altoTexto });
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      return this === caja ? rect(100, 150) : rect(180, 200);
+      if (this === caja) return rect(100, 100 + altoCaja);
+      const i = [...caja.querySelectorAll('.ch')].indexOf(this);
+      // Como en un navegador: lo que se desplaza la caja, suben los caracteres.
+      const top = 110 + lineaDe(Math.max(i, 0)) * 40 - caja.scrollTop;
+      return rect(top, top + 30);
     });
+    const teclear = async (hasta: number) => {
+      campo.value = texto.slice(0, hasta);
+      campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      await tick();
+    };
+    return { caja, teclear };
+  }
 
-    campo.value = 'u';
-    campo.dispatchEvent(new InputEvent('input', { bubbles: true }));
-    await tick();
-
+  it('lleva el cursor a la vista al salirse de la caja', async () => {
+    // Sin esto, en cuanto el texto pasaba de lo que cabe en la caja, el cursor
+    // seguía avanzando por debajo sin que se viera.
+    const { caja, teclear } = conMaqueta('uno dos tres', (i) => Math.floor(i / 4), 50, 120);
+    await teclear(9); // el cursor en «tres», tercera línea: fuera de una caja de 50
     expect(caja.scrollTop).toBe(80);
+  });
+
+  it('la línea del cursor va arriba aunque aún se vea: debajo queda lo que viene', async () => {
+    // Con dos líneas a la vista, al pasar a la segunda no se veía nada por delante
+    // hasta salirse de la caja. Ahora sube en cuanto se llega a ella.
+    const { caja, teclear } = conMaqueta('uno dos tres', (i) => Math.floor(i / 4), 80, 120);
+    await teclear(2);
+    expect(caja.scrollTop).toBe(0);
+    await teclear(5); // segunda línea: cabe en la caja, pero se pone arriba
+    expect(caja.scrollTop).toBe(40);
+    await teclear(6);
+    expect(caja.scrollTop).toBe(40); // dentro de la misma línea no se mueve nada
+  });
+
+  it('si todo el texto cabe en la caja, no se desplaza nada', async () => {
+    const { caja, teclear } = conMaqueta('uno dos tres', (i) => Math.floor(i / 4), 120, 120);
+    await teclear(9);
+    expect(caja.scrollTop).toBe(0);
   });
 
   it('no parte las palabras: cada una va entera en su envoltorio', () => {
@@ -117,11 +145,14 @@ describe('foco de la lección', () => {
 });
 
 describe('accesibilidad de la lección (#15, #16)', () => {
-  it('proporciona un aria-label descriptivo con el texto de la lección al textarea', () => {
+  it('el campo tiene un nombre corto y el texto entero va como descripción', () => {
     const campo = montar();
-    expect(campo.getAttribute('aria-label')).toBe('Escribe el texto de la lección: ás');
-    const contenedor = campo.closest('label');
-    expect(contenedor?.getAttribute('aria-label')).toBe('Texto de la lección: ás');
+    expect(campo.getAttribute('aria-label')).toBe('Campo de práctica: Tildes');
+    expect(campo.getAttribute('aria-label')).not.toContain('ás');
+    const idDesc = campo.getAttribute('aria-describedby')!;
+    expect(document.getElementById(idDesc)?.textContent).toBe('Texto: ás');
+    // La etiqueta que envuelve el campo no le pisa el nombre con otro aria-label.
+    expect(campo.closest('label')?.hasAttribute('aria-label')).toBe(false);
   });
 
   it('mantiene elementos decorativos con aria-hidden para no inundar el lector de pantalla', () => {
@@ -323,5 +354,118 @@ describe('pulido de la lección', () => {
   it('el aviso de foco perdido no le estorba al lector de pantalla', () => {
     montar();
     expect(document.querySelector('.aviso-foco')?.getAttribute('aria-hidden')).toBe('true');
+  });
+});
+
+describe('Esc pausa desde el campo', () => {
+  function montarConPausa() {
+    const onPausar = vi.fn();
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'ás', titulo: 'Tildes', onPausar },
+    });
+    flushSync();
+    return { campo: document.querySelector('textarea')!, onPausar };
+  }
+
+  const esc = (init: KeyboardEventInit = {}) =>
+    new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true, ...init });
+
+  it('Esc en el campo pide la pausa y no deja que el motor haga nada más', () => {
+    const { campo, onPausar } = montarConPausa();
+    const ev = esc();
+    campo.dispatchEvent(ev);
+    expect(onPausar).toHaveBeenCalledTimes(1);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it('a mitad de un acento, Esc es del método de entrada y no pausa', () => {
+    const { campo, onPausar } = montarConPausa();
+    campo.dispatchEvent(esc({ isComposing: true }));
+    campo.dispatchEvent(esc({ keyCode: 229 }));
+    // Composición en curso según el propio motor (el ´ ya está en el campo).
+    campo.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    campo.value = '´';
+    campo.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+    flushSync();
+    campo.dispatchEvent(esc());
+    expect(onPausar).not.toHaveBeenCalled();
+  });
+
+  it('Esc fuera del campo no lo escucha nadie: no hay manejador global', () => {
+    const { onPausar } = montarConPausa();
+    document.body.dispatchEvent(esc());
+    window.dispatchEvent(esc());
+    expect(onPausar).not.toHaveBeenCalled();
+  });
+
+  it('las demás teclas pasan sin tocar', () => {
+    const { campo, onPausar } = montarConPausa();
+    const ev = new KeyboardEvent('keydown', { key: 'a', code: 'KeyA', bubbles: true, cancelable: true });
+    campo.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    expect(onPausar).not.toHaveBeenCalled();
+  });
+});
+
+describe('filtro de temblor en el campo', () => {
+  function montarFiltro(ignorarRepeticion: boolean) {
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'aab', titulo: 'Prueba', ignorarRepeticion },
+    });
+    flushSync();
+    return document.querySelector('textarea')!;
+  }
+
+  function escribe(campo: HTMLTextAreaElement, data: string, t: number): boolean {
+    vi.spyOn(performance, 'now').mockReturnValue(t);
+    const ev = new InputEvent('beforeinput', { inputType: 'insertText', data, bubbles: true, cancelable: true });
+    campo.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  }
+
+  it('activado, cancela el rebote antes de que llegue al campo', () => {
+    const campo = montarFiltro(true);
+    expect(escribe(campo, 'a', 1000)).toBe(false);
+    expect(escribe(campo, 'a', 1040)).toBe(true);
+    expect(escribe(campo, 'a', 1200)).toBe(false);
+  });
+
+  it('apagado (por defecto) no toca nada', () => {
+    const campo = montarFiltro(false);
+    expect(escribe(campo, 'a', 1000)).toBe(false);
+    expect(escribe(campo, 'a', 1010)).toBe(false);
+  });
+
+  it.each([MACOS_ACUTE_A, LINUX_ACUTE_A])('activado, no estorba a la composición del acento: $description', async (traza) => {
+    // Las trazas reales de los dos motores, con el filtro puesto: el acento a
+    // medias no avanza y la á se confirma igual que sin él.
+    componente = mount(Drill, {
+      target: document.body,
+      props: { layout: ES_ISO, target: 'ás', titulo: 'Tildes', ignorarRepeticion: true },
+    });
+    flushSync();
+    const campo = document.querySelector('textarea')!;
+    let confirmado = false;
+    replay(campo, traza, (paso) => {
+      if (paso.type === 'compositionend') confirmado = true;
+      flushSync();
+      expect(document.querySelector('.ch.current')?.textContent).toBe(confirmado ? 's' : 'á');
+    });
+    await tick();
+    expect(document.querySelector('.ch.correct')?.textContent).toBe('á');
+  });
+
+  it('activado, nunca cancela una entrada de composición', () => {
+    const campo = montarFiltro(true);
+    for (const inputType of ['insertCompositionText', 'insertFromComposition']) {
+      for (const t of [1000, 1010]) {
+        vi.spyOn(performance, 'now').mockReturnValue(t);
+        const ev = new InputEvent('beforeinput', { inputType, data: 'á', bubbles: true, cancelable: true });
+        campo.dispatchEvent(ev);
+        expect(ev.defaultPrevented, inputType).toBe(false);
+      }
+    }
   });
 });

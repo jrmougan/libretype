@@ -6,6 +6,7 @@
  * clic puede no hacer nada y encima parecer que ha ido bien. Por eso en Tauri se
  * llama al comando `guardar_en_descargas` de `lib.rs`, que escribe en la carpeta
  * de descargas y devuelve la ruta para poder decirle a la persona dónde está.
+ * Solo admite un nombre plano `.json` o `.html` (el informe del docente).
  *
  * Se descartó `tauri-plugin-dialog` + `tauri-plugin-fs`: elegir carpeta sería algo
  * mejor, pero a cambio de dos dependencias, una en cada lado, y permisos más
@@ -32,7 +33,8 @@ async function invocarDeTauri(): Promise<Invocar | null> {
 }
 
 function descargarEnNavegador(nombre: string, contenido: string): void {
-  const blob = new Blob([contenido], { type: 'application/json;charset=utf-8' });
+  const tipo = nombre.endsWith('.html') ? 'text/html' : 'application/json';
+  const blob = new Blob([contenido], { type: `${tipo};charset=utf-8` });
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement('a');
   enlace.href = url;

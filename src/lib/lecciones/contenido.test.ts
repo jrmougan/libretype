@@ -39,8 +39,9 @@ const prosa: readonly string[] = [
 describe('contenido apto para todo el público', () => {
   it('ninguna lección ni vocabulario lleva palabras de la lista de exclusión', () => {
     const fuentes: [string, string[]][] = [
-      ...lecciones.map((l): [string, string[]] => [l.id, palabrasDe(l.text)]),
+      ...lecciones.map((l): [string, string[]] => [l.id, palabrasDe([l.text, ...(l.frases ?? [])].join(' '))]),
       ...catalogo.cursos.map((c): [string, string[]] => [`vocabulario de ${c.id}`, [...(c.vocabulario ?? [])]]),
+      ...catalogo.cursos.map((c): [string, string[]] => [`frecuentes de ${c.id}`, [...(c.frecuentes ?? [])]]),
       ['palabras base del refuerzo', [...PALABRAS_BASE]],
     ];
     for (const [nombre, palabras] of fuentes) {
@@ -60,7 +61,7 @@ describe('ortografía comprobable', () => {
   const cuenta = (texto: string, signo: string) => [...texto].filter((c) => c === signo).length;
 
   it('toda pregunta y exclamación abre y cierra', () => {
-    const textos = [...prosa, ...lecciones.map((l) => l.text)];
+    const textos = [...prosa, ...lecciones.flatMap((l) => [l.text, ...(l.frases ?? [])])];
     for (const texto of textos) {
       expect(cuenta(texto, '¿'), texto).toBe(cuenta(texto, '?'));
       expect(cuenta(texto, '¡'), texto).toBe(cuenta(texto, '!'));
@@ -104,7 +105,9 @@ describe('afirmaciones del temario', () => {
   });
 
   it('los números no fijan un año que envejezca', () => {
-    const l = catalogo.leccion('numeros')!;
-    expect(l.text).not.toMatch(/\b(19|20)\d\d\b/);
+    for (const id of ['numeros', 'numeros-2', 'simbolos']) {
+      const l = catalogo.leccion(id)!;
+      for (const f of [l.text, ...(l.frases ?? [])]) expect(f, id).not.toMatch(/\b(19|20)\d\d\b/);
+    }
   });
 });

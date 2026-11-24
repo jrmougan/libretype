@@ -47,9 +47,22 @@ export function comprobarCurso(curso: Curso, layouts: readonly Layout[] = LAYOUT
     const monotonas = l.text.split(' ').filter((p) => p.length > 2 && new Set(p).size === 1);
     if (monotonas.length > 0) problemas.push(`«${l.title}» tiene relleno: ${monotonas.join(' ')}`);
 
+    // Las frases sustituyen al texto a partir del segundo intento: lo mismo que a él.
+    const frases = l.frases ?? [];
+    if (new Set(frases).size !== frases.length) problemas.push(`«${l.title}» repite alguna frase`);
+    for (const f of frases) {
+      const fuera = [...new Set(f)].filter((ch) => ch !== ' ' && !vistas.has(ch));
+      if (fuera.length > 0) problemas.push(`«${l.title}» usa ${fuera.join(' ')} en la frase «${f}» antes de enseñarlas`);
+      if (f !== normalizarTexto(f) || f.length === 0) problemas.push(`«${l.title}» tiene la frase «${f}» sin normalizar`);
+    }
+    if (frases.length > 0) {
+      const sinPracticar = [...l.nuevas].every((ch) => !frases.some((f) => f.includes(ch)));
+      if (sinPracticar) problemas.push(`«${l.title}» no practica ninguna tecla nueva en sus frases`);
+    }
+
     for (const layout of layouts) {
       const permitidos = caracteresEscribibles(layout);
-      const imposibles = [...new Set([...l.text, ...l.nuevas])].filter((ch) => !permitidos.has(ch));
+      const imposibles = [...new Set([...l.text, ...l.nuevas, ...frases.join('')])].filter((ch) => !permitidos.has(ch));
       if (imposibles.length > 0) {
         problemas.push(`«${l.title}» pide ${imposibles.join(' ')}, que no se teclea en ${layout.name}`);
       }

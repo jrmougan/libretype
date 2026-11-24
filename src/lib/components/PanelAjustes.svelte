@@ -115,7 +115,8 @@
   </div>
   <p class="note">
     Cortos si cansa llegar al final; largos para coger ritmo. Vale para la
-    práctica continua, no para las lecciones del temario.
+    práctica continua y para los textos nuevos de cada lección; la primera vez
+    que abres una lección se usa siempre su texto original.
   </p>
 </div>
 

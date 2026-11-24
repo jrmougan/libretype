@@ -25,7 +25,12 @@ export interface Ejercicio {
 }
 
 export type Seleccion =
-  | { tipo: 'leccion'; id: string }
+  /**
+   * `texto` es el del intento cuando no es el revisado a mano (ver `generador.ts`),
+   * e `intento` cambia con él para volver a montar la práctica. Solo valen para el
+   * temario: una lección del alumno es siempre su texto.
+   */
+  | { tipo: 'leccion'; id: string; texto?: string | null; intento?: number }
   | { tipo: 'refuerzo'; ejercicio: EjercicioRefuerzo }
   | { tipo: 'continua'; hasta: string; texto: string; intento: number }
   | { tipo: 'libre'; texto: string; intento: number };
@@ -91,11 +96,12 @@ export function ejercicioDe(
         }
       }
       const leccion = catalogo.leccion(s.id) ?? catalogo.primera;
+      const generado = catalogo.tiene(s.id) && s.texto ? s.texto : null;
       return {
-        clave: leccion.id,
+        clave: generado === null ? leccion.id : `${leccion.id}#${s.intento ?? 0}`,
         idSesion: leccion.id,
         titulo: leccion.title,
-        texto: leccion.text,
+        texto: generado ?? leccion.text,
         explicacion: objetivoLeccion(leccion.focus),
         cobertura: formatearPct(leccion.cobertura),
         idioma: catalogo.cursoDe(leccion.id)?.idioma ?? '',

@@ -29,6 +29,10 @@ const boton = (texto: string): HTMLButtonElement =>
 const campo = (): HTMLTextAreaElement => document.querySelector('textarea.capture')!;
 const prefsGuardadas = (): Preferencias => JSON.parse(localStorage.getItem('libretype.preferencias')!);
 
+/** Lo que hay que teclear ahora, sea el texto de la lección o uno generado. */
+const textoMostrado = (): string =>
+  document.getElementById(campo().getAttribute('aria-describedby')!)!.textContent!.replace(/^Texto: /, '');
+
 async function teclear(texto: string): Promise<void> {
   campo().value = texto;
   campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
@@ -80,7 +84,7 @@ describe('ocultar las métricas', () => {
   it('quita velocidad, precisión y avance de la barra, pero el resultado se enseña igual', async () => {
     await abrir({ ocultarMetricas: true });
     expect(document.querySelector('.metricas')).toBeNull();
-    await teclear(catalogo.primera.text);
+    await teclear(textoMostrado());
     expect(document.querySelector('#resultado-desc')?.textContent).toMatch(/palabras por minuto/);
   });
 
@@ -118,7 +122,8 @@ describe('Esc para pausar desde el campo', () => {
 
   it('pausa, deja el foco en «Reanudar» y al reanudar vuelve al campo', async () => {
     await abrir();
-    await teclear(catalogo.primera.text.slice(0, 3));
+    const principio = textoMostrado().slice(0, 3);
+    await teclear(principio);
     campo().dispatchEvent(esc());
     await tick();
     await tick();
@@ -132,7 +137,7 @@ describe('Esc para pausar desde el campo', () => {
     expect(document.querySelector('.pausa-cartel')).toBeNull();
     expect(document.activeElement).toBe(campo());
     // Lo tecleado sigue ahí: pausar no es reiniciar.
-    expect(campo().value).toBe(catalogo.primera.text.slice(0, 3));
+    expect(campo().value).toBe(principio);
   });
 
   it('Esc fuera del campo no pausa: no hay manejador global de teclas', async () => {
@@ -141,5 +146,57 @@ describe('Esc para pausar desde el campo', () => {
     document.body.dispatchEvent(esc());
     await tick();
     expect(document.querySelector('.pausa-cartel')).toBeNull();
+  });
+});
+
+describe('texto nuevo a partir del segundo intento', () => {
+  const OTRA = { ...SESION, leccion: 'practica-continua' };
+  const alfabeto = catalogo.alfabetoHasta(catalogo.primera.id);
+
+  it('el primer contacto con una lección es su texto revisado a mano', async () => {
+    await abrir({}, [OTRA]);
+    expect(textoMostrado()).toBe(catalogo.primera.text);
+  });
+
+  it('una lección ya practicada se abre con un texto distinto, solo con teclas enseñadas', async () => {
+    await abrir();
+    const texto = textoMostrado();
+    expect(texto).not.toBe(catalogo.primera.text);
+    expect([...texto].filter((ch) => ch !== ' ' && !alfabeto.has(ch))).toEqual([]);
+    for (const ch of catalogo.primera.nuevas) expect(texto).toContain(ch);
+  });
+
+  it('repetir tras terminar trae otro texto, y la sesión se guarda con el mismo identificador', async () => {
+    await abrir({}, [OTRA]);
+    await teclear(textoMostrado());
+    boton('Repetir').click();
+    await tick();
+    await tick();
+    const segundo = textoMostrado();
+    expect(segundo).not.toBe(catalogo.primera.text);
+    expect(document.activeElement).toBe(campo());
+    await teclear(segundo);
+    boton('Repetir').click();
+    await tick();
+    await tick();
+    expect(textoMostrado()).not.toBe(segundo);
+    const guardadas = JSON.parse(localStorage.getItem('libretype.sesiones')!) as { leccion: string }[];
+    expect(guardadas.map((s) => s.leccion)).toEqual(['practica-continua', catalogo.primera.id, catalogo.primera.id]);
+  });
+
+  it('reiniciar a medias no cambia el texto: sigue siendo el mismo intento', async () => {
+    await abrir();
+    const texto = textoMostrado();
+    await teclear(texto.slice(0, 4));
+    document.querySelector<HTMLButtonElement>('button[aria-label="Reiniciar esta lección"]')!.click();
+    await tick();
+    await tick();
+    expect(textoMostrado()).toBe(texto);
+    expect(campo().value).toBe('');
+  });
+
+  it('los textos largos alargan los intentos generados', async () => {
+    await abrir({ longitudTexto: 'largo' });
+    expect(textoMostrado().length).toBeGreaterThan(catalogo.primera.text.length * 1.5);
   });
 });

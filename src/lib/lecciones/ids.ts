@@ -67,9 +67,11 @@ export function cuentaParaMarcaGlobal(id: string): boolean {
 }
 
 /**
- * ¿Tiene sentido decir «tu mejor marca en esta lección»? En una guardada o del
- * temario sí, porque es siempre el mismo texto. Bajo los modos de práctica hay textos
- * distintos que comparten identificador: uno más fácil no es una mejora.
+ * ¿Tiene sentido decir «tu mejor marca en esta lección»? En una guardada sí, porque
+ * es siempre el mismo texto, y en una del temario también: sus intentos cambian de
+ * texto, pero salen del mismo vocabulario, con las mismas teclas nuevas y el mismo
+ * largo (`generador.ts`). Bajo los modos de práctica hay textos distintos que
+ * comparten identificador: uno más fácil no es una mejora.
  */
 export function tieneMarcaPropia(id: string): boolean {
   return !MODOS_DE_TEXTO_CAMBIANTE.has(id);

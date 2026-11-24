@@ -93,7 +93,9 @@ export function crearCatalogo(cursos: readonly Curso[]): Catalogo {
     const deLecciones = entrada.curso.lecciones.slice(0, entrada.indice + 1)
       .flatMap((l) => l.text.split(' '))
       .map((w) => w.replace(/[.,:;¿?¡!"()]/g, ''))
-      .filter((w) => w.length >= 2);
+      // Lo que aún lleve un signo por dentro («Madrid-Toledo», un correo, «3/10»)
+      // no es una palabra suelta que se pueda sacar de su frase.
+      .filter((w) => w.length >= 2 && /^[\p{L}\p{N}]+$/u.test(w));
     const todas = [...new Set([...deLecciones, ...(entrada.curso.vocabulario ?? [])])];
     const validas = todas.filter((w) => [...w].every((ch) => permitidas.has(ch)));
     return validas.length > 0 ? validas : entrada.leccion.text.split(' ');

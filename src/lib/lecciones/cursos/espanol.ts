@@ -149,6 +149,17 @@ const LECCIONES: Lesson[] = [
       'viaja a Jaén y a Oviedo Nuria conoce Kenia Una prima de Quito llama a Úrsula ' +
       'Óscar y Yolanda cenan en casa Ñoquis con salsa para Ángel e Íñigo Él y ' +
       'Xavier saludan a Wendy en Zaragoza',
+    frases: [
+      'El sol brilla en Madrid y Ana pasea por el Retiro', 'Carlos y Elena viajan a Toledo',
+      'Mañana sale el tren hacia Sevilla', 'Pedro visita a Laura en Valencia',
+      'Beatriz y Diego viven en Bilbao', 'Fernando e Irene estudian en Granada',
+      'Hugo viaja a Jaén y a Oviedo', 'Nuria conoce Kenia', 'Una prima de Quito llama a Úrsula',
+      'Óscar y Yolanda cenan en casa', 'Ñoquis con salsa para Ángel e Íñigo',
+      'Él y Xavier saludan a Wendy en Zaragoza', 'Ana vive en Madrid', 'Mañana voy a Sevilla',
+      'Hoy cena Pedro en casa', 'El tren sale de Toledo', 'Laura estudia en Valencia',
+      'Mi hermano vive en Zaragoza', 'Ya llega el verano', 'Quiero ir a Granada',
+      'Juan come con Lucía', 'Óscar visita Málaga', 'Úrsula trabaja en Cádiz', 'Iván juega en Oviedo',
+    ],
   },
   {
     id: 'puntuacion',
@@ -162,6 +173,14 @@ const LECCIONES: Lesson[] = [
       'Hola, ¿cómo estás? ¡Qué alegría verte! Sí, todo va bien por aquí. ' +
       '¿Vienes hoy al cine? ¡Claro que sí, me apunto! Uno, dos, tres. ' +
       '¿Dónde vamos? ¡Espera, ya voy!',
+    frases: [
+      'Hola, ¿cómo estás?', '¡Qué alegría verte!', 'Sí, todo va bien por aquí.',
+      '¿Vienes hoy al cine?', '¡Claro que sí, me apunto!', 'Uno, dos, tres.',
+      '¿Dónde vamos?', '¡Espera, ya voy!', 'Buenos días, ¿qué tal?',
+      'Mañana llueve, coge el paraguas.', '¡Qué bien, ya es viernes!',
+      '¿Tienes un momento?', 'Gracias, eres muy amable.', 'Luego te llamo, ¿vale?',
+      '¡Feliz cumpleaños, Marta!', 'No pasa nada, otra vez será.',
+    ],
   },
   {
     id: 'numeros',
@@ -176,6 +195,16 @@ const LECCIONES: Lesson[] = [
       'Un año tiene 365 días y un día tiene 24 horas. En el pueblo viven 1280 ' +
       'personas y hay 3 colegios. Compró 7 libros por 49 euros y 8 libretas por ' +
       '10 euros. El tren sale a las 6 y llega a las 9.',
+    // Tampoco aquí hay años.
+    frases: [
+      'Tengo 3 hermanos.', 'Vivo en el piso 4.', 'Son las 2 y cuarto.', 'Somos 5 en casa.',
+      'Compré 12 huevos.', 'La clase es a las 11.', 'Enero tiene 31 días.', 'Nací el 15 de mayo.',
+      'Llegó el 24 de abril.', 'Cuesta 45 euros.', 'Lee la página 132.', 'Quedan 3 días.',
+      '¿Vienes a las 4?', '¡Faltan 2 minutos!', 'Un año tiene 365 días.', 'El día tiene 24 horas.',
+      'Mi número es el 678.', 'Compró 7 libros por 49 euros.', 'Somos 8 en la mesa.',
+      'Son las 9 y media.', 'El tren sale a las 10.', 'Tengo 60 años.', 'Hay 100 sillas.',
+      'Corre 6 kilómetros.', '¿Quedamos a las 7?', '¡Ya son las 8!',
+    ],
   },
   // Consolidación: textos seguidos con todo lo anterior. Cada una estrena los
   // signos que aún faltaban, para que escribir un texto real no deje a nadie sin

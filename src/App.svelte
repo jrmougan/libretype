@@ -16,6 +16,7 @@
   import { obtenerLayout } from './lib/keyboard/layouts';
   import { catalogo } from './lib/lecciones/catalogo';
   import { ejercicioDe, resolverLeccion, type Seleccion } from './lib/lecciones/ejercicio';
+  import { semillaNueva, textoDeIntento } from './lib/lecciones/generador';
   import { cuentaParaDominio, esIdPropio } from './lib/lecciones/ids';
   import { LIMITES, type Borrador, type LeccionPropia } from './lib/lecciones/personalizadas';
   import { caracteresEscribibles, normalizarTextoLibre } from './lib/lecciones/texto';
@@ -29,7 +30,7 @@
   import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
   import { leccionesSuperadas, OBJETIVO_PENDIENTE } from './lib/storage/objetivos';
   import {
-    aplicar, cargar, guardar as guardarPrefs, palabrasPorTexto, POR_DEFECTO,
+    aplicar, cargar, guardar as guardarPrefs, PALABRAS_POR_LONGITUD, palabrasPorTexto, POR_DEFECTO,
     type Preferencias, type Tono,
   } from './lib/preferencias';
   import { QUE_ES_PPM, vozDe } from './lib/voz';
@@ -59,6 +60,13 @@
   let layout = $state(obtenerLayout(prefsIniciales.layout));
   let leccionId = $state(catalogo.primera.id);
   let refuerzo = $state<EjercicioRefuerzo | null>(null);
+  /**
+   * Texto del intento en curso cuando no es el revisado a mano: a partir del
+   * segundo intento de una lección del temario se genera uno nuevo cada vez
+   * (`lecciones/generador.ts`). `null` es el texto de la lección.
+   */
+  let textoIntento = $state<string | null>(null);
+  let numIntento = $state(0);
   let progresoCargado = $state(false);
   let errorGuardado = $state(false);
   let pausado = $state(false);
@@ -135,7 +143,7 @@
         ? { tipo: 'libre', texto: textoPropioActivo, intento: propioKey }
         : refuerzo
           ? { tipo: 'refuerzo', ejercicio: refuerzo }
-          : { tipo: 'leccion', id: leccionId },
+          : { tipo: 'leccion', id: leccionId, texto: textoIntento, intento: numIntento },
   );
   const ejercicio = $derived(ejercicioDe(seleccion, propias));
   /** Solo el temario habla de objetivos, desbloqueos y lección siguiente. */
@@ -346,6 +354,25 @@
   function fijarLeccion(id: string): void {
     leccionId = id;
     if (prefs.ultimaLeccion !== id) prefs = { ...prefs, ultimaLeccion: id };
+    prepararTextoIntento();
+  }
+
+  /**
+   * Decide el texto del intento que empieza. La primera vez, el revisado a mano;
+   * si la lección ya se ha practicado, uno nuevo, para que el objetivo mida
+   * destreza y no memoria. Se llama al entrar en una lección y al repetirla, no
+   * al reiniciar a medias: ese sigue siendo el mismo intento.
+   */
+  function prepararTextoIntento(): void {
+    const yaPracticada = porLeccion.has(leccionId);
+    const texto = catalogo.tiene(leccionId)
+      ? textoDeIntento(
+        leccionId, yaPracticada, semillaNueva(),
+        palabrasPorTexto(prefs.longitudTexto) / PALABRAS_POR_LONGITUD.normal,
+      )
+      : null;
+    textoIntento = texto !== null && texto !== catalogo.leccion(leccionId)?.text ? texto : null;
+    numIntento++;
   }
 
   /**
@@ -494,6 +521,8 @@
     if (!result) {
       teclas = new Map(teclasBase);
     }
+    // Repetir tras terminar es otro intento: en el temario toca texto nuevo.
+    if (result && enTemario) prepararTextoIntento();
     result = null;
     pausado = false;
     drill?.restart();

@@ -11,7 +11,18 @@ export interface Lesson {
   nuevas: string;
   /** Porcentaje de palabras del idioma escribibles al terminarla. */
   cobertura: number;
+  /**
+   * Texto revisado a mano. Es el del primer intento y el de referencia de los
+   * tests; a partir del segundo, `generador.ts` saca uno nuevo cada vez.
+   */
   text: string;
+  /**
+   * Frases completas con las que componer los intentos siguientes, para las
+   * lecciones en las que las palabras sueltas no sirven (mayúsculas, signos,
+   * cifras). Solo usan teclas ya enseñadas; `garantias.ts` lo comprueba. Sin
+   * ellas, una lección que ya no estrena letras conserva siempre su texto.
+   */
+  frases?: readonly string[];
 }
 
 /**

@@ -63,7 +63,9 @@ describe('captura y paneles', () => {
     guardar({ ...POR_DEFECTO, tono: 'sobrio', ultimaLeccion: LESSONS[1].id });
     app = mount(App, { target: document.body });
     await vi.waitFor(() => expect(document.querySelector('h2')?.textContent).toBe(LESSONS[1].title));
-    campo().value = LESSONS[1].text;
+    // Ya practicada: el texto es uno nuevo, así que se teclea el que se enseña.
+    campo().value = document.getElementById(campo().getAttribute('aria-describedby')!)!
+      .textContent!.replace(/^Texto: /, '');
     campo().dispatchEvent(new InputEvent('input', { bubbles: true }));
     flushSync();
     await tick();

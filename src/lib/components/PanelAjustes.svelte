@@ -3,6 +3,7 @@
   import TamanoTexto from './TamanoTexto.svelte';
   import { LAYOUTS } from '../keyboard/layouts';
   import type { Preferencias } from '../preferencias';
+  import { QUE_ES_PPM } from '../voz';
   import type { Actualizador, EstadoActualizacion } from '../actualizacion';
 
   interface Props {
@@ -89,6 +90,18 @@
     Las teclas que ya dominas dejan de mostrar su letra, para que dejes de
     mirar el teclado. {#if aprendidas > 0}Llevas {aprendidas}
     {aprendidas === 1 ? 'tecla aprendida' : 'teclas aprendidas'}.{/if}
+  </p>
+</div>
+
+<div class="field">
+  <span id="metricas-l">Mientras practicas</span>
+  <div class="group" role="group" aria-labelledby="metricas-l">
+    <button aria-pressed={!prefs.ocultarMetricas} onclick={() => onCambiar({ ocultarMetricas: false })}>Ver velocidad y precisión</button>
+    <button aria-pressed={prefs.ocultarMetricas} onclick={() => onCambiar({ ocultarMetricas: true })}>Ocultarlas</button>
+  </div>
+  <p class="note">
+    Si ver los números a cada tecla te distrae o te agobia, puedes ocultarlos:
+    al terminar se siguen enseñando. {QUE_ES_PPM}
   </p>
 </div>
 

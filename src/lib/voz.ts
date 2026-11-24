@@ -65,3 +65,11 @@ export function vozDe(tono: Tono | null): Voz {
 
 /** Umbral de precisión a partir del cual el ánimo es de enhorabuena. */
 export const PRECISION_ALTA = 95;
+
+/**
+ * Qué son las «ppm», igual en los dos tonos porque es información, no ánimo.
+ * El motor cuenta cada cinco caracteres acertados como una palabra.
+ */
+export const QUE_ES_PPM =
+  'ppm son palabras por minuto: cuántas palabras escribirías en un minuto a este ritmo. ' +
+  'Cada cinco letras acertadas cuentan como una palabra.';

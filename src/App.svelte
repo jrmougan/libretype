@@ -31,7 +31,7 @@
     aplicar, cargar, guardar as guardarPrefs, POR_DEFECTO,
     type Preferencias, type Tono,
   } from './lib/preferencias';
-  import { vozDe } from './lib/voz';
+  import { QUE_ES_PPM, vozDe } from './lib/voz';
   import { crearSonido } from './lib/sonido';
   import {
     crearActualizador, detectarEntorno,
@@ -632,11 +632,15 @@
         </button>
       </div>
 
-      <dl class="metricas">
-        <div><dt>Velocidad</dt><dd>{ultimasStats.wpm}<small>ppm</small></dd></div>
-        <div><dt>Precisión</dt><dd>{ultimasStats.accuracy}<small>%</small></dd></div>
-        <div><dt>Avance</dt><dd>{ultimasStats.typed}<small>/{ejercicio.texto.length}</small></dd></div>
-      </dl>
+      <!-- Quien se distrae o se agobia con los números puede quitarlos de la vista;
+           el resultado se sigue enseñando al terminar. -->
+      {#if !prefs.ocultarMetricas}
+        <dl class="metricas">
+          <div title={QUE_ES_PPM}><dt>Velocidad</dt><dd>{ultimasStats.wpm}<small>ppm</small></dd></div>
+          <div><dt>Precisión</dt><dd>{ultimasStats.accuracy}<small>%</small></dd></div>
+          <div><dt>Avance</dt><dd>{ultimasStats.typed}<small>/{ejercicio.texto.length}</small></dd></div>
+        </dl>
+      {/if}
     {/if}
 
     <div class="acciones">

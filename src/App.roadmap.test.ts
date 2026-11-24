@@ -75,3 +75,24 @@ describe('tamaño del texto', () => {
     expect(prefsGuardadas().escala).toBe(1);
   });
 });
+
+describe('ocultar las métricas', () => {
+  it('quita velocidad, precisión y avance de la barra, pero el resultado se enseña igual', async () => {
+    await abrir({ ocultarMetricas: true });
+    expect(document.querySelector('.metricas')).toBeNull();
+    await teclear(catalogo.primera.text);
+    expect(document.querySelector('#resultado-desc')?.textContent).toMatch(/palabras por minuto/);
+  });
+
+  it('por defecto se ven, y Ajustes explica qué son las ppm', async () => {
+    await abrir();
+    expect(document.querySelector('.metricas')).not.toBeNull();
+    boton('Ajustes').click();
+    await tick();
+    expect(document.querySelector('#panel-dialogo')?.textContent).toContain('ppm son palabras por minuto');
+    boton('Ocultarlas').click();
+    await tick();
+    expect(prefsGuardadas().ocultarMetricas).toBe(true);
+    expect(document.querySelector('.metricas')).toBeNull();
+  });
+});

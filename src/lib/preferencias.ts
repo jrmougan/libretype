@@ -74,6 +74,12 @@ export interface Preferencias {
   sonido: boolean;
   /** Volumen del sonido, de 0,1 a 1. */
   volumen: number;
+  /**
+   * Oculta velocidad, precisión y avance mientras se practica. Ver los números
+   * moverse a cada tecla distrae a unos (TDAH, niños) y agobia a otros
+   * (ansiedad); el resultado se sigue enseñando al terminar.
+   */
+  ocultarMetricas: boolean;
 }
 
 export const POR_DEFECTO: Preferencias = {
@@ -89,6 +95,7 @@ export const POR_DEFECTO: Preferencias = {
   contraste: 'auto',
   sonido: false,
   volumen: 0.6,
+  ocultarMetricas: false,
 };
 
 const CLAVE = 'libretype.preferencias';
@@ -131,6 +138,7 @@ export function normalizar(crudo: unknown): Preferencias {
     // sonar en un aula sin que nadie lo haya pedido.
     sonido: o.sonido === true,
     volumen: enRango(o.volumen, 0.1, 1, POR_DEFECTO.volumen),
+    ocultarMetricas: o.ocultarMetricas === true,
   };
 }
 

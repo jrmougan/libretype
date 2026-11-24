@@ -119,13 +119,23 @@
       ></textarea>
 
       {#if listo}
-        <p class="ok">Eso es. Los dedos ya saben dónde están.</p>
+        <p class="ok"><span aria-hidden="true">✓ </span>Eso es. Los dedos ya saben dónde están.</p>
       {:else}
+        <!-- Cada tecla, en una teja del color de su dedo, como en el teclado de
+             al lado. El nombre del dedo va también escrito: el color solo
+             refuerza. Sigue siendo una frase: «Pulsa la F (índice) y luego…». -->
         <p class="pide">
-          Pulsa
+          <span class="verbo">Pulsa</span>
           {#each pendientes as p, n (p.code)}
-            {n > 0 ? ' y luego ' : ''}<strong>{p.comoSeLlama}</strong>
-            <span class="dedo">({FINGER_NAMES[p.dedo]})</span>
+            {#if n > 0}{' '}{/if}<span class="pedida">
+              {#if n > 0}<span class="luego">y luego</span>{/if}
+              <strong
+                class="teja"
+                class:larga={p.comoSeLlama.length > 6}
+                style:--dedo="var(--finger-{p.dedo})"
+              >{p.comoSeLlama}</strong>
+              <span class="dedo">({FINGER_NAMES[p.dedo]})</span>
+            </span>
           {/each}
         </p>
         <p class="sugerencia">Si no responde, haz clic dentro de este recuadro.</p>
@@ -141,7 +151,9 @@
     <Keyboard
       {layout}
       held={pulsadas}
+      variante="reposo"
       guia={new Set(paso.guia)}
+      objetivos={paso.guia.length <= 2 ? new Set(paso.guia) : undefined}
       etiqueta={paso.guia.length
         ? `Teclado en pantalla con ${paso.guia.length === 1 ? 'una tecla señalada' : `${paso.guia.length} teclas señaladas`}.`
         : 'Teclado en pantalla.'}
@@ -151,11 +163,17 @@
   <nav class="pasos" aria-label="Pasos de «Antes de empezar»">
     <button onclick={() => ir(i - 1)} disabled={i === 0}>Anterior</button>
 
-    <ol class="puntos" aria-hidden="true">
-      {#each PASOS as p, n (p.titulo)}
-        <li class:hecho={n < i} class:actual={n === i}></li>
-      {/each}
-    </ol>
+    <!-- Los puntos no dependen del color: los hechos van rellenos, el actual es
+         una píldora más ancha y los pendientes son un aro. Y el texto lo dice;
+         para el lector de pantalla ya lo dice la cabecera. -->
+    <div class="progreso-pasos" aria-hidden="true">
+      <ol class="puntos">
+        {#each PASOS as p, n (p.titulo)}
+          <li class:hecho={n < i} class:actual={n === i}></li>
+        {/each}
+      </ol>
+      <span class="cuenta">paso {i + 1} de {PASOS.length}</span>
+    </div>
 
     {#if ultimo}
       <button class="primario" onclick={() => onTerminar?.()}>
@@ -247,27 +265,32 @@
   .etapa {
     margin: 0 0 var(--space-1);
     font-size: var(--text-sm);
-    color: var(--fg-muted);
+    font-weight: 700;
+    color: var(--accent-ink);
     font-variant-numeric: tabular-nums;
   }
-  h2 { margin: 0; font-size: var(--text-xl); }
+  h2 { margin: 0; font-size: var(--text-2xl); line-height: 1.2; }
+  /* Con la letra grande el título no puede comerse la pantalla. */
+  :global(.app.compacta) .cero h2 { font-size: var(--text-xl); }
 
   /* Texto generoso y ancho de lectura cómodo: esta pantalla se lee, no se
      escanea. */
   .cuerpo { max-width: 68ch; display: grid; gap: var(--space-2); }
-  .cuerpo p { margin: 0; font-size: var(--text-base); line-height: 1.55; }
+  .cuerpo p { margin: 0; font-size: var(--text-base); line-height: 1.6; }
 
   /* El campo está fuera de pantalla pero es enfocable de verdad: es lo que
      recibe las pulsaciones. */
   .captura { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
+  /* El recuadro de acción: discontinuo mientras espera, continuo y en verde al
+     completarse. */
   .prueba {
     position: relative;
     cursor: text;
-    border: 2px dashed var(--border-strong);
-    border-radius: var(--radius);
+    border: 2px dashed var(--accent);
+    border-radius: var(--radius-card);
     padding: var(--space-4);
-    background: var(--surface);
+    background: var(--accent-soft);
     display: grid;
     gap: var(--space-2);
     min-height: var(--target-min);
@@ -280,28 +303,75 @@
   /* El estado no depende solo del color: cambia el borde y el texto. */
   .prueba.completa { border-style: solid; border-color: var(--ok); background: var(--ok-bg); }
 
-  .pide { margin: 0; font-size: var(--text-lg); }
-  .pide strong {
-    font-family: var(--font-drill);
-    background: var(--accent);
-    color: var(--accent-fg);
-    padding: 0 var(--space-2);
-    border-radius: var(--radius-key);
+  .pide {
+    margin: 0;
+    font-size: var(--text-lg);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
   }
-  .dedo { color: var(--fg-muted); font-size: var(--text-base); }
-  .ok { margin: 0; font-size: var(--text-lg); color: var(--ok); font-weight: 600; }
-  .sugerencia, .eco { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
+  .verbo { font-weight: 700; }
+  .luego { font-size: var(--text-base); }
+  .pedida { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  /* La teja repite la tecla del teclado: del color de su dedo y con la letra en
+     el tono que contrasta con él. */
+  .teja {
+    display: inline-grid;
+    place-items: center;
+    min-width: calc(3rem * var(--ui-scale));
+    min-height: calc(3rem * var(--ui-scale));
+    padding: 0 var(--space-2);
+    font-family: var(--font-key);
+    font-size: var(--text-cifra);
+    font-weight: 700;
+    background: var(--dedo);
+    color: var(--on-finger);
+    border-radius: var(--radius);
+    box-shadow: 0 3px 0 var(--scrim), 0 3px 0 var(--dedo);
+  }
+  /* «La barra espaciadora» no es una letra: va en la letra de la interfaz y más
+     pequeña, para que la teja no ocupe medio recuadro. */
+  .teja.larga { font-family: inherit; font-size: var(--text-base); padding: 0 var(--space-4); }
+  :global(.app.compacta) .teja { min-width: calc(1.75rem * var(--ui-scale)); min-height: calc(1.75rem * var(--ui-scale)); }
+  /* Sobre el fondo de acento suave el texto secundario va en tinta plena. */
+  .dedo { color: var(--fg); font-size: var(--text-base); }
+  .ok { margin: 0; font-size: var(--text-lg); color: var(--ok); font-weight: 700; }
+  .sugerencia, .eco { margin: 0; font-size: var(--text-sm); color: var(--fg); }
+  @media (forced-colors: active) {
+    .teja { border: 2px solid CanvasText; box-shadow: none; }
+  }
 
   /* Volver a un lado y seguir al otro, como en cualquier asistente. */
   .pasos { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 
-  .puntos { display: flex; gap: var(--space-2); list-style: none; margin: 0; padding: 0; }
-  .puntos li {
-    width: var(--space-2); height: var(--space-2); border-radius: 50%;
-    border: 1px solid var(--border-strong); background: transparent;
+  .progreso-pasos { display: flex; align-items: center; gap: var(--space-3); }
+  .cuenta {
+    font-size: var(--text-sm);
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
-  .puntos li.hecho { background: var(--border-strong); }
-  .puntos li.actual { background: var(--accent); border-color: var(--accent); transform: scale(1.3); }
+  .puntos { display: flex; align-items: center; gap: var(--space-2); list-style: none; margin: 0; padding: 0; }
+  .puntos li {
+    box-sizing: border-box;
+    width: calc(0.625rem * var(--ui-scale));
+    height: calc(0.625rem * var(--ui-scale));
+    border-radius: var(--radius-chip);
+    border: 2px solid var(--border-strong);
+    background: transparent;
+  }
+  .puntos li.hecho { background: var(--ok); border-color: var(--ok); }
+  .puntos li.actual {
+    width: calc(1.75rem * var(--ui-scale));
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  /* Con la letra grande la fila de botones va justa: se queda la cuenta escrita. */
+  :global(.app.compacta) .puntos { display: none; }
+  @media (forced-colors: active) {
+    .puntos li.hecho, .puntos li.actual { background: CanvasText; }
+  }
 
   .saltar {
     margin: 0;
@@ -313,17 +383,14 @@
     flex-wrap: wrap;
     min-height: var(--target-min);
   }
+  /* El aspecto es el de `.enlace` de base.css; aquí solo se fija que, por mucho
+     que parezca un enlace, mida lo que un botón. */
   .enlace {
-    background: none;
-    border: none;
-    padding: 0 var(--space-1);
     min-height: var(--target-min);
     min-width: var(--target-min);
+    padding: 0 var(--space-1);
     display: inline-flex;
     align-items: center;
-    color: var(--accent);
-    text-decoration: underline;
-    cursor: pointer;
     font-size: inherit;
   }
 </style>

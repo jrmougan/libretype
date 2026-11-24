@@ -27,6 +27,7 @@
 
 {#if fase === 'antes'}
   <section class="prueba" aria-labelledby="prueba-tit">
+    <p class="antetitulo">Si ya escribes algo</p>
     <h2 id="prueba-tit">Prueba de colocación</h2>
     <p>
       Vas a escribir tramos cortos, uno de cada lección, empezando por
@@ -76,9 +77,13 @@
     padding: var(--space-6);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-panel);
   }
-  h2 { margin: 0; font-size: var(--text-xl); line-height: 1.2; }
-  p { margin: 0; line-height: 1.6; }
+  h2 { margin: 0; font-size: var(--text-2xl); line-height: 1.2; }
+  p { margin: 0; font-size: var(--text-md); line-height: 1.6; }
+  /* Con la letra grande la tarjeta no puede gastar media pantalla en aire. */
+  :global(.app.compacta) .prueba { padding: var(--space-4); gap: var(--space-2); }
+  :global(.app.compacta) .prueba h2 { font-size: var(--text-xl); }
+  :global(.app.compacta) .prueba p { font-size: var(--text-base); line-height: 1.4; }
   .botones { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-2); }
 </style>

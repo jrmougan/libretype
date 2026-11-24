@@ -25,8 +25,8 @@
 </script>
 
 <div class="tamano">
-  <span id="{id}-l" class="titulo">Tamaño del texto: {pct(escala)}</span>
-  <div class="botones" role="group" aria-labelledby="{id}-l">
+  <span id="{id}-l" class="titulo">Tamaño del texto: <span class="valor">{pct(escala)}</span></span>
+  <div class="group botones" role="group" aria-labelledby="{id}-l">
     {#each ESCALAS_FIJAS as valor (valor)}
       <button
         type="button"
@@ -61,9 +61,12 @@
 </div>
 
 <style>
-  .tamano { display: grid; gap: var(--space-2); }
-  .titulo { font-weight: 600; }
-  .botones { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .tamano { display: grid; gap: var(--space-2); justify-items: start; }
+  .titulo { font-weight: 700; }
+  /* El valor elegido en tinta de acento, como el del volumen. */
+  .valor { color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+
+  /* Grupo segmentado de base.css, con botones altos porque llevan muestra. */
   .botones button {
     display: inline-flex;
     flex-direction: column;
@@ -71,17 +74,16 @@
     justify-content: flex-end;
     min-width: calc(var(--target-min) * 1.5);
     min-height: calc(var(--target-min) * 1.5);
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-1) var(--space-3);
     gap: 0;
   }
-  /* Lo elegido se distingue por el relleno y también por la marca de la cifra. */
-  .botones button[aria-pressed='true'] {
-    background: var(--accent);
-    color: var(--accent-fg);
-    border-color: var(--accent);
-  }
-  .muestra { line-height: 1.1; font-weight: 600; }
-  .cifra { font-size: var(--text-xs); }
-  .fino { display: grid; gap: var(--space-1); font-size: var(--text-sm); }
+  /* Lo elegido: papel, contorno más grueso, negrita y ✓. Nunca solo color. La
+     marca va junto a la cifra y no delante de la muestra (como en los demás
+     grupos): así la muestra queda alineada con las otras. */
+  .botones button[aria-pressed='true'] { border: var(--borde-grueso) solid var(--fg); }
+  .botones button[aria-pressed='true']::before { content: none; }
+  .muestra { line-height: 1.1; font-weight: 700; }
+  .cifra { font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+  .fino { display: grid; gap: var(--space-1); font-size: var(--text-sm); justify-self: stretch; }
   .nota { margin: 0; font-size: var(--text-sm); color: var(--fg-muted); }
 </style>

@@ -93,10 +93,13 @@
     padding: var(--space-6);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-panel);
   }
-  h2 { margin: 0; font-size: var(--text-xl); line-height: 1.2; }
-  .intro { margin: 0; font-size: var(--text-lg); color: var(--fg-muted); }
+  h2 { margin: 0; font-size: var(--text-2xl); line-height: 1.2; }
+  .intro { margin: 0; font-size: var(--text-md); color: var(--fg-muted); }
+  /* Con la letra grande la tarjeta no puede gastar media pantalla en aire. */
+  :global(.app.compacta) .quien { padding: var(--space-4); gap: var(--space-3); }
+  :global(.app.compacta) .quien h2 { font-size: var(--text-xl); }
 
   .perfiles {
     list-style: none;
@@ -117,12 +120,15 @@
     text-align: left;
     padding: var(--space-3) var(--space-4);
     border-width: var(--borde-grueso);
+    border-radius: var(--radius-card);
+    box-shadow: 0 2px 0 var(--border-strong);
     overflow-wrap: anywhere;
   }
+  .perfil:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); }
   .otro { justify-self: start; }
 
   .nuevo { display: grid; gap: var(--space-2); }
-  .nuevo label { font-weight: 600; }
+  .nuevo label { font-weight: 700; }
   .fila { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
   input { flex: 1 1 calc(14rem * var(--ui-scale)); min-width: 0; font-size: var(--text-lg); }
   .error { margin: 0; font-size: var(--text-sm); color: var(--error); overflow-wrap: anywhere; }

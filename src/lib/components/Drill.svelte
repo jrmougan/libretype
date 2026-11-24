@@ -186,19 +186,25 @@
   /**
    * El texto se desplaza dentro de su caja (paso 2 del orden de sacrificio), así
    * que hay que llevar el cursor a la vista: nadie va a soltar el teclado para
-   * mover la rueda a mitad de una lección. Se sitúa su línea arriba del todo para
-   * dejar a la vista lo que viene. Sin animación: lo que importa es que esté ya.
+   * mover la rueda a mitad de una lección. Su línea va **siempre** arriba del todo,
+   * no solo cuando se sale: así lo que queda a la vista por debajo es lo que viene,
+   * y al llegar al final de una línea ya se ve la siguiente. Leer por delante es
+   * como mantiene el ritmo quien ya no reacciona tan rápido. Sin animación: lo que
+   * importa es que esté ya.
+   *
+   * La distancia entre el primer carácter y el cursor no depende de cuánto esté
+   * desplazada la caja, así que sirve de destino tal cual; si todo cabe, no se toca.
    */
   $effect(() => {
     void states;
     const caja = cajaTexto;
     const cursor = caja?.querySelector('.ch.current');
-    if (!caja || !cursor) return;
-    const c = caja.getBoundingClientRect();
-    const r = cursor.getBoundingClientRect();
-    if (r.top < c.top || r.bottom > c.bottom) {
-      caja.scrollTop += r.top - c.top - caja.clientTop;
-    }
+    const primero = caja?.querySelector('.ch');
+    if (!caja || !cursor || !primero) return;
+    if (caja.scrollHeight <= caja.clientHeight + 1) return;
+    const destino = Math.max(0, cursor.getBoundingClientRect().top - primero.getBoundingClientRect().top);
+    // Con margen: un píxel de redondeo no puede mover el texto a cada tecla.
+    if (Math.abs(caja.scrollTop - destino) > 2) caja.scrollTop = destino;
   });
 
   /**
@@ -508,7 +514,14 @@
     overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
   .compacta .cobertura { display: none; }
-  .compacta .text { padding: var(--space-1) var(--space-3); }
+  /* Con la letra grande la caja enseña una línea y poco más, y al llegar al final
+     de esa línea no se veía nada de lo que viene: leer por delante es como mantiene
+     el ritmo quien ya no reacciona tan rápido. Con el interlineado más prieto, en el
+     mismo alto de caja caben la línea del cursor y la siguiente en cuanto la ventana
+     da para ello (medido: dos enteras a 1280x800 al 200%; en ventanas más bajas, la
+     de debajo asoma). El suelo de la fila no cambia: esto no le quita nada al
+     teclado ni mueve el orden de sacrificio. */
+  .compacta .text { padding: var(--space-1) var(--space-3); line-height: 1.35; }
   .compacta .hint { font-size: var(--text-base); }
   .compacta .explica { padding: 0 var(--space-3); }
 

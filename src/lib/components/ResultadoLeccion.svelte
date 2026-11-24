@@ -136,7 +136,7 @@
     background: var(--surface);
     border: var(--borde-grueso) solid var(--ok);
     border-radius: var(--radius);
-    box-shadow: var(--sombra-capa);
+    box-shadow: var(--shadow-panel);
   }
   h2 { margin: 0; font-size: var(--text-lg); }
   #resultado-desc { display: grid; gap: var(--space-1); }

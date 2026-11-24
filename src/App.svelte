@@ -1273,7 +1273,7 @@
     grid-template-rows: auto minmax(0, 1fr);
     background: var(--surface);
     border-left: 1px solid var(--border);
-    box-shadow: var(--sombra-panel);
+    box-shadow: var(--shadow-lateral);
   }
   /* Las tablas de progreso caben enteras sin desplazarse de lado al 100%. */
   .panel.ancho { width: min(calc(46rem * var(--ui-scale)), 100%); }

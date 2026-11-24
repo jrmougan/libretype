@@ -74,7 +74,7 @@
     color: var(--fg);
     border: var(--borde-grueso) solid var(--accent);
     border-radius: var(--radius);
-    box-shadow: var(--sombra-capa);
+    box-shadow: var(--shadow-panel);
     font-size: var(--text-sm);
   }
   p { margin: 0; flex: 1 1 calc(14rem * var(--ui-scale)); }

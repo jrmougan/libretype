@@ -543,7 +543,7 @@
     font-variant-numeric: tabular-nums;
     color: var(--accent);
     border: 1px solid var(--accent);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-chip);
     padding: 1px var(--space-2);
     white-space: nowrap;
   }

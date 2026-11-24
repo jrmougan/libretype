@@ -93,7 +93,7 @@
     font-size: var(--text-sm);
     font-weight: 600;
     padding: var(--space-1) var(--space-3);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-chip);
   }
   .muestra.juego .chip {
     background: var(--muestra-juego-chip);

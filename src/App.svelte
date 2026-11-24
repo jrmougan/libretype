@@ -1006,7 +1006,7 @@
         </div>
       {:else if vista === 'propio'}
         <div class="barra-practica">
-          <span>Practicando tu propio texto ({textoPropioActivo.length} caracteres)</span>
+          <span class="chip neutro">Practicando tu propio texto ({textoPropioActivo.length} caracteres)</span>
           <button onclick={cambiarTexto}>Cambiar texto</button>
         </div>
       {/if}

@@ -50,7 +50,7 @@
       Buen momento para una pausa: suelta las manos, mueve las muñecas y mira
       algo lejano un momento. Cuando quieras, sigues donde lo dejaste.
     </p>
-    <button type="button" onclick={cerrar}>Vale</button>
+    <button type="button" class="suave" onclick={cerrar}>Vale</button>
   </div>
 {/if}
 
@@ -73,7 +73,7 @@
     background: var(--surface);
     color: var(--fg);
     border: var(--borde-grueso) solid var(--accent);
-    border-radius: var(--radius);
+    border-radius: var(--radius-card);
     box-shadow: var(--shadow-panel);
     font-size: var(--text-sm);
   }

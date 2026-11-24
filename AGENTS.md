@@ -622,10 +622,20 @@ reducido en ese punto.
 
 Reglas que aplican a cualquier UI nueva:
 
-- Los campos, `button.primario`, `button.peligro` y `button:disabled` son globales
-  en `tokens.css`: no se redeclaran en cada componente. Una copia local se quedó con
-  un borde de 1,4:1 y otra perdía el `:hover`. Los campos de captura están excluidos
-  a propósito: su caja de 1px es parte de cómo funcionan.
+- Los controles son globales en `src/styles/base.css` y no se redeclaran en cada
+  componente: los campos, `button` (secundario), `.primario`, `.suave`, `.enlace`,
+  `.peligro`, `button:disabled`, el grupo segmentado `.group` (la opción elegida
+  lleva papel, contorno, negrita y «✓») y las piezas `.chip`, `.superficie` y
+  `.antetitulo`. Una copia local se quedó con un borde de 1,4:1 y otra perdía el
+  `:hover`. Un componente que necesite otra cosa añade solo la diferencia. Los
+  campos de captura están excluidos a propósito: su caja de 1px es parte de cómo
+  funcionan.
+- La dirección visual (PR #58) es la misma en todas las vistas: paneles y diálogos
+  con `--radius-panel` sobre el velo `--scrim`, que pinta el propio `<dialog>` y no
+  `::backdrop`; tarjetas con `--radius-card`; cifras en tarjetas hundidas
+  (`--surface-sunken`), y las pantallas de entrada como tarjeta centrada. Un par de
+  color nuevo (texto sobre fondo) se añade a `accesibilidad.test.ts`, que lo mide en
+  las paletas normales y en las de alto contraste.
 - Si el botón pulsado desaparece (pedir confirmación, cancelar, borrar), hay que
   decir adónde va el foco; si no, se va al documento. Al pedir confirmación, a la
   salida segura.

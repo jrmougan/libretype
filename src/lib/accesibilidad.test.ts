@@ -343,6 +343,12 @@ describe("Paleta: texto sobre sus fondos (WCAG 1.4.3, 4,5:1)", () => {
       for (const fondo of ["--bg", "--surface", "--surface-sunken"]) {
         expect(contrast(t("--border-strong"), t(fondo))).toBeGreaterThanOrEqual(3);
       }
+      // La tarjeta «Con celebración» del selector de tono se perfila con el color
+      // de su muestra, no con --border-strong: también tiene que verse.
+      for (const fondo of ["--bg", "--surface"]) {
+        expect(contrast(t("--muestra-juego-chip"), t(fondo)), `--muestra-juego-chip sobre ${fondo}`)
+          .toBeGreaterThanOrEqual(3);
+      }
     });
   }
 });

@@ -110,13 +110,13 @@ describe('datos corruptos', () => {
     const a = new AlmacenSqlite(db);
     await a.guardarLeccion(leccion());
     await db.execute(
-      `INSERT INTO lecciones_propias (id, titulo, descripcion, texto, creada_en, actualizada_en)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO lecciones_propias (id, titulo, descripcion, texto, creada_en, actualizada_en, perfil)
+       VALUES ($1, $2, $3, $4, $5, $6, 1)`,
       ['reposo', 'no', '', 'x', 'ayer', 'ayer'],
     );
     await db.execute(
-      `INSERT INTO lecciones_propias (id, titulo, descripcion, texto, creada_en, actualizada_en)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO lecciones_propias (id, titulo, descripcion, texto, creada_en, actualizada_en, perfil)
+       VALUES ($1, $2, $3, $4, $5, $6, 1)`,
       ['propia:rota', '', '', '', 'ayer', 'ayer'],
     );
     expect((await a.leerLecciones()).map((l) => l.id)).toEqual(['propia:a']);
@@ -154,12 +154,14 @@ describe('si no cabe, se dice', () => {
 describe('la migración', () => {
   it('es la tercera, nueva, y no editó las dos anteriores', () => {
     const sql = migraciones();
-    expect(sql).toHaveLength(3);
+    expect(sql.length).toBeGreaterThanOrEqual(3);
     expect(sql[0]).toContain('sesiones');
     expect(sql[1]).toContain('teclas');
     expect(sql[2]).toContain('lecciones_propias');
     expect(sql[0]).not.toContain('lecciones_propias');
     expect(sql[1]).not.toContain('lecciones_propias');
+    // Los perfiles llegaron después, en su propia migración: ninguna de estas tres los conoce.
+    for (const anterior of sql.slice(0, 3)) expect(anterior).not.toMatch(/perfil/);
   });
 });
 

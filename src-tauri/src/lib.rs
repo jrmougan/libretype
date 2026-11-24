@@ -58,6 +58,60 @@ fn migraciones() -> Vec<Migration> {
         ",
             kind: MigrationKind::Up,
         },
+        // Perfiles: un equipo de aula lo comparten varios alumnos. Todo lo que
+        // ya había pasa al perfil 1, «Principal», también las lecciones propias,
+        // que son de cada perfil. Va en una transacción (sqlx envuelve cada
+        // migración en una), así que o se aplica entera o no se aplica.
+        // `teclas` y `lecciones_propias` se rehacen porque su clave pasa a
+        // incluir el perfil, y en SQLite eso no se puede cambiar con un ALTER.
+        // La columna `perfil` de `sesiones` no lleva REFERENCES: con las claves
+        // foráneas activas, SQLite no deja añadir una con valor por defecto.
+        Migration {
+            version: 4,
+            description: "perfiles locales",
+            sql: "
+            CREATE TABLE IF NOT EXISTS perfiles (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                alias      TEXT    NOT NULL,
+                creado_en  TEXT    NOT NULL
+            );
+            INSERT INTO perfiles (id, alias, creado_en)
+                VALUES (1, 'Principal', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            ALTER TABLE sesiones ADD COLUMN perfil INTEGER NOT NULL DEFAULT 1;
+            CREATE INDEX IF NOT EXISTS idx_sesiones_perfil
+                ON sesiones (perfil, leccion);
+            CREATE TABLE teclas_por_perfil (
+                perfil    INTEGER NOT NULL,
+                code      TEXT    NOT NULL,
+                intentos  INTEGER NOT NULL,
+                aciertos  INTEGER NOT NULL,
+                ms_total  INTEGER NOT NULL,
+                PRIMARY KEY (perfil, code)
+            );
+            INSERT INTO teclas_por_perfil (perfil, code, intentos, aciertos, ms_total)
+                SELECT 1, code, intentos, aciertos, ms_total FROM teclas;
+            DROP TABLE teclas;
+            ALTER TABLE teclas_por_perfil RENAME TO teclas;
+            CREATE TABLE lecciones_por_perfil (
+                perfil          INTEGER NOT NULL,
+                id              TEXT NOT NULL,
+                titulo          TEXT NOT NULL,
+                descripcion     TEXT NOT NULL DEFAULT '',
+                texto           TEXT NOT NULL,
+                creada_en       TEXT NOT NULL,
+                actualizada_en  TEXT NOT NULL,
+                borrada_en      TEXT,
+                PRIMARY KEY (perfil, id)
+            );
+            INSERT INTO lecciones_por_perfil
+                (perfil, id, titulo, descripcion, texto, creada_en, actualizada_en, borrada_en)
+                SELECT 1, id, titulo, descripcion, texto, creada_en, actualizada_en, borrada_en
+                  FROM lecciones_propias;
+            DROP TABLE lecciones_propias;
+            ALTER TABLE lecciones_por_perfil RENAME TO lecciones_propias;
+        ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -318,7 +372,7 @@ mod tests {
     #[test]
     fn migraciones_tienen_versiones_validas_y_sql_no_vacio() {
         let migs = migraciones();
-        assert_eq!(migs.len(), 3, "debe haber 3 migraciones");
+        assert_eq!(migs.len(), 4, "debe haber 4 migraciones");
 
         // Versión 1: sesiones de práctica
         assert_eq!(migs[0].version, 1);
@@ -335,6 +389,12 @@ mod tests {
             .sql
             .contains("CREATE TABLE IF NOT EXISTS lecciones_propias"));
         assert!(migs[2].sql.contains("borrada_en"));
+
+        // Versión 4: perfiles, con las lecciones propias dentro de cada uno
+        assert_eq!(migs[3].version, 4);
+        assert!(migs[3].sql.contains("CREATE TABLE IF NOT EXISTS perfiles"));
+        assert!(migs[3].sql.contains("PRIMARY KEY (perfil, code)"));
+        assert!(migs[3].sql.contains("PRIMARY KEY (perfil, id)"));
         assert_eq!(version_esquema(), migs.len() as i64);
 
         // Invariantes generales

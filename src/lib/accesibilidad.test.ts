@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import drillSvelte from "./components/Drill.svelte?raw";
 import resultadoSvelte from "./components/ResultadoLeccion.svelte?raw";
 import leccionCeroSvelte from "./components/LeccionCero.svelte?raw";
+import keyboardSvelte from "./components/Keyboard.svelte?raw";
 import leccionesPropiasSvelte from "./components/LeccionesPropias.svelte?raw";
 import { DOMINADA, opacidadEtiqueta } from "./keyboard/dominio";
 
@@ -200,3 +201,40 @@ describe("un título sin espacios no ensancha la lección", () => {
   });
 });
 
+
+describe("Tipografía para dislexia", () => {
+  // Antes solo se nombraba OpenDyslexic sin incluirla, y en Linux el ajuste no
+  // cambiaba nada. Estos tests fallan si la fuente vuelve a quedarse fuera.
+  const caras = [...tokensCss.matchAll(/@font-face\s*\{[^}]*\}/g)].map((m) => m[0]);
+  const urls = caras.flatMap((c) => [...c.matchAll(/url\("\.\.\/([^"]+)"\)/g)].map((m) => m[1]));
+
+  it("declara OpenDyslexic con @font-face en normal y negrita", () => {
+    const deOpenDyslexic = caras.filter((c) => c.includes('font-family: "OpenDyslexic"'));
+    expect(deOpenDyslexic.map((c) => c.match(/font-weight:\s*(\d+)/)?.[1]).sort()).toEqual(["400", "700"]);
+    expect(urls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("los ficheros existen, son woff2 de verdad y llevan la licencia OFL al lado", () => {
+    for (const url of urls) {
+      const binario = readFileSync(`src/${url}`, "latin1");
+      expect(binario.slice(0, 4), url).toBe("wOF2");
+    }
+    const licencia = readFileSync("src/assets/fonts/OFL.txt", "utf8");
+    expect(licencia).toContain("SIL OPEN FONT LICENSE Version 1.1");
+    expect(licencia).toContain("OpenDyslexic");
+  });
+
+  it("la pila para dislexia empieza por la fuente incluida y no por una que no existe en Linux", () => {
+    const bloque = tokensCss.slice(tokensCss.indexOf(':root[data-font="dyslexic"]'));
+    expect(bloque).toMatch(/--font-stack:\s*"OpenDyslexic"/);
+    expect(bloque).toMatch(/--font-drill:\s*"OpenDyslexic"/);
+    expect(tokensCss).not.toContain("Comic Sans");
+    expect(tokensCss).not.toContain("OpenDyslexic Mono");
+  });
+
+  it("el teclado conserva la monoespaciada con la que está medida su geometría", () => {
+    expect(keyboardSvelte).toMatch(/\.lbl\s*\{[^}]*font-family:\s*var\(--font-key\)/);
+    const bloque = tokensCss.slice(tokensCss.indexOf(':root[data-font="dyslexic"]'));
+    expect(bloque.slice(0, bloque.indexOf("}"))).not.toContain("--font-key");
+  });
+});

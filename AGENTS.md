@@ -271,7 +271,7 @@ Lo que dicen los datos, y que no es intuitivo:
 
 - **El 13% de las palabras que se escriben en español llevan tilde, diéresis
   o eñe**, y la tecla `´` se pulsa más que la `p`. Las tildes van en la lección
-  5 de 14 (de las 9 que enseñan el alfabeto), no al final. No son un tema avanzado del español: son el español.
+  5 de 16 (de las 9 que enseñan el alfabeto), no al final. No son un tema avanzado del español: son el español.
 - **Con la fila de reposo entera solo se escribe el 5,5% de las palabras.**
   `asdfjklñ` contiene cuatro de las letras más raras (`f`, `j`, `k`, `ñ`) y
   solo dos de las cinco más usadas (`a` y `s`). Sigue siendo el ancla anatómica
@@ -289,8 +289,19 @@ y que las tildes lleguen con las cinco vocales ya dadas.
 
 Cada lección del alfabeto practica **todas** sus teclas nuevas (la k solo tiene
 «ka» en la fila de reposo; no es un descuido), con 25 palabras o más y sin
-repetir ninguna. Las dos últimas (`un-dia`, `refranes`) son textos seguidos de
-consolidación y estrenan los signos que faltaban (`: ; " ( )`).
+repetir ninguna. `un-dia` y `refranes` son textos seguidos de consolidación y
+estrenan `: ; " ( )`. Las dos últimas (`numeros-2`, `simbolos`) traen lo que
+faltaba para una fecha, un teléfono, un precio o un correo (`- / @ € %`). **Una
+lección nueva va siempre al final del curso**: el desbloqueo lo recorre en orden,
+y una en medio volvería a cerrar a quien ya las superó todas las de detrás. Por
+eso «Números» tampoco se partió en dos. Hay test.
+
+**A partir del segundo intento el texto cambia** (`lecciones/generador.ts`): con
+uno fijo, al tercer intento se recita de memoria. Mientras se estrena el alfabeto
+salen palabras del vocabulario ya enseñado, con más peso para las teclas nuevas;
+después, las `frases` de la lección, que pasan por las mismas garantías que su
+texto. Una lección sin frases y fuera del alfabeto conserva su texto. Es
+determinista con la semilla, y el identificador de sesión no cambia.
 
 El público incluye menores y el corpus son subtítulos, con tacos entre las
 palabras frecuentes: `lecciones/contenido.test.ts` tiene una lista de exclusión

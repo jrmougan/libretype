@@ -104,8 +104,9 @@ describe('afirmaciones del temario', () => {
   });
 
   it('los números no fijan un año que envejezca', () => {
-    const l = catalogo.leccion('numeros')!;
-    expect(l.text).not.toMatch(/\b(19|20)\d\d\b/);
-    for (const f of l.frases ?? []) expect(f).not.toMatch(/\b(19|20)\d\d\b/);
+    for (const id of ['numeros', 'numeros-2', 'simbolos']) {
+      const l = catalogo.leccion(id)!;
+      for (const f of [l.text, ...(l.frases ?? [])]) expect(f, id).not.toMatch(/\b(19|20)\d\d\b/);
+    }
   });
 });

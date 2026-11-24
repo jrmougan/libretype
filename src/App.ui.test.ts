@@ -170,7 +170,8 @@ describe('después de terminar', () => {
     const ultima = catalogo.lecciones[catalogo.lecciones.length - 1];
     const sesiones = catalogo.lecciones.map((l) => ({ ...SESION, leccion: l.id, pctAcierto: 95 }));
     await abrir({ ultimaLeccion: ultima.id }, sesiones);
-    await teclear(ultima.text);
+    // Ya practicada: el texto puede ser uno nuevo, así que se teclea el que se enseña.
+    await teclear(document.getElementById(campo().getAttribute('aria-describedby')!)!.textContent!.replace(/^Texto: /, ''));
     expect(botones()).toEqual(['Ver tu progreso', 'Repetir']);
   });
 

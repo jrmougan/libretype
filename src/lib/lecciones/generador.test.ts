@@ -20,7 +20,7 @@ describe('texto nuevo en cada intento', () => {
   it('se generan todas las lecciones que estrenan letras y las que traen frases', () => {
     const ids = generables.map((l) => l.id);
     for (const id of ['reposo', 'vocales-1', 'nasales', 'vocales-2', 'tildes', 'oclusivas',
-      'consonantes', 'dificiles', 'raras', 'mayusculas', 'puntuacion', 'numeros']) {
+      'consonantes', 'dificiles', 'raras', 'mayusculas', 'puntuacion', 'numeros', 'numeros-2', 'simbolos']) {
       expect(ids, id).toContain(id);
     }
   });

@@ -235,6 +235,59 @@ const LECCIONES: Lesson[] = [
       'Yo me quedo con este: "más vale tarde que nunca". Y si hoy no sale, mañana ' +
       'será otro día.',
   },
+  /*
+   * Lo que faltaba para escribir una fecha, un teléfono, un precio o un correo.
+   *
+   * Van al final a propósito, y no junto a «Números»: el desbloqueo recorre el
+   * curso en orden, así que una lección nueva en medio volvería a cerrarle a
+   * quien ya las superó todas las que vienen detrás. Por lo mismo «Números» no
+   * se parte en dos: quien la superó escribió las diez cifras, y quitarle
+   * cinco sería retirar algo ya acreditado. `numeros-2` es una segunda vuelta
+   * a la fila de arriba con los dos signos que acompañan a las cifras.
+   */
+  {
+    id: 'numeros-2',
+    title: 'Fechas y teléfonos',
+    focus:
+      'Otra vuelta a la fila de números, ahora en fechas, horas y teléfonos. ' +
+      'Estrenas el guion, que está junto a la Mayús derecha, y la barra: Mayús con el 7.',
+    nuevas: '-/',
+    cobertura: 100,
+    // Fechas sin año, como en «Números».
+    text:
+      'Nació el 3/10 y su hermana el 25/12. El teléfono del centro es 912-345-678. ' +
+      'La biblioteca abre de 9 a 14, de lunes a viernes; por la tarde, de 17-20. ' +
+      'El tren Madrid-Toledo sale a las 10:30. Apunta la fecha: 6/4.',
+    frases: [
+      'Nació el 3/10.', 'La cita es el 14/02.', 'El teléfono es 912-345-678.',
+      'El tren Madrid-Toledo sale a las 10:30.', 'Abre de 9 a 14, de lunes a viernes.',
+      'El horario de tarde es 17-20.', 'Mi número de socio es el 12-345.',
+      'La reunión es el 25/11 a las 18:00.', 'Usa y/o según el caso.',
+      'Lee las páginas 40-45.', 'Quedamos el 6/4, ¿te viene bien?', 'El partido acabó 3-2.',
+      'Vuelo Sevilla-Bilbao, puerta 7.', 'Del 1/7 al 15/8 cerramos por vacaciones.',
+    ],
+  },
+  {
+    id: 'simbolos',
+    title: 'Correo, precios y porcentajes',
+    focus:
+      'La arroba sale con AltGr y el 2; el euro, con AltGr y el 5; el tanto por ' +
+      'ciento, con Mayús y el 5. Con esto ya puedes escribir una dirección de correo.',
+    nuevas: '@€%',
+    cobertura: 100,
+    text:
+      'Mi correo es ana.ruiz@ejemplo.es y el de Luis es luis@ejemplo.org. El menú ' +
+      'cuesta 12 € y hoy tiene un 20% de descuento. Un café cuesta 1,50 €. El 30% ' +
+      'de la clase fue a la excursión, que costaba 8 € por persona.',
+    frases: [
+      'Mi correo es ana.ruiz@ejemplo.es.', 'Escríbeme a luis@ejemplo.org.',
+      'El menú cuesta 12 €.', 'Hay un 20% de descuento.', 'Un café cuesta 1,50 €.',
+      'El 30% de la clase vino.', 'El IVA es del 21%.', 'Son 25 € por persona.',
+      'Mi correo nuevo es marta@ejemplo.org.', 'La entrada cuesta 6 €, con un 50% de descuento.',
+      'Envía la foto a info@ejemplo.es.', 'Ahorra un 10% cada mes.',
+      '¿Cuánto es el 15% de 200 €?', 'El billete sube un 3%.',
+    ],
+  },
 ];
 
 /** Banco de vocabulario frecuente para práctica continua. */

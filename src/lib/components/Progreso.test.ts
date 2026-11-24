@@ -342,6 +342,11 @@ describe("Progreso.svelte - Evolución temporal (Issue #26) y Teclas flojas (Iss
     expect(dtDias).not.toBeNull();
     expect(dtDias?.nextElementSibling?.textContent).toContain("1");
 
+    // La racha que volvía a 0 se cambió por constancia semanal: nada que perder.
+    const rotulos = [...document.querySelectorAll("dl.global dt")].map((dt) => dt.textContent);
+    expect(rotulos).toContain("Esta semana");
+    expect(rotulos.join(" ")).not.toMatch(/racha/i);
+
     const tituloEvolucion = document.querySelector("#titulo-evolucion");
     expect(tituloEvolucion).not.toBeNull();
     expect(tituloEvolucion?.textContent).toContain("Evolución por días");

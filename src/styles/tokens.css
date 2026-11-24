@@ -111,6 +111,11 @@
   --bg: #faf9f7;
   --surface: #ffffff;
   --surface-sunken: #f0eee9;
+  /* Dos bordes con usos distintos. --border es para separadores decorativos
+   * (líneas entre zonas, tarjetas que no se pulsan), que no identifican nada y
+   * pueden ser tenues. --border-strong es para el contorno de cualquier control
+   * o de las teclas: eso sí lo exige WCAG 1.4.11 a 3:1, y --border se queda en
+   * 1,4:1. Lo comprueba accesibilidad.test.ts. */
   --border: #d9d5cd;
   --border-strong: #8c867b;
 

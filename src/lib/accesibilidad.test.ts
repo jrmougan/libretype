@@ -346,3 +346,54 @@ describe("Alto contraste propio: «Normal» apaga también el ajuste suave del s
     expect(selectores.match(/:not\(\[data-contrast="normal"\]\)/g)).toHaveLength(3);
   });
 });
+
+describe("Contraste de controles y teclas (WCAG 1.4.11)", () => {
+  /** Valor de un token en el primer bloque que lo define a partir de `desde`. */
+  function token(nombre: string, desde: string): string {
+    const bloque = tokensCss.slice(tokensCss.indexOf(desde));
+    const m = bloque.match(new RegExp(`${nombre}:\\s*(#[0-9a-fA-F]{6});`));
+    if (!m) throw new Error(`no encuentro ${nombre} tras ${desde}`);
+    return m[1];
+  }
+
+  const temas = {
+    claro: ":root {",
+    "oscuro del sistema": "@media (prefers-color-scheme: dark)",
+    "oscuro elegido": ':root[data-theme="dark"] {',
+  };
+
+  for (const [tema, desde] of Object.entries(temas)) {
+    it(`${tema}: el contorno de controles y teclas llega a 3:1 con lo que tiene al lado`, () => {
+      const borde = token("--border-strong", desde);
+      // La tecla en reposo se rellena con --surface-sunken y está sobre --bg;
+      // los controles se pintan sobre --surface o --bg.
+      for (const fondo of ["--bg", "--surface", "--surface-sunken"]) {
+        expect(contrast(borde, token(fondo, desde)), `${tema}: --border-strong vs ${fondo}`)
+          .toBeGreaterThanOrEqual(3.0);
+      }
+    });
+  }
+
+  it("las teclas en reposo se perfilan con --border-strong y no con el borde decorativo", () => {
+    expect(keyboardSvelte).toMatch(/'var\(--border-strong\)'\}/);
+    expect(keyboardSvelte).not.toMatch(/'var\(--border\)'/);
+  });
+
+  it("la caja del texto de práctica usa el contorno de control", () => {
+    expect(drillSvelte).toMatch(/\.text\s*\{[^}]*border:\s*1px solid var\(--border-strong\)/);
+  });
+
+  it("ningún botón, campo ni selector se perfila con el borde decorativo", () => {
+    // Los globales de tokens.css ya usan --border-strong; esto vigila que un
+    // componente no los redeclare con el tenue.
+    const componentes = import.meta.glob("../**/*.svelte", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+    for (const [ruta, fuente] of Object.entries(componentes)) {
+      const estilo = fuente.slice(fuente.indexOf("<style"));
+      for (const m of estilo.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const [, selector, cuerpo] = m;
+        if (!/border(-color)?:[^;]*var\(--border\)/.test(cuerpo)) continue;
+        expect(selector.trim(), `${ruta}: ${selector.trim()}`).not.toMatch(/\b(button|select|input|textarea)\b|\.text\b/);
+      }
+    }
+  });
+});

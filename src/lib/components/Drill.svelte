@@ -536,7 +536,8 @@
     font-size: var(--text-drill);
     line-height: 1.7;
     background: var(--surface);
-    border: 1px solid var(--border);
+    /* Es la caja que se pulsa para escribir: cuenta como contorno de control. */
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius);
     padding: var(--space-3) var(--space-4);
     margin: 0;

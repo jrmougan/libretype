@@ -6,6 +6,7 @@
   import LeccionesPropias from './lib/components/LeccionesPropias.svelte';
   import PanelAjustes from './lib/components/PanelAjustes.svelte';
   import Progreso from './lib/components/Progreso.svelte';
+  import RecordatorioPausa from './lib/components/RecordatorioPausa.svelte';
   import ResultadoLeccion, { type Accion } from './lib/components/ResultadoLeccion.svelte';
   import SelectConfirmado from './lib/components/SelectConfirmado.svelte';
   import SelectorLeccion from './lib/components/SelectorLeccion.svelte';
@@ -28,7 +29,7 @@
   import { esRecord, resumirLecciones, type Sesion } from './lib/storage/progreso';
   import { leccionesSuperadas, OBJETIVO_PENDIENTE } from './lib/storage/objetivos';
   import {
-    aplicar, cargar, guardar as guardarPrefs, POR_DEFECTO,
+    aplicar, cargar, guardar as guardarPrefs, palabrasPorTexto, POR_DEFECTO,
     type Preferencias, type Tono,
   } from './lib/preferencias';
   import { QUE_ES_PPM, vozDe } from './lib/voz';
@@ -80,7 +81,9 @@
 
   /** Variables para Práctica continua (Issue #19) */
   let nivelPractica = $state(catalogo.primera.id);
-  let textoContinua = $state(catalogo.textoPractica(catalogo.primera.id));
+  let textoContinua = $state(
+    catalogo.textoPractica(catalogo.primera.id, palabrasPorTexto(prefsIniciales.longitudTexto)),
+  );
   let continuaKey = $state(0);
 
   /** Variables para Texto propio (Issue #19) */
@@ -417,7 +420,7 @@
     soltarIntento();
     refuerzo = null;
     nivelPractica = catalogo.ultimaDisponible(superadas, catalogo.cursoDe(leccionId)?.id).id;
-    textoContinua = catalogo.textoPractica(nivelPractica);
+    textoContinua = catalogo.textoPractica(nivelPractica, palabrasPorTexto(prefs.longitudTexto));
     continuaKey++;
     vista = 'continua';
     await arrancarDrill();
@@ -425,7 +428,7 @@
 
   async function nuevaContinua(): Promise<void> {
     soltarIntento();
-    textoContinua = catalogo.textoPractica(nivelPractica);
+    textoContinua = catalogo.textoPractica(nivelPractica, palabrasPorTexto(prefs.longitudTexto));
     continuaKey++;
     await arrancarDrill();
   }
@@ -775,6 +778,11 @@
       onRepetir={again}
     />
   {/if}
+
+  <RecordatorioPausa
+    minutos={prefs.recordatorioPausa}
+    practicando={progresoCargado && practicando && !pausado && !panel && !result}
+  />
 
   {#if panel}
     <dialog

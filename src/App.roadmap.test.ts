@@ -96,3 +96,19 @@ describe('ocultar las métricas', () => {
     expect(document.querySelector('.metricas')).toBeNull();
   });
 });
+
+describe('longitud de los textos de práctica', () => {
+  const palabras = (): number => (document.querySelector('.text [aria-hidden="true"]')?.textContent ?? '')
+    .split('\u00a0').filter(Boolean).length;
+
+  it('la práctica continua genera textos cortos o largos según la preferencia', async () => {
+    await abrir({ longitudTexto: 'corto' });
+    const selector = document.querySelector<HTMLSelectElement>('.barra select')!;
+    selector.value = 'continua';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    await tick();
+    expect(document.querySelector('.drill h2')?.textContent).toBe('Práctica continua');
+    expect(palabras()).toBe(10);
+  });
+});

@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { aplicar, cargar, guardar, normalizar, POR_DEFECTO } from './preferencias';
+import {
+  aplicar, cargar, guardar, normalizar, PALABRAS_POR_LONGITUD, palabrasPorTexto, POR_DEFECTO,
+} from './preferencias';
 
 describe('normalizar', () => {
   it('sin nada guardado devuelve los valores por defecto', () => {
@@ -147,5 +149,30 @@ describe('sonido', () => {
     expect(normalizar({ volumen: 5 }).volumen).toBe(1);
     expect(normalizar({ volumen: 0 }).volumen).toBe(0.1);
     expect(normalizar({ volumen: 'alto' }).volumen).toBe(POR_DEFECTO.volumen);
+  });
+});
+
+describe('longitud del texto y recordatorio de pausa', () => {
+  it('traen valores por defecto prudentes', () => {
+    const p = normalizar({});
+    expect(p.longitudTexto).toBe('normal');
+    expect(p.recordatorioPausa).toBe(20);
+  });
+
+  it('un valor corrupto cae al de por defecto', () => {
+    const p = normalizar({ longitudTexto: 7, recordatorioPausa: 13 });
+    expect(p.longitudTexto).toBe('normal');
+    expect(p.recordatorioPausa).toBe(20);
+  });
+
+  it('respeta lo elegido, también apagar el recordatorio', () => {
+    expect(normalizar({ longitudTexto: 'corto', recordatorioPausa: 0 }))
+      .toMatchObject({ longitudTexto: 'corto', recordatorioPausa: 0 });
+  });
+
+  it('la longitud del texto se traduce a palabras en un solo sitio', () => {
+    expect(palabrasPorTexto('corto')).toBeLessThan(palabrasPorTexto('normal'));
+    expect(palabrasPorTexto('normal')).toBeLessThan(palabrasPorTexto('largo'));
+    expect(palabrasPorTexto('raro' as never)).toBe(PALABRAS_POR_LONGITUD.normal);
   });
 });

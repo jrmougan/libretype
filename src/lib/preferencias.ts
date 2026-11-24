@@ -80,7 +80,46 @@ export interface Preferencias {
    * (ansiedad); el resultado se sigue enseñando al terminar.
    */
   ocultarMetricas: boolean;
+  /**
+   * Longitud de los textos de práctica generados. Ver `palabrasPorTexto()`:
+   * es el único sitio del que debe sacar la cifra cualquier generador.
+   */
+  longitudTexto: LongitudTexto;
+  /**
+   * Minutos de práctica tras los que se sugiere una pausa; 0 lo apaga. Nunca
+   * bloquea: es un aviso que se cierra y ya.
+   */
+  recordatorioPausa: number;
 }
+
+/**
+ * Longitud de los textos de práctica.
+ *
+ * Con temblor, fatiga o poca atención sostenida, un texto largo cansa antes de
+ * terminar; a quien ya va suelto, uno corto se le queda en nada.
+ */
+export type LongitudTexto = 'corto' | 'normal' | 'largo';
+
+/**
+ * Palabras por texto generado según la longitud elegida.
+ *
+ * **Contrato para los generadores de texto** (práctica continua, fluidez y el
+ * texto nuevo de cada intento): la cantidad de palabras sale de aquí, con
+ * `palabrasPorTexto(prefs.longitudTexto)`, y no de una cifra propia. Así la
+ * preferencia vale igual en todos los modos.
+ */
+export const PALABRAS_POR_LONGITUD: Readonly<Record<LongitudTexto, number>> = {
+  corto: 10,
+  normal: 20,
+  largo: 40,
+};
+
+export function palabrasPorTexto(longitud: LongitudTexto): number {
+  return PALABRAS_POR_LONGITUD[longitud] ?? PALABRAS_POR_LONGITUD.normal;
+}
+
+/** Opciones del recordatorio de pausa, en minutos. 0 es «no avisar». */
+export const MINUTOS_PAUSA = [0, 15, 20, 30, 45] as const;
 
 export const POR_DEFECTO: Preferencias = {
   escala: 1,
@@ -96,6 +135,8 @@ export const POR_DEFECTO: Preferencias = {
   sonido: false,
   volumen: 0.6,
   ocultarMetricas: false,
+  longitudTexto: 'normal',
+  recordatorioPausa: 20,
 };
 
 const CLAVE = 'libretype.preferencias';
@@ -139,6 +180,10 @@ export function normalizar(crudo: unknown): Preferencias {
     sonido: o.sonido === true,
     volumen: enRango(o.volumen, 0.1, 1, POR_DEFECTO.volumen),
     ocultarMetricas: o.ocultarMetricas === true,
+    longitudTexto: unaDe(o.longitudTexto, ['corto', 'normal', 'largo'] as const, POR_DEFECTO.longitudTexto),
+    recordatorioPausa: (MINUTOS_PAUSA as readonly unknown[]).includes(o.recordatorioPausa)
+      ? (o.recordatorioPausa as number)
+      : POR_DEFECTO.recordatorioPausa,
   };
 }
 

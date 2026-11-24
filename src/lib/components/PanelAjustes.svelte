@@ -2,7 +2,7 @@
   /** Contenido del panel de ajustes. Quien lo monta decide qué hacer con cada cambio. */
   import TamanoTexto from './TamanoTexto.svelte';
   import { LAYOUTS } from '../keyboard/layouts';
-  import type { Preferencias } from '../preferencias';
+  import { MINUTOS_PAUSA, type Preferencias } from '../preferencias';
   import { QUE_ES_PPM } from '../voz';
   import type { Actualizador, EstadoActualizacion } from '../actualizacion';
 
@@ -22,6 +22,7 @@
   let { prefs, onCambiar, layoutId, aprendidas, gestorDelSistema, actualizador, estadoAct, onProbarSonido }: Props = $props();
 
   const TEMAS = [['auto', 'Sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']] as const;
+  const LONGITUDES = [['corto', 'Cortos'], ['normal', 'Normales'], ['largo', 'Largos']] as const;
   const CONTRASTES = [['auto', 'Sistema'], ['normal', 'Normal'], ['alto', 'Alto']] as const;
 </script>
 
@@ -103,6 +104,31 @@
     Si ver los números a cada tecla te distrae o te agobia, puedes ocultarlos:
     al terminar se siguen enseñando. {QUE_ES_PPM}
   </p>
+</div>
+
+<div class="field">
+  <span id="longitud-l">Longitud de los textos de práctica</span>
+  <div class="group" role="group" aria-labelledby="longitud-l">
+    {#each LONGITUDES as [v, l] (v)}
+      <button aria-pressed={prefs.longitudTexto === v} onclick={() => onCambiar({ longitudTexto: v })}>{l}</button>
+    {/each}
+  </div>
+  <p class="note">
+    Cortos si cansa llegar al final; largos para coger ritmo. Vale para la
+    práctica continua, no para las lecciones del temario.
+  </p>
+</div>
+
+<div class="field">
+  <span id="pausa-l">Recordarme descansar</span>
+  <div class="group" role="group" aria-labelledby="pausa-l">
+    {#each MINUTOS_PAUSA as m (m)}
+      <button aria-pressed={prefs.recordatorioPausa === m} onclick={() => onCambiar({ recordatorioPausa: m })}>
+        {m === 0 ? 'No' : `Cada ${m} min`}
+      </button>
+    {/each}
+  </div>
+  <p class="note">Un aviso en una esquina, que no interrumpe ni se lleva el foco.</p>
 </div>
 
 <div class="field">

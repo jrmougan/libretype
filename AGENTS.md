@@ -159,6 +159,13 @@ continua o texto propio, a 1024x640 al 200% sobran unos 50px y actúa el paso 4.
 Los paneles miden en función de `--ui-scale`, como la letra; fijos, al 200% cabían
 dos palabras por línea.
 
+**Leer por delante.** La línea del cursor va siempre arriba de la caja del texto, no
+solo cuando se sale: lo que queda debajo es lo que viene. Con la letra grande el
+interlineado baja a 1,35 para que en el mismo alto quepa también la línea siguiente
+(dos enteras a 1280x800 al 200%; en ventanas más bajas asoma). El suelo de la fila
+del texto sigue siendo una línea: subirlo a dos le quita alto al teclado, y eso no
+se decide sin medir las cuatro vistas.
+
 Al tocar esta zona, comprobar las cuatro vistas al 100% y al 200%.
 
 ## Tono y preferencias
@@ -171,6 +178,16 @@ que abre la aplicación. Van en localStorage y no en la base de datos porque son
 de este equipo, no progreso del alumno. `normalizar()` acota y sanea lo que
 venga de disco: un valor corrupto cae al de por defecto en vez de dejar la
 interfaz en un estado imposible.
+
+Además del tamaño, el tema, el tono y la tipografía, son preferencias: el contraste
+(`auto` sigue al sistema, `normal` lo apaga aunque el sistema lo pida, `alto` usa la
+paleta propia), el sonido (apagado; solo un `true` explícito lo enciende), ocultar
+las métricas mientras se practica, la longitud de los textos generados
+(`palabrasPorTexto()` es el único sitio del que un generador saca la cifra), el
+recordatorio de pausa, el filtro de rebote por temblor (`keyboard/temblor.ts`,
+apagado) y el último perfil que practicó en el equipo. El tamaño tiene además
+valores fijos y los atajos Ctrl+, Ctrl− y Ctrl+0 (`tamano.ts`), que mueven
+`--ui-scale` y no el zoom del motor, y se puede cambiar ya en la primera pantalla.
 
 **El tono** responde a un problema real de este público doble. La investigación
 de usabilidad con personas mayores le llama *design disqualification*: la
@@ -229,6 +246,10 @@ intentos, intentos, aciertos y milisegundos se reescalan a una en la misma
 proporción. Es una media que olvida sin tocar el esquema, que guarda enteros.
 Así el niño que mejora no arrastra los fallos de la primera semana, y una tecla
 dominada hace meses vuelve a enseñar su letra si hoy se falla.
+
+`fallos.ts` lleva aparte la cuenta de lo fallado **en el intento en curso**, para
+decir al terminar qué teclas costaron y ofrecer un refuerzo con ellas. El dominio es
+una media de semanas; esto es solo el intento que acaba.
 
 Los intentos se atribuyen a la tecla del carácter **objetivo**, no al `keydown`:
 los spikes demostraron que no se puede emparejar un carácter confirmado con la
@@ -334,12 +355,26 @@ que se está siguiendo. Los identificadores de lección son únicos
 entre cursos, porque es lo que guarda el histórico: el catálogo se niega a arrancar
 si se repiten o si usan uno reservado.
 
+### Otras formas de practicar
+
+Todas entran por `lecciones/ejercicio.ts` como un tipo más de `Seleccion`, para que
+`App` siga teniendo un solo `<Drill>`:
+
+- **Fluidez** (`lecciones/fluidez.ts`): tandas de las palabras y bigramas más
+  frecuentes del curso (datos del curso: `frecuentes`, `bigramas`). La meta es el
+  ritmo propio —la mediana de las últimas tandas limpias—, nunca una cifra fija ni a
+  costa de la precisión. No fija marca global: sus textos no se comparan con nada.
+- **Prueba de colocación** (`lecciones/colocacion.ts`): para quien ya escribe algo.
+  Tramos cortos, uno por lección, que se guardan como **sesiones normales de esa
+  lección**; es el catálogo de siempre quien la abre. Se ofrece desde el selector,
+  nunca por edad, y no enseña cifras.
+
 ### Lecciones personalizadas
 
 `lecciones/personalizadas.ts` (modelo, validación y formato) y
 `components/LeccionesPropias.svelte` (el panel). Son datos del alumno, así que van
-en `almacen.ts`, con migración v3 en SQLite y respaldo en localStorage, y **no**
-pasan por el catálogo. Eso no es un descuido: objetivos, repaso y dificultad solo
+en `almacen.ts`, **por perfil** como el progreso (migración v3, y v4 para el perfil),
+con respaldo en localStorage, y **no** pasan por el catálogo. Eso no es un descuido: objetivos, repaso y dificultad solo
 saben preguntar al catálogo, y por eso no pueden colarse ahí.
 
 Decisiones que no hay que deshacer sin rehacer el razonamiento:
@@ -374,7 +409,8 @@ Decisiones que no hay que deshacer sin rehacer el razonamiento:
 **Ficheros:** `src/lib/ficheros.ts`. En Tauri, `<a download>` no es fiable porque
 WebKitGTK y WKWebView no tienen gestor de descargas propio, así que el comando
 `guardar_en_descargas` de `lib.rs` escribe en Descargas sin pisar nada y devuelve la
-ruta para enseñarla. Solo admite un nombre plano `.json`. Se descartó
+ruta para enseñarla. Solo admite un nombre plano `.json` o `.html` (el informe del
+docente). Se descartó
 `tauri-plugin-dialog` + `tauri-plugin-fs`: dos dependencias por lado y permisos más
 amplios para poder elegir carpeta. Importar usa `<input type="file">`. La copia de
 seguridad de Progreso va por la misma vía.
@@ -435,6 +471,22 @@ Reglas que están ahí por algo:
   porque este público no va a ir a mirar si hay versión nueva, pero la promesa
   de no hablar con ningún servidor es parte de lo que se ofrece: si se añade
   cualquier otra petición, hay que decirlo en el README y en Ajustes.
+
+### Instalaciones gestionadas
+
+`src/lib/politica.ts` y el comando `politica_del_sistema` de `lib.rs`. Quien
+administra los equipos deja un JSON en una ruta del sistema que el usuario normal no
+puede tocar (`/etc/libretype/politica.json` y sus equivalentes); la ruta es fija a
+propósito, sin variable de entorno que cualquiera pudiera cambiar. Rust solo lee el
+fichero; interpretarlo se hace en TypeScript para poder probarlo sin compilar.
+
+- `actualizaciones: false` apaga el actualizador entero: `detectarEntorno()` devuelve
+  `gestionado` con gestor `politica`.
+- `perfilPorDefecto` abre con ese perfil, y lo crea si no existe.
+- **Un fichero ilegible apaga las actualizaciones.** De las dos formas de
+  equivocarse, no hablar con ningún servidor es la que no sorprende a nadie.
+
+La guía para quien instala está en `docs/instalacion-gestionada.md`.
 
 ### El repositorio apt
 
@@ -509,8 +561,46 @@ localStorage no tiene migraciones: en TypeScript se arreglan los dos backends
 con el mismo código, y sin tocar lo que ya está escrito en disco.
 
 Las lecciones personalizadas son datos del alumno y viven aquí también, en
-`lecciones_propias` (migración v3). `lecciones-almacen.test.ts` ejecuta las
-migraciones reales de `lib.rs` contra un SQLite de verdad (`node:sqlite`).
+`lecciones_propias` (migración v3). Los tests del almacén ejecutan las migraciones
+reales de `lib.rs` contra un SQLite de verdad (`node:sqlite`, en
+`storage/sqlite-de-prueba.ts`), también sobre datos de una instalación anterior.
+
+**Perfiles** (migración v4). Un equipo de aula lo comparten varios alumnos: sesiones,
+teclas y lecciones propias van por perfil; las preferencias no, que son del equipo.
+El almacén trabaja sobre un perfil activo (`usarPerfil`). Reglas:
+
+- Un perfil es **un alias, sin contraseña ni edad**. No son privados entre sí y la
+  interfaz lo dice tal cual.
+- Todo lo que había antes de los perfiles es del primero, «Principal», que **no se
+  puede borrar**. En localStorage usa las claves de siempre, así no hay nada que mover.
+- Con más de un perfil se pregunta «¿Quién practica?» al abrir. **La barra no muestra
+  el perfil activo**; lo dice el título del panel de progreso.
+- La copia de seguridad es **del perfil activo** y lleva su alias. Al importarla entra
+  en el perfil que esté activo, se llame como se llame.
+- `prefs.ultimaLeccion` es del último perfil que practicó en el equipo: a otro no se
+  le abre.
+
+**Importar tiene dos modos.** «Sustituir» es restaurar una copia. «Combinar» junta la
+de otro equipo con lo que hay, y es idempotente: las sesiones se reconocen por todos
+sus campos y **de cada tecla se queda el estado con más intentos, sin sumar**. Sumar
+duplicaría el dominio al importar dos veces lo mismo; quedarse corto es el lado
+seguro, porque una letra visible de más no perjudica a nadie.
+
+**El respaldo se traspasa.** En el escritorio localStorage solo es respaldo, así que
+si SQLite vuelve a abrir y ahí hay algo, es práctica hecha durante un fallo:
+`traspasarRespaldo()` la combina en SQLite, perfil a perfil, y solo entonces vacía el
+respaldo. Con SQLite caído no se pregunta por el perfil ni se gestionan: se sigue con
+el último usado.
+
+**Antes de una migración nueva se copia la base de datos** a
+`libretype-antes-de-esquema-N.db` (`copiar_antes_de_migrar` en `lib.rs`). Las
+migraciones las aplica el plugin al cargar la base de datos desde la interfaz, que es
+después de `setup`; una copia que ya existe no se pisa.
+
+**El informe del docente** (`storage/informe.ts`) junta varias copias sin servidor.
+La tabla va por orden alfabético, no se puede ordenar y no lleva velocidad: no hay
+clasificaciones. Las lecciones propias cuentan como práctica, pero ni superan nada ni
+entran en las medias.
 
 Restaurar una copia en SQLite **no usa `BEGIN`**: `tauri-plugin-sql` reparte cada
 llamada por un pool y nada asegura que el `COMMIT` llegue a la misma conexión. Cada
@@ -541,6 +631,15 @@ Reglas que aplican a cualquier UI nueva:
   escribe: lo que falta se dice al salir del campo; lo que no se arregla escribiendo
   más (una letra imposible, pasarse del límite), al momento.
 
+- `--border` es para separadores y tarjetas que no se pulsan; el contorno de
+  cualquier control o tecla va con `--border-strong`, que es el que llega a 3:1.
+- El alto contraste propio (`data-contrast="alto"`, o `prefers-contrast: more` con la
+  preferencia en «Sistema») va al final de `tokens.css` para ganarle al tono de juego.
+  Sus paletas se miden en `accesibilidad.test.ts` leyéndolas del propio fichero.
+- OpenDyslexic va incluida (`src/assets/fonts/`, OFL). El teclado en pantalla se
+  queda en la monoespaciada (`--font-key`): su geometría está medida con ella.
+- vitest sustituye el CSS por una cadena vacía: un error de sintaxis en `tokens.css`
+  solo lo ve `pnpm build`.
 - Ningún estado se comunica solo por color. El error lleva fondo, subrayado
   doble y color; la tecla objetivo lleva triángulo además del contorno.
 - Todo tamaño de texto se deriva de `--ui-scale` (100–200%).
@@ -567,6 +666,11 @@ Existen porque **el orden de eventos no se puede reproducir tecleando en una
 sola máquina**: un cambio que funcione en tu Mac puede romper Linux sin que nada
 avise. Los dos bugs que ha tenido el motor están fijados como tests con nombre.
 
+`App.roadmap.test.ts`, `App.perfiles.test.ts` y `App.respaldo.test.ts` comprueban,
+con la aplicación montada, que cada pieza de las fases 0 a 3 del `ROADMAP.md` está
+conectada. Tecleando en una lección ya practicada hay que escribir el texto que se
+enseña, no `leccion.text`: a partir del segundo intento es uno nuevo.
+
 `progreso.test.ts` cubre la agregación y los dos almacenes; el caso que más
 importa es que un intento rápido y lleno de fallos no fije récord.
 
@@ -580,6 +684,11 @@ pista.
 Los dos bugs encontrados hasta ahora **compilaban limpios y pasaban
 `svelte-check` sin errores**. Eran de orden y de estado de composición, y solo
 aparecieron ejecutando la app.
+
+`Esc` para pausar y el filtro de rebote se escuchan en el propio `<textarea>` y no
+tocan una composición a medias (`isComposing`, `keyCode` 229, o una entrada de
+composición): ahí la tecla es del método de entrada. Hay tests con las trazas reales,
+pero es justo lo que hay que probar a mano.
 
 Los tests ya cubren esos dos casos, pero no sustituyen a ejecutar: cubren el
 motor con trazas grabadas, no el método de entrada real del sistema. Si cambias

@@ -1041,6 +1041,7 @@
       stats={result.stats}
       record={result.record}
       celebra={result.record && prefs.tono === 'juego'}
+      franja={prefs.tono === 'juego'}
       {voz}
       {avance}
       nota={notaResultado}

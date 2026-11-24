@@ -7,6 +7,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushSync, mount, tick, unmount } from 'svelte';
 import App from './App.svelte';
+import ResultadoLeccion from './lib/components/ResultadoLeccion.svelte';
+import type { Stats } from './lib/keyboard/engine';
+import { VOCES } from './lib/voz';
 import appSvelte from './App.svelte?raw';
 import leccionCeroSvelte from './lib/components/LeccionCero.svelte?raw';
 import progresoSvelte from './lib/components/Progreso.svelte?raw';
@@ -186,6 +189,48 @@ describe('después de terminar', () => {
     // Con todo fallado se ofrece además practicar las teclas que costaron, detrás.
     expect(botones()).toEqual(['Repetir', 'Tus lecciones', 'Practicar estas teclas']);
     expect(document.querySelector('#dialogo-resultado .primario')?.textContent?.trim()).toBe('Repetir');
+  });
+});
+
+describe('el diálogo de resultado (dirección visual 1a)', () => {
+  it('el tono tranquilo no lleva franja, y el récord va en su chip con la palabra', async () => {
+    const dialogo = mount(ResultadoLeccion, {
+      target: document.body,
+      props: {
+        stats: { wpm: 20, accuracy: 100, correct: 10, typed: 10, elapsedMs: 6000 } satisfies Stats,
+        record: true, celebra: false, voz: VOCES.sobrio, avance: null, onRepetir: () => {},
+      },
+    });
+    flushSync();
+    expect(document.querySelector('#dialogo-resultado .franja')).toBeNull();
+    const chip = document.querySelector('#dialogo-resultado .chip-record');
+    expect(chip?.textContent).toContain('★');
+    expect(chip?.textContent).toContain('Récord');
+    expect(document.getElementById('resultado-titulo')?.textContent).toBe(VOCES.sobrio.record);
+    await unmount(dialogo);
+  });
+
+  it('con el tono de celebración lleva la franja de los dedos, que es decorativa', async () => {
+    await abrir({ ultimaLeccion: 'propia:mia', tono: 'juego' });
+    await teclear(TEXTO);
+    expect(document.querySelector('#dialogo-resultado .franja')?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('la tarjeta de precisión solo se pinta de acierto cuando lo es', async () => {
+    await abrir({ ultimaLeccion: 'propia:mia' });
+    await teclear(TEXTO);
+    expect(document.querySelectorAll('#resultado-desc .cifra')).toHaveLength(2);
+    expect(document.querySelector('#resultado-desc .cifra-ok')?.textContent).toContain('100%');
+    // Leído de corrido sigue siendo una frase, no dos cifras sueltas.
+    expect(document.querySelector('#resultado-desc')?.textContent?.replace(/\s+/g, ' '))
+      .toMatch(/\d+ palabras por minuto, 100% de precisión\./);
+    boton('Repetir').click();
+    await tick();
+    await teclear('x'.repeat(TEXTO.length));
+    expect(document.querySelector('#resultado-desc .cifra-ok')).toBeNull();
+    expect(document.querySelector('#resultado-desc')?.textContent).toContain('de precisión');
+    // Sin récord no hay chip.
+    expect(document.querySelector('#dialogo-resultado .chip-record')).toBeNull();
   });
 });
 

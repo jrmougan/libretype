@@ -46,7 +46,7 @@ function aliasLimpio(alias: string): string {
 }
 
 /** «Ana» y «ana » son la misma persona para quien busca su nombre en la lista. */
-const mismoAlias = (a: string, b: string): boolean =>
+export const mismoAlias = (a: string, b: string): boolean =>
   a.localeCompare(b, "es", { sensitivity: "base" }) === 0;
 
 /** El perfil que se llama así, con la misma tolerancia que al crearlo. */

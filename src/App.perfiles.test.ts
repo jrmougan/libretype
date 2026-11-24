@@ -273,3 +273,15 @@ describe('desde el panel de progreso', () => {
     clic.mockRestore();
   });
 });
+
+describe('informe para el docente', () => {
+  it('está en el panel de progreso y habla del perfil que practica', async () => {
+    preparar({ perfiles: [PRINCIPAL, ANA], ana: [sesion(LECCIONES[0].id)], prefs: { perfil: 2 } });
+    politica.actual = { actualizaciones: true, perfilPorDefecto: 'Ana' };
+    await abrir();
+    const panel = await abrirProgreso();
+    boton('Informe de Ana para imprimir', panel).click();
+    await vi.waitFor(() => expect(panel.querySelector('.informe h2')?.textContent).toBe('Informe de práctica de Ana'));
+    expect(panel.querySelector('.informe')?.textContent).toMatch(/1 de \d+ lecciones superadas/);
+  });
+});

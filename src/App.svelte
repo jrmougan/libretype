@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import Drill from './lib/components/Drill.svelte';
   import EditorTextoPropio from './lib/components/EditorTextoPropio.svelte';
+  import Informe from './lib/components/Informe.svelte';
   import LeccionCero from './lib/components/LeccionCero.svelte';
   import LeccionesPropias from './lib/components/LeccionesPropias.svelte';
   import PanelAjustes from './lib/components/PanelAjustes.svelte';
@@ -1124,6 +1125,7 @@
               onBorrar={borrarPerfil}
             />
           {/if}
+          <Informe alias={aliasActivo || 'este equipo'} {sesiones} {teclas} />
         {/if}
       </div>
     </dialog>

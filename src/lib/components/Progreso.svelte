@@ -11,6 +11,7 @@
   import { catalogo } from "../lecciones/catalogo";
   import { ES_ISO, type Layout } from "../keyboard/layouts";
   import { comparacionPropia, fraseResumen, serieGrafica, teclasSinMirar } from "../storage/comparacion";
+  import { aliasParaFichero } from "../storage/informe";
   import GraficaEvolucion from "./GraficaEvolucion.svelte";
   import { guardarFichero } from "../ficheros";
   import { esIdPropio, ID_FLUIDEZ, ID_PRACTICA_CONTINUA, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_TEXTO_PROPIO } from "../lecciones/ids";
@@ -67,14 +68,8 @@
     alias = '',
   }: Props = $props();
 
-  /**
-   * El alias, como trozo de nombre de fichero: `guardar_en_descargas` solo admite
-   * letras sin tilde, cifras y guiones. Vacío si no queda nada aprovechable.
-   */
-  const aliasEnFichero = $derived(
-    alias.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30).replace(/-+$/, ''),
-  );
+  /** `guardar_en_descargas` solo admite letras sin tilde, cifras y guiones. */
+  const aliasEnFichero = $derived(aliasParaFichero(alias));
 
   const esDegradado = $derived(errorAlmacen || Boolean(almacen?.errorAlmacen));
   const porLeccion = $derived(resumirLecciones(sesiones));

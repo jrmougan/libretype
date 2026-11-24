@@ -7,7 +7,8 @@ un centro de mayores. Lo que se cuenta aquí:
 - cómo apagar las actualizaciones automáticas;
 - cómo fijar el perfil con el que se abre;
 - cómo instalar en Windows sin red;
-- cómo funcionan los perfiles y dónde están los datos.
+- cómo funcionan los perfiles y dónde están los datos;
+- cómo sacar el informe para el docente.
 
 LibreType no tiene cuentas ni servidor. Ningún dato del alumno sale del
 equipo. La única petición de red es la comprobación de actualizaciones, y en
@@ -156,8 +157,31 @@ seguridad) se guardan en su carpeta de Descargas, como un fichero `.json`. Para
 juntar en un equipo lo practicado en otro, se importa esa copia eligiendo
 **Combinar con lo que hay**: no se pierde nada ni se repite lo que ya estaba.
 
+## Informe para el docente
+
+Sin servidor: cada alumno exporta su copia de seguridad (Progreso → Exportar
+copia de seguridad) a una carpeta compartida o a un USB. El docente abre
+LibreType en cualquier equipo y, en Progreso → Para el docente, elige
+**Abrir copias de varios alumnos**. Las copias solo se leen: no se importan ni
+cambian nada del equipo del docente.
+
+- La tabla va por orden alfabético y enseña lecciones superadas, teclas que
+  ya escribe sin mirar, días de práctica, tiempo y la última vez que practicó.
+  No lleva velocidad ni se puede ordenar: no es una clasificación.
+- Si un alumno practicó en dos equipos, sus dos copias se juntan en una fila
+  sin duplicar sesiones. Se reconoce por el alias del perfil; las copias
+  anteriores a los perfiles usan el nombre del fichero.
+- Las lecciones que escribe el propio alumno cuentan como práctica (días y
+  tiempo), pero no como lecciones superadas ni en las medias de precisión.
+- Desde cada fila se abre el informe individual, que se puede imprimir o
+  guardar como página HTML en la carpeta de Descargas. La página se abre en
+  cualquier navegador y se imprime desde allí, útil si «Imprimir» no responde
+  (en macOS el motor web no siempre abre el diálogo de impresión).
+
 ## Lo que queda por probar
 
 - En macOS, la política se lee pero no se ha probado con un MDM real.
 - En Windows, falta probar el instalador sin red en una máquina sin WebView2
   (Windows 10 LTSC, por ejemplo).
+- «Imprimir» el informe no se ha probado en los tres motores; «Guardar como
+  página» es el camino que no depende de ellos.

@@ -172,25 +172,35 @@ fn copiar_antes_de_migrar(dir: &Path, version: i64) -> io::Result<Option<PathBuf
 /// sigue siendo unos pocos megas; más que esto no sale de esta aplicación.
 const MAX_BYTES_FICHERO: usize = 64 * 1024 * 1024;
 
+/// Lo único que sabe escribir este comando: copias y lecciones en JSON, y el
+/// informe del docente como página HTML para abrirla en un navegador.
+const EXTENSIONES: [&str; 2] = [".json", ".html"];
+
+/// La extensión admitida con la que acaba el nombre, si acaba en alguna.
+fn extension_de(nombre: &str) -> Option<&'static str> {
+    EXTENSIONES.into_iter().find(|e| nombre.ends_with(e))
+}
+
 /// El nombre lo pone la interfaz, pero por aquí no puede pasar una ruta: solo un
-/// nombre plano `.json`. Con esto el comando no sabe escribir fuera de la carpeta
-/// que se le da, ni crear otra cosa que un JSON.
+/// nombre plano `.json` o `.html`. Con esto el comando no sabe escribir fuera de
+/// la carpeta que se le da, ni crear otra cosa que esos dos tipos de fichero.
 fn nombre_valido(nombre: &str) -> bool {
     let plano = nombre
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
-    plano && nombre.len() <= 128 && !nombre.starts_with('.') && nombre.ends_with(".json")
+    plano && nombre.len() <= 128 && !nombre.starts_with('.') && extension_de(nombre).is_some()
 }
 
 /// Crea el fichero sin pisar ninguno: si ya existe, prueba con `-1`, `-2`...
 /// `create_new` lo hace atómico, sin el hueco entre comprobar y escribir.
 fn escribir_sin_pisar(carpeta: &Path, nombre: &str, contenido: &str) -> io::Result<PathBuf> {
-    let base = nombre.trim_end_matches(".json");
+    let extension = extension_de(nombre).unwrap_or("");
+    let base = nombre.strip_suffix(extension).unwrap_or(nombre);
     for intento in 0..1000 {
         let candidato = if intento == 0 {
             carpeta.join(nombre)
         } else {
-            carpeta.join(format!("{base}-{intento}.json"))
+            carpeta.join(format!("{base}-{intento}{extension}"))
         };
         match OpenOptions::new()
             .write(true)
@@ -211,7 +221,8 @@ fn escribir_sin_pisar(carpeta: &Path, nombre: &str, contenido: &str) -> io::Resu
     ))
 }
 
-/// Guarda un JSON en la carpeta de descargas y devuelve la ruta para enseñarla.
+/// Guarda un fichero de texto (JSON o HTML) en la carpeta de descargas y devuelve
+/// la ruta para enseñarla.
 ///
 /// Existe porque `<a download>` no es fiable dentro de un WebView: WebKitGTK y
 /// WKWebView no tienen gestor de descargas propio. La alternativa eran dos
@@ -488,8 +499,9 @@ mod tests {
     }
 
     #[test]
-    fn nombre_valido_solo_admite_un_json_plano() {
+    fn nombre_valido_solo_admite_un_json_o_un_html_plano() {
         assert!(nombre_valido("libretype-lecciones-2026-11-04.json"));
+        assert!(nombre_valido("informe-ana-2026-11-04.html"));
         for malo in [
             "../fuera.json",
             "a/b.json",
@@ -498,6 +510,9 @@ mod tests {
             ".oculto.json",
             "script.sh",
             "lecciones.json.exe",
+            "informe.htm",
+            "informe.html.sh",
+            "pagina.HTML",
             "",
             "ñu.json",
         ] {
@@ -517,6 +532,13 @@ mod tests {
         assert_ne!(primero, segundo);
         assert!(segundo.ends_with("copia-1.json"));
         assert_eq!(std::fs::read_to_string(&primero).unwrap(), "uno");
+        assert_eq!(std::fs::read_to_string(&segundo).unwrap(), "dos");
+
+        // Con cada extensión por su lado: un informe no pisa ni se numera con las copias.
+        let pagina = escribir_sin_pisar(&carpeta, "copia.html", "tres").unwrap();
+        let otra = escribir_sin_pisar(&carpeta, "copia.html", "cuatro").unwrap();
+        assert!(pagina.ends_with("copia.html"));
+        assert!(otra.ends_with("copia-1.html"));
         assert_eq!(std::fs::read_to_string(&segundo).unwrap(), "dos");
 
         std::fs::remove_dir_all(&carpeta).unwrap();

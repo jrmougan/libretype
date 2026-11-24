@@ -20,7 +20,8 @@
   import { cuentaParaDominio, esIdPropio } from './lib/lecciones/ids';
   import { LIMITES, type Borrador, type LeccionPropia } from './lib/lecciones/personalizadas';
   import { caracteresEscribibles, normalizarTextoLibre } from './lib/lecciones/texto';
-  import type { EjercicioRefuerzo } from './lib/refuerzo';
+  import { generarRefuerzoDeTeclas, type EjercicioRefuerzo } from './lib/refuerzo';
+  import { anotarFallo, enumerar, teclasConMasFallos, type TeclaConFallos } from './lib/fallos';
   import type { Stats } from './lib/keyboard/engine';
   import {
     contarDominadas, mapaDeDominio, registrar, type EstadoTecla,
@@ -71,7 +72,9 @@
   let errorGuardado = $state(false);
   let pausado = $state(false);
   let drill = $state<ReturnType<typeof Drill> | null>(null);
-  let result = $state<{ stats: Stats; record: boolean } | null>(null);
+  let result = $state<{ stats: Stats; record: boolean; costaron: TeclaConFallos[] } | null>(null);
+  /** Fallos por tecla del intento en curso; aparte del dominio, que es una media de semanas. */
+  let fallosIntento = new Map<string, number>();
   let dialogoPanel = $state<HTMLDialogElement | null>(null);
   let panelLecciones = $state<ReturnType<typeof LeccionesPropias> | null>(null);
   const STATS_CERO: Stats = { wpm: 0, accuracy: 100, correct: 0, typed: 0, elapsedMs: 0 };
@@ -181,6 +184,14 @@
       : null,
   );
 
+  /** Las teclas del intento, dichas como en una frase, y un ejercicio hecho con ellas. */
+  const costaronResultado = $derived(result ? enumerar(result.costaron.map((t) => t.nombre)) : '');
+  const refuerzoResultado = $derived.by<Accion | null>(() => {
+    if (!result || result.costaron.length === 0) return null;
+    const ej = generarRefuerzoDeTeclas(result.costaron, superadas, layout, catalogo.cursoDe(leccionId)?.id);
+    return ej ? { texto: voz.refuerzo, onclick: () => void practicarRefuerzo(ej) } : null;
+  });
+
   onMount(async () => {
     try {
       const datos = await cargarDatos(await abrirAlmacen());
@@ -247,6 +258,7 @@
       if (acierto) sonido.acierto(prefs.volumen);
       else sonido.fallo(prefs.volumen);
     }
+    fallosIntento = anotarFallo(fallosIntento, code, acierto);
     if (!cuentaParaDominio(ejercicio.idSesion)) return;
     // Se muta un mapa nuevo para que Svelte lo vea cambiar.
     const m = new Map(teclas);
@@ -270,7 +282,8 @@
     const record = esRecord(porLeccion.get(idLeccion), sesion);
     errorGuardado = false;
     sesiones = [...sesiones, sesion];
-    result = { stats, record };
+    result = { stats, record, costaron: teclasConMasFallos(fallosIntento, 3, layout) };
+    fallosIntento = new Map();
     if (prefs.sonido) sonido.fin(prefs.volumen);
     // Este intento ya no se descarta aunque falle el guardado: al siguiente se reintenta.
     teclasBase = new Map(teclas);
@@ -386,6 +399,7 @@
     result = null;
     pausado = false;
     ultimasStats = STATS_CERO;
+    fallosIntento = new Map();
   }
 
   /**
@@ -525,6 +539,7 @@
     if (result && enTemario) prepararTextoIntento();
     result = null;
     pausado = false;
+    fallosIntento = new Map();
     drill?.restart();
     await tick();
     drill?.enfocar();
@@ -535,6 +550,7 @@
     teclas = new Map(teclasBase);
     pausado = false;
     ultimasStats = STATS_CERO;
+    fallosIntento = new Map();
     drill?.restart();
     await tick();
     drill?.enfocar();
@@ -816,6 +832,8 @@
       nota={notaResultado}
       {errorGuardado}
       repaso={repasoResultado}
+      costaron={costaronResultado}
+      refuerzoTeclas={refuerzoResultado}
       onRepetir={again}
     />
   {/if}

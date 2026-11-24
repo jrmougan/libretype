@@ -200,3 +200,49 @@ describe('texto nuevo a partir del segundo intento', () => {
     expect(textoMostrado().length).toBeGreaterThan(catalogo.primera.text.length * 1.5);
   });
 });
+
+describe('las teclas que más costaron en el intento', () => {
+  const dialogo = (): string => document.querySelector('#dialogo-resultado')?.textContent ?? '';
+
+  /** Teclea el texto, pero poniendo una x donde tocaba cada una de esas letras. */
+  async function teclearFallando(letras: string): Promise<void> {
+    await teclear([...textoMostrado()].map((ch) => (letras.includes(ch) ? 'x' : ch)).join(''));
+  }
+
+  it('un intento limpio no dice nada de teclas', async () => {
+    await abrir();
+    await teclear(textoMostrado());
+    expect(dialogo()).not.toContain('costaron');
+    expect(boton('Practicar estas teclas')).toBeUndefined();
+  });
+
+  it('nombra las teclas falladas, sin reprender, y ofrece practicarlas', async () => {
+    await abrir();
+    await teclearFallando('lf');
+    expect(dialogo()).toContain('Las teclas que más costaron esta vez:');
+    expect(dialogo()).toMatch(/la L y la F|la F y la L/);
+    expect(dialogo()).toContain('Es normal; se asientan practicando.');
+
+    boton('Practicar estas teclas').click();
+    await tick();
+    await tick();
+    expect(document.querySelector('#dialogo-resultado')).toBeNull();
+    expect(document.querySelector('.drill h2')?.textContent).toMatch(/^Refuerzo de teclas \((L, F|F, L)\)$/);
+    // Solo con lo ya enseñado: está en la primera lección.
+    const alfabeto = catalogo.alfabetoHasta(catalogo.primera.id);
+    expect([...textoMostrado()].filter((ch) => ch !== ' ' && !alfabeto.has(ch))).toEqual([]);
+    expect(textoMostrado()).toMatch(/l/);
+    expect(textoMostrado()).toMatch(/f/);
+    expect(document.activeElement).toBe(campo());
+  });
+
+  it('lo fallado en un intento no se arrastra al siguiente', async () => {
+    await abrir();
+    await teclearFallando('lf');
+    boton('Repetir').click();
+    await tick();
+    await tick();
+    await teclear(textoMostrado());
+    expect(dialogo()).not.toContain('costaron');
+  });
+});

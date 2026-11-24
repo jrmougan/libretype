@@ -3,6 +3,7 @@ import { VOCES, vozDe, type Voz } from './voz';
 
 const CLAVES: (keyof Voz)[] = [
   'terminada', 'record', 'animoAlto', 'animoMedio', 'animoBajo', 'repetir', 'siguiente', 'progreso', 'repaso',
+  'costaron', 'costaronAnimo', 'refuerzo',
 ];
 
 describe('voces', () => {
@@ -37,6 +38,14 @@ describe('voces', () => {
       const texto = VOCES[tono].animoBajo.toLowerCase();
       for (const palabra of ['mal', 'error', 'fallo', 'incorrecto', 'peor']) {
         expect(texto, `${tono} usa "${palabra}"`).not.toContain(palabra);
+      }
+      // También lo que se dice de las teclas que costaron: el sujeto son ellas.
+      // Por palabras enteras: «normal» no es «mal».
+      for (const clave of ['costaron', 'costaronAnimo', 'refuerzo'] as const) {
+        const palabras = VOCES[tono][clave].toLowerCase().split(/[^\p{L}]+/u);
+        for (const palabra of ['mal', 'error', 'errores', 'fallo', 'fallos', 'fallas', 'incorrecto', 'peor']) {
+          expect(palabras, `${tono}.${clave} usa "${palabra}"`).not.toContain(palabra);
+        }
       }
     }
   });

@@ -27,11 +27,15 @@
     errorGuardado?: boolean;
     /** Si hay teclas que piden repaso, cómo ir a practicarlas. */
     repaso?: Accion | null;
+    /** Las teclas que más costaron en este intento, ya enumeradas («la P y la tilde»). */
+    costaron?: string;
+    /** Cómo practicar justo esas teclas, si se puede con lo que ya ha visto. */
+    refuerzoTeclas?: Accion | null;
   }
 
   let {
     stats, record, celebra, voz, avance, onRepetir,
-    nota = null, errorGuardado = false, repaso = null,
+    nota = null, errorGuardado = false, repaso = null, costaron = '', refuerzoTeclas = null,
   }: Props = $props();
 
   /** Por debajo del objetivo lo natural es repetir; por encima, seguir. */
@@ -83,6 +87,14 @@
         <button onclick={onRepetir}>{voz.repetir}</button>
       {/if}
     </div>
+    <!-- «86 %» no dice qué hacer después; «las que más costaron: la P» sí. El
+         sujeto son las teclas, nunca la persona. -->
+    {#if costaron}
+      <div class="repaso costaron">
+        <p class="note">{voz.costaron} {costaron}. {voz.costaronAnimo}</p>
+        {#if refuerzoTeclas}<button onclick={refuerzoTeclas.onclick}>{refuerzoTeclas.texto}</button>{/if}
+      </div>
+    {/if}
     {#if repaso}
       <div class="repaso">
         <p class="note">{voz.repaso} Puedes practicar a tu ritmo con vocabulario conocido.</p>

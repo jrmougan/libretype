@@ -29,6 +29,15 @@ export interface Voz {
    * reprender, y eso está prohibido en los dos tonos.
    */
   repaso: string;
+  /**
+   * Encabeza las teclas que más costaron en el intento («…: la P y la tilde»).
+   * El sujeto son las teclas, no la persona, por la misma razón que en `repaso`.
+   */
+  costaron: string;
+  /** Cierra esa lista sin reprender: lo que costó se asienta practicando. */
+  costaronAnimo: string;
+  /** El botón que lleva a practicar esas teclas desde el diálogo de resultado. */
+  refuerzo: string;
 }
 
 const JUEGO: Voz = {
@@ -42,6 +51,9 @@ const JUEGO: Voz = {
   siguiente: '¡Siguiente!',
   progreso: 'Lo que llevas conseguido',
   repaso: '¡Hora de repasar! Algunas teclas piden otra vuelta.',
+  costaron: 'Las que más se han resistido:',
+  costaronAnimo: '¡Con un poco de práctica saldrán solas!',
+  refuerzo: '¡A por esas teclas!',
 };
 
 const SOBRIO: Voz = {
@@ -54,6 +66,9 @@ const SOBRIO: Voz = {
   siguiente: 'Siguiente lección',
   progreso: 'Tu progreso',
   repaso: 'Algunas teclas que ya conoces llevan tiempo sin salir.',
+  costaron: 'Las teclas que más costaron esta vez:',
+  costaronAnimo: 'Es normal; se asientan practicando.',
+  refuerzo: 'Practicar estas teclas',
 };
 
 export const VOCES: Record<Tono, Voz> = { juego: JUEGO, sobrio: SOBRIO };

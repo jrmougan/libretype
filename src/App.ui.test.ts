@@ -178,7 +178,8 @@ describe('después de terminar', () => {
   it('por debajo del objetivo lo primero es repetir, sin regañar', async () => {
     await abrir({ ultimaLeccion: 'propia:mia' });
     await teclear('x'.repeat(TEXTO.length));
-    expect(botones()).toEqual(['Repetir', 'Tus lecciones']);
+    // Con todo fallado se ofrece además practicar las teclas que costaron, detrás.
+    expect(botones()).toEqual(['Repetir', 'Tus lecciones', 'Practicar estas teclas']);
     expect(document.querySelector('#dialogo-resultado .primario')?.textContent?.trim()).toBe('Repetir');
   });
 });

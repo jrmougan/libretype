@@ -30,6 +30,7 @@
   }: Props = $props();
 
   const lista = $derived(activas(propias));
+  const hayBloqueadas = $derived(catalogo.lecciones.some((l) => !catalogo.estaDesbloqueada(l.id, superadas)));
   const marca = (id: string) => {
     const m = porLeccion.get(id);
     return m && m.mejorPpm > 0 ? ` · ${m.mejorPpm} ppm` : '';
@@ -48,6 +49,10 @@
     {onElegir}
   >
     <option value="cero">Antes de empezar · dónde van las manos</option>
+    <!-- Para quien ya escribe algo. Solo mientras quede algo por abrir. -->
+    {#if hayBloqueadas || valor === 'colocacion'}
+      <option value="colocacion">Prueba de colocación · si ya escribes algo</option>
+    {/if}
     {#if tituloRefuerzo}
       <option value="refuerzo">{tituloRefuerzo}</option>
     {/if}

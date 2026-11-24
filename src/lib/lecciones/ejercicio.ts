@@ -7,6 +7,7 @@ import type { Layout } from '../keyboard/layouts';
 import type { EjercicioRefuerzo } from '../refuerzo';
 import { objetivoLeccion } from '../storage/objetivos';
 import { catalogo as catalogoApp, type Catalogo } from './catalogo';
+import { tramoDe } from './colocacion';
 import { explicacionFluidez } from './fluidez';
 import { esIdPropio, ID_FLUIDEZ, ID_PRACTICA_CONTINUA, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_TEXTO_PROPIO } from './ids';
 import { activas, problemasDeTexto, type LeccionPropia } from './personalizadas';
@@ -36,6 +37,8 @@ export type Seleccion =
   | { tipo: 'continua'; hasta: string; texto: string; intento: number }
   /** Una tanda de fluidez. `referencia` es el ritmo de las tandas anteriores, o null. */
   | { tipo: 'fluidez'; texto: string; intento: number; referencia: number | null }
+  /** Un tramo de la prueba de colocación: palabras de esa lección. `tramo` empieza en 1. */
+  | { tipo: 'colocacion'; id: string; tramo: number }
   | { tipo: 'libre'; texto: string; intento: number };
 
 /** En español el separador decimal es la coma, no el punto. */
@@ -82,6 +85,19 @@ export function ejercicioDe(
         cobertura: '',
         idioma: '',
       };
+    case 'colocacion': {
+      const leccion = catalogo.leccion(s.id) ?? catalogo.primera;
+      return {
+        clave: `colocacion:${leccion.id}`,
+        // Una sesión normal de esa lección: es lo que la abre, sin mecanismo aparte.
+        idSesion: leccion.id,
+        titulo: `Prueba de colocación · ${leccion.title}`,
+        texto: tramoDe(leccion),
+        explicacion: `Tramo ${s.tramo}: palabras de la lección «${leccion.title}». Sin prisa: aquí no cuenta la velocidad.`,
+        cobertura: '',
+        idioma: '',
+      };
+    }
     case 'libre':
       return {
         clave: `libre:${s.intento}`,

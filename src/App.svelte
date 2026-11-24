@@ -6,6 +6,7 @@
   import LeccionesPropias from './lib/components/LeccionesPropias.svelte';
   import PanelAjustes from './lib/components/PanelAjustes.svelte';
   import Progreso from './lib/components/Progreso.svelte';
+  import PruebaColocacion from './lib/components/PruebaColocacion.svelte';
   import RecordatorioPausa from './lib/components/RecordatorioPausa.svelte';
   import ResultadoLeccion, { type Accion } from './lib/components/ResultadoLeccion.svelte';
   import SelectConfirmado from './lib/components/SelectConfirmado.svelte';
@@ -16,6 +17,7 @@
   import { obtenerLayout } from './lib/keyboard/layouts';
   import { catalogo } from './lib/lecciones/catalogo';
   import { ejercicioDe, resolverLeccion, type Seleccion } from './lib/lecciones/ejercicio';
+  import { inicioDeColocacion, trasTramo, type Colocacion } from './lib/lecciones/colocacion';
   import { generarTanda, ritmoReferencia, valorarTanda } from './lib/lecciones/fluidez';
   import { semillaNueva, textoDeIntento } from './lib/lecciones/generador';
   import { cuentaParaDominio, esIdPropio } from './lib/lecciones/ids';
@@ -89,7 +91,10 @@
   let tipoAlmacen = $state<'sqlite' | 'local'>('local');
   let errorAlmacen = $state(false);
   /** 'tono' solo aparece la primera vez; 'cero' es la colocación de manos; 'continua' y 'propio' son práctica libre. */
-  let vista = $state<'tono' | 'cero' | 'leccion' | 'continua' | 'propio' | 'fluidez'>('leccion');
+  let vista = $state<'tono' | 'cero' | 'leccion' | 'continua' | 'propio' | 'fluidez' | 'colocacion'>('leccion');
+
+  /** La prueba de colocación en curso; solo cuenta mientras `vista` es 'colocacion'. */
+  let colocacion = $state<Colocacion | null>(null);
 
   /** Tandas de fluidez: el texto, la clave para rehacer la práctica y el ritmo con el que se compara. */
   let textoFluidez = $state('');
@@ -148,6 +153,8 @@
   const seleccion = $derived<Seleccion>(
     vista === 'continua'
       ? { tipo: 'continua', hasta: nivelPractica, texto: textoContinua, intento: continuaKey }
+      : vista === 'colocacion' && colocacion
+        ? { tipo: 'colocacion', id: colocacion.actual, tramo: colocacion.abiertas + 1 }
       : vista === 'fluidez'
         ? { tipo: 'fluidez', texto: textoFluidez, intento: fluidezKey, referencia: ritmoFluidez }
       : vista === 'propio'
@@ -165,7 +172,8 @@
   });
   /** La captura está activa solo si hay algo que teclear y nada encima. */
   const practicando = $derived(
-    vista === 'leccion' || vista === 'continua' || vista === 'fluidez' || (vista === 'propio' && !enEdicionPropio),
+    vista === 'leccion' || vista === 'continua' || vista === 'fluidez'
+      || (vista === 'propio' && !enEdicionPropio) || (vista === 'colocacion' && colocacion?.fase === 'tramo'),
   );
   /** Con la letra grande cada fila cuesta el doble: barra y lección se aprietan. */
   const compacta = $derived(prefs.escala >= 1.4);
@@ -288,6 +296,26 @@
       ms: Math.round(stats.elapsedMs),
       terminadaEn: new Date().toISOString(),
     };
+
+    // Un tramo de la prueba de colocación no abre el diálogo de resultado: se
+    // guarda como una sesión normal y se pasa al siguiente, o la prueba se para.
+    if (vista === 'colocacion' && colocacion) {
+      sesiones = [...sesiones, sesion];
+      teclasBase = new Map(teclas);
+      fallosIntento = new Map();
+      ultimasStats = STATS_CERO;
+      colocacion = trasTramo(colocacion, sesion);
+      try {
+        await almacen?.guardar(sesion);
+        await almacen?.guardarTeclas(teclas);
+      } catch (err) {
+        console.warn('[libretype] no se pudo guardar el tramo:', err);
+      }
+      await tick();
+      if (colocacion?.fase === 'tramo') drill?.enfocar();
+      else document.querySelector<HTMLElement>('.prueba .primario')?.focus();
+      return;
+    }
 
     // Se calcula antes de guardar: después, la propia sesión ya sería la marca.
     const record = esRecord(porLeccion.get(idLeccion), sesion);
@@ -452,6 +480,7 @@
       refuerzo = null;
       vista = 'cero';
     } else if (valor === 'continua') void activarContinua();
+    else if (valor === 'colocacion') abrirColocacion();
     else if (valor === 'fluidez') void nuevaFluidez();
     else if (valor === 'propio') void activarPropio();
     else if (valor === 'gestionar') abrirLecciones();
@@ -484,6 +513,28 @@
     textoContinua = catalogo.textoPractica(nivelPractica, palabrasPorTexto(prefs.longitudTexto));
     continuaKey++;
     await arrancarDrill();
+  }
+
+  /** Enseña la tarjeta de la prueba de colocación; los tramos empiezan al pulsar su botón. */
+  function abrirColocacion(): void {
+    const inicio = inicioDeColocacion(superadas, catalogo.cursoDe(leccionId)?.id);
+    if (!progresoCargado || inicio === null) return;
+    soltarIntento();
+    refuerzo = null;
+    colocacion = { fase: 'antes', inicio, actual: inicio, abiertas: 0 };
+    vista = 'colocacion';
+  }
+
+  async function empezarColocacion(): Promise<void> {
+    if (!colocacion) return;
+    colocacion = { ...colocacion, fase: 'tramo' };
+    await tick();
+    drill?.enfocar();
+  }
+
+  /** Al salir de la prueba, a la lección más avanzada que haya quedado abierta. */
+  function seguirTrasColocacion(): void {
+    void elegirLeccion(catalogo.ultimaDisponible(superadas, catalogo.cursoDe(colocacion?.inicio ?? leccionId)?.id).id);
   }
 
   /** Empieza o repite una tanda de fluidez con lo que hay abierto en el curso que se sigue. */
@@ -718,7 +769,7 @@
 
       <!-- Quien se distrae o se agobia con los números puede quitarlos de la vista;
            el resultado se sigue enseñando al terminar. -->
-      {#if !prefs.ocultarMetricas}
+      {#if !prefs.ocultarMetricas && vista !== 'colocacion'}
         <dl class="metricas">
           <div title={QUE_ES_PPM}><dt>Velocidad</dt><dd>{ultimasStats.wpm}<small>ppm</small></dd></div>
           <div><dt>Precisión</dt><dd>{ultimasStats.accuracy}<small>%</small></dd></div>
@@ -792,6 +843,17 @@
         onTerminar={() => elegirLeccion(
           sesiones.length > 0 ? resolverLeccion(leccionId, superadas, propias, layout) : catalogo.primera.id,
         )}
+      />
+    {:else if vista === 'colocacion' && colocacion && colocacion.fase !== 'tramo'}
+      {@const destino = catalogo.ultimaDisponible(superadas, catalogo.cursoDe(colocacion.inicio)?.id)}
+      <PruebaColocacion
+        fase={colocacion.fase}
+        primera={catalogo.leccion(colocacion.inicio)?.title ?? ''}
+        seguirEn={destino.title}
+        abiertas={colocacion.abiertas}
+        completo={inicioDeColocacion(superadas, catalogo.cursoDe(colocacion.inicio)?.id) === null}
+        onEmpezar={empezarColocacion}
+        onSeguir={seguirTrasColocacion}
       />
     {:else if vista === 'propio' && enEdicionPropio}
       <EditorTextoPropio

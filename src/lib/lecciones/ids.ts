@@ -24,7 +24,7 @@ export const ID_FLUIDEZ = 'fluidez';
  */
 export const IDS_RESERVADOS: ReadonlySet<string> = new Set([
   ID_PRACTICA_CONTINUA, ID_TEXTO_PROPIO, ID_REFUERZO, ID_REFUERZO_SUELTO, ID_FLUIDEZ,
-  'cero', 'tono', 'leccion', 'continua', 'propio', 'gestionar',
+  'cero', 'tono', 'leccion', 'continua', 'propio', 'gestionar', 'colocacion',
 ]);
 
 /** Generan un texto nuevo en cada intento, bajo el mismo identificador. */

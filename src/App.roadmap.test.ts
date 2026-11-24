@@ -291,3 +291,88 @@ describe('fluidez', () => {
     expect(texto).not.toContain('Objetivo');
   });
 });
+
+describe('prueba de colocación', () => {
+  const OTRA = { ...SESION, leccion: 'practica-continua' };
+  const lecciones = catalogo.principal.lecciones;
+  const guardadas = (): { leccion: string; pctAcierto: number }[] => JSON.parse(localStorage.getItem('libretype.sesiones')!);
+
+  async function abrirPrueba(): Promise<void> {
+    await abrir({}, [OTRA]);
+    const selector = document.querySelector<HTMLSelectElement>('.barra select')!;
+    selector.value = 'colocacion';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    await tick();
+  }
+
+  it('se explica antes de empezar, sin cifras ni preguntar por la edad, y se puede no hacer', async () => {
+    await abrirPrueba();
+    const tarjeta = document.querySelector('.prueba')!;
+    expect(tarjeta.querySelector('h2')?.textContent).toBe('Prueba de colocación');
+    expect(tarjeta.textContent).toContain(`«${lecciones[0].title}»`);
+    expect(tarjeta.textContent).not.toMatch(/\d/);
+    expect(tarjeta.textContent).not.toMatch(/edad|años|niñ|mayor/i);
+    expect(document.querySelector('textarea.capture')).toBeNull();
+
+    boton('Mejor empiezo por las lecciones').click();
+    await tick();
+    await tick();
+    expect(document.querySelector('.drill h2')?.textContent).toBe(lecciones[0].title);
+    expect(guardadas()).toHaveLength(1);
+  });
+
+  it('cada tramo bien escrito abre su lección y pasa al siguiente; al primero que cuesta, se para', async () => {
+    await abrirPrueba();
+    boton('Empezar la prueba').click();
+    await tick();
+    await tick();
+    expect(document.querySelector('.drill h2')?.textContent).toBe(`Prueba de colocación · ${lecciones[0].title}`);
+    expect(document.activeElement).toBe(campo());
+    // Durante la prueba no hay cifras en la barra.
+    expect(document.querySelector('.metricas')).toBeNull();
+
+    await teclear(textoMostrado());
+    await vi.waitFor(() => expect(document.querySelector('.drill h2')?.textContent)
+      .toBe(`Prueba de colocación · ${lecciones[1].title}`));
+    expect(document.querySelector('#dialogo-resultado')).toBeNull();
+    await teclear(textoMostrado());
+    await vi.waitFor(() => expect(document.querySelector('.drill h2')?.textContent)
+      .toBe(`Prueba de colocación · ${lecciones[2].title}`));
+
+    // El tercero, lleno de fallos.
+    await teclear('x'.repeat(textoMostrado().length));
+    await vi.waitFor(() => expect(document.querySelector('.prueba h2')?.textContent).toBe('Prueba terminada'));
+    const fin = document.querySelector('.prueba')!;
+    expect(fin.textContent).toContain('Se han abierto 2 lecciones');
+    expect(fin.textContent).toContain(`«${lecciones[2].title}»`);
+    // Ni qué ha fallado ni cuánto.
+    expect(fin.textContent).not.toMatch(/%|fall|precisi/i);
+
+    // Tres sesiones normales, una por tramo, con el identificador de su lección.
+    expect(guardadas().slice(1).map((s) => s.leccion)).toEqual(lecciones.slice(0, 3).map((l) => l.id));
+
+    boton(`Ir a «${lecciones[2].title}»`).click();
+    await tick();
+    await tick();
+    expect(document.querySelector('.drill h2')?.textContent).toBe(lecciones[2].title);
+    const opcion = (id: string) => document.querySelector<HTMLOptionElement>(`.barra option[value="${id}"]`)!;
+    expect(opcion(lecciones[2].id).disabled).toBe(false);
+    expect(opcion(lecciones[3].id).disabled).toBe(true);
+  });
+
+  it('si el primer tramo ya cuesta, no se abre nada y se sigue por la primera lección', async () => {
+    await abrirPrueba();
+    boton('Empezar la prueba').click();
+    await tick();
+    await tick();
+    await teclear('x'.repeat(textoMostrado().length));
+    await vi.waitFor(() => expect(document.querySelector('.prueba h2')?.textContent).toBe('Prueba terminada'));
+    expect(document.querySelector('.prueba')?.textContent).toContain(`empezar por «${lecciones[0].title}»`);
+  });
+
+  it('con todo el temario abierto la opción no se ofrece', async () => {
+    await abrir({}, lecciones.map((l) => ({ ...SESION, leccion: l.id, pctAcierto: 95 })));
+    expect(document.querySelector('.barra option[value="colocacion"]')).toBeNull();
+  });
+});
